@@ -1,55 +1,155 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/ui/link-button";
-import { createPharmacy } from "@/lib/api";
+import {
+  createPharmacy,
+  getCitiesOrProvinces,
+  getCountries,
+  type CityOrProvinceOption,
+  type CountryOption,
+} from "@/lib/api";
 import { LAST_PHARMACY_KEY } from "@/lib/auth";
 
 type FormState = {
   name: string;
   email: string;
   phoneNumber: string;
+  devise: string;
   countryPhoneCode: string;
+  cityOrProvinceId: string;
   street: string;
   neighborhood: string;
 };
-
-const countryOptions = [
-  { label: "Congo (République démocratique)", value: "+243" },
-  { label: "Congo", value: "+242" },
-  { label: "Angola", value: "+244" },
-  { label: "Burundi", value: "+257" },
-  { label: "Cameroun", value: "+237" },
-  { label: "Centrafrique", value: "+236" },
-  { label: "Côte d'Ivoire", value: "+225" },
-  { label: "France", value: "+33" },
-  { label: "Gabon", value: "+241" },
-  { label: "Rwanda", value: "+250" },
-  { label: "Sénégal", value: "+221" },
-  { label: "Tanzanie", value: "+255" },
-  { label: "Ouganda", value: "+256" },
-  { label: "Zambie", value: "+260" },
-];
 
 const initialFormState: FormState = {
   name: "",
   email: "",
   phoneNumber: "",
-  countryPhoneCode: "+243",
+  devise: "USD",
+  countryPhoneCode: "",
+  cityOrProvinceId: "",
   street: "",
   neighborhood: "",
 };
 
+const currencyOptions = [
+  { label: "USD", value: "USD" },
+  { label: "CDF", value: "CDF" },
+];
+
 export default function CreatePharmacyPage() {
   const [form, setForm] = useState<FormState>(initialFormState);
+  const [countries, setCountries] = useState<CountryOption[]>([]);
+  const [citiesOrProvinces, setCitiesOrProvinces] = useState<CityOrProvinceOption[]>([]);
+  const [isLoadingCountries, setIsLoadingCountries] = useState(true);
+  const [isLoadingCities, setIsLoadingCities] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
   function updateField(field: keyof FormState, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
   }
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadCountries() {
+      setIsLoadingCountries(true);
+      setErrorMessage("");
+
+      try {
+        const rows = await getCountries();
+        if (!isMounted) {
+          return;
+        }
+
+        setCountries(rows);
+        setForm((current) => {
+          if (current.countryPhoneCode || !rows.length) {
+            return current;
+          }
+
+          const defaultCountry = rows.find((country) => country.phoneCode === "+243") || rows[0];
+          return { ...current, countryPhoneCode: defaultCountry.phoneCode };
+        });
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        const message = error instanceof Error ? error.message : "";
+        setErrorMessage(message || "Impossible de charger les pays.");
+      } finally {
+        if (isMounted) {
+          setIsLoadingCountries(false);
+        }
+      }
+    }
+
+    loadCountries();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadCitiesOrProvinces() {
+      if (!form.countryPhoneCode) {
+        setCitiesOrProvinces([]);
+        setForm((current) => ({ ...current, cityOrProvinceId: "" }));
+        return;
+      }
+
+      setIsLoadingCities(true);
+
+      try {
+        const rows = await getCitiesOrProvinces(form.countryPhoneCode);
+        if (!isMounted) {
+          return;
+        }
+
+        setCitiesOrProvinces(rows);
+        setForm((current) => {
+          const selectedCityExists = rows.some(
+            (cityOrProvince) => String(cityOrProvince.id) === current.cityOrProvinceId,
+          );
+          if (selectedCityExists) {
+            return current;
+          }
+
+          return {
+            ...current,
+            cityOrProvinceId: rows.length ? String(rows[0].id) : "",
+          };
+        });
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setCitiesOrProvinces([]);
+        setForm((current) => ({ ...current, cityOrProvinceId: "" }));
+        const message = error instanceof Error ? error.message : "";
+        setErrorMessage(message || "Impossible de charger les villes ou provinces.");
+      } finally {
+        if (isMounted) {
+          setIsLoadingCities(false);
+        }
+      }
+    }
+
+    loadCitiesOrProvinces();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [form.countryPhoneCode]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -61,7 +161,9 @@ export default function CreatePharmacyPage() {
         name: form.name.trim(),
         email: form.email.trim(),
         phoneNumber: form.phoneNumber.trim(),
+        devise: form.devise,
         country: form.countryPhoneCode,
+        cityOrProvince: form.cityOrProvinceId,
         street: form.street.trim(),
         neighborhood: form.neighborhood.trim(),
       });
@@ -139,6 +241,15 @@ export default function CreatePharmacyPage() {
                 />
               </div>
 
+              <SelectField
+                id="devise"
+                label="Devise"
+                value={form.devise}
+                onChange={(value) => updateField("devise", value)}
+                options={currencyOptions}
+                required
+              />
+
               <div className="border-t border-app-border pt-5">
                 <h2 className="text-lg font-bold text-app-text">Adresse</h2>
                 <div className="mt-4 grid gap-5">
@@ -147,9 +258,19 @@ export default function CreatePharmacyPage() {
                       id="country"
                       label="Pays"
                       value={form.countryPhoneCode}
-                      onChange={(value) => updateField("countryPhoneCode", value)}
-                      options={countryOptions}
+                      onChange={(value) => {
+                        setForm((current) => ({
+                          ...current,
+                          countryPhoneCode: value,
+                          cityOrProvinceId: "",
+                        }));
+                      }}
+                      options={countries.map((country) => ({
+                        label: country.name + " (" + country.phoneCode + ")",
+                        value: country.phoneCode,
+                      }))}
                       required
+                      disabled={isLoadingCountries || !countries.length}
                     />
                     <TextField
                       id="street"
@@ -160,6 +281,18 @@ export default function CreatePharmacyPage() {
                       placeholder="Ex. Avenue du Commerce 12"
                     />
                   </div>
+                  <SelectField
+                    id="cityOrProvince"
+                    label="Ville ou province"
+                    value={form.cityOrProvinceId}
+                    onChange={(value) => updateField("cityOrProvinceId", value)}
+                    options={citiesOrProvinces.map((cityOrProvince) => ({
+                      label: cityOrProvince.name,
+                      value: String(cityOrProvince.id),
+                    }))}
+                    required
+                    disabled={isLoadingCities || !citiesOrProvinces.length}
+                  />
                   <TextField
                     id="neighborhood"
                     label="Quartier ou commune"
@@ -181,6 +314,7 @@ export default function CreatePharmacyPage() {
                   isSubmitting ||
                   !form.name.trim() ||
                   !form.countryPhoneCode.trim() ||
+                  !form.cityOrProvinceId.trim() ||
                   !form.street.trim()
                 }
               >
@@ -245,6 +379,7 @@ function SelectField({
   onChange,
   options,
   required = false,
+  disabled = false,
 }: {
   id: string;
   label: string;
@@ -252,6 +387,7 @@ function SelectField({
   onChange: (value: string) => void;
   options: { label: string; value: string }[];
   required?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <label htmlFor={id} className="block">
@@ -264,8 +400,14 @@ function SelectField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         required={required}
-        className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 py-2 text-sm text-app-text outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
+        disabled={disabled}
+        className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 py-2 text-sm text-app-text outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100 disabled:cursor-not-allowed disabled:bg-app-border/30 disabled:text-app-muted"
       >
+        {!options.length && (
+          <option value="">
+            {disabled ? "Chargement..." : "Aucune option disponible"}
+          </option>
+        )}
         {options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}

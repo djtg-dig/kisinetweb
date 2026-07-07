@@ -5,6 +5,7 @@ export type PharmacySummary = {
   id: string;
   reference?: string;
   name: string;
+  devise?: string;
   role?: string;
   status?: string;
   email?: string;
@@ -19,9 +20,26 @@ export type CreatePharmacyInput = {
   name: string;
   email?: string;
   phoneNumber?: string;
+  devise?: string;
   country: string;
+  cityOrProvince?: string;
   street?: string;
   neighborhood?: string;
+};
+
+export type CountryOption = {
+  id: number;
+  name: string;
+  iso2: string;
+  phoneCode: string;
+};
+
+export type CityOrProvinceOption = {
+  id: number;
+  country: number;
+  countryPhoneCode: string;
+  name: string;
+  code?: string;
 };
 
 type UnknownRecord = Record<string, unknown>;
@@ -49,6 +67,7 @@ function normalizePharmacy(item: UnknownRecord): PharmacySummary {
     id: String(id),
     reference: getText(item.reference) ?? String(id),
     name: String(name),
+    devise: getText(item.devise) ?? "USD",
     role: getText(item.role),
     status: getText(item.status) ?? getText(subscription?.status),
     email: getText(item.email),
@@ -102,6 +121,67 @@ export async function getUserPharmacies(): Promise<PharmacySummary[]> {
     .filter((item: unknown): item is UnknownRecord => Boolean(item) && typeof item === "object")
     .map(normalizePharmacy)
     .filter((pharmacy: PharmacySummary) => Boolean(pharmacy.id));
+}
+
+async function fetchApiJson<T>(path: string, fallbackMessage: string): Promise<T> {
+  const accessToken = getAccessToken();
+  if (!accessToken) {
+    throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
+  }
+
+  const response = await fetch(apiBaseUrl.replace(/\/$/, "") + path, {
+    cache: "no-store",
+    headers: {
+      Authorization: "Bearer " + accessToken,
+      Accept: "application/json",
+    },
+  });
+
+  const responseText = await response.text();
+  const data = parseJsonResponse(responseText);
+
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(data, fallbackMessage));
+  }
+
+  return data as T;
+}
+
+export async function getCountries(): Promise<CountryOption[]> {
+  const data = await fetchApiJson<unknown>("/api/pharmacies/countries/", "Impossible de charger les pays.");
+  const rows = Array.isArray(data) ? data : [];
+
+  return rows
+    .filter((item: unknown): item is UnknownRecord => Boolean(item) && typeof item === "object")
+    .map((item) => ({
+      id: Number(item.id),
+      name: String(item.name || ""),
+      iso2: String(item.iso2 || ""),
+      phoneCode: String(item.phone_code || ""),
+    }))
+    .filter((country) => country.id && country.name && country.phoneCode);
+}
+
+export async function getCitiesOrProvinces(country: string): Promise<CityOrProvinceOption[]> {
+  const params = new URLSearchParams();
+  if (country) {
+    params.set("country", country);
+  }
+
+  const path = "/api/pharmacies/cities-or-provinces/" + (params.size ? "?" + params.toString() : "");
+  const data = await fetchApiJson<unknown>(path, "Impossible de charger les villes ou provinces.");
+  const rows = Array.isArray(data) ? data : [];
+
+  return rows
+    .filter((item: unknown): item is UnknownRecord => Boolean(item) && typeof item === "object")
+    .map((item) => ({
+      id: Number(item.id),
+      country: Number(item.country),
+      countryPhoneCode: String(item.country_phone_code || ""),
+      name: String(item.name || ""),
+      code: getText(item.code),
+    }))
+    .filter((city) => city.id && city.name);
 }
 
 function getApiErrorMessages(data: unknown, fallback: string, path = ""): string[] {
@@ -169,6 +249,7 @@ export async function createPharmacy(input: CreatePharmacyInput): Promise<Pharma
 
   const adresse = {
     country: input.country,
+    city_or_province: input.cityOrProvince || undefined,
     street: input.street,
     neighborhood: input.neighborhood,
   };
@@ -177,6 +258,7 @@ export async function createPharmacy(input: CreatePharmacyInput): Promise<Pharma
     name: input.name,
     email: input.email || undefined,
     phone_number: input.phoneNumber || undefined,
+    devise: input.devise || "USD",
     adresse,
   };
 
