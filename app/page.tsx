@@ -130,7 +130,7 @@ export default function HomePage() {
 
         <section
           id="fonctionnalites"
-          className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:px-8"
+          className="mx-auto max-w-6xl scroll-mt-24 px-4 py-16 sm:px-6 lg:px-8"
         >
           <SectionHeading
             eyebrow="Fonctionnalités"
@@ -190,7 +190,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section id="tarifs" className="bg-app-surface">
+        <section id="tarifs" className="scroll-mt-24 bg-app-surface">
           <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:px-8">
             <SectionHeading
               eyebrow="Tarifs"
@@ -228,7 +228,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section id="faq" className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:px-8">
+        <section id="faq" className="mx-auto max-w-6xl scroll-mt-24 px-4 py-16 sm:px-6 lg:px-8">
           <SectionHeading
             eyebrow="FAQ"
             title="Questions fréquentes"

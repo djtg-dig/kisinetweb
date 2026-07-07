@@ -17,7 +17,6 @@ export default function SelectPharmacyPage() {
   useEffect(() => {
     async function loadPharmacies() {
       try {
-        // Le callback OAuth arrive ici avec #access=...&refresh=...
         saveTokensFromUrlHash();
 
         const userPharmacies = await getUserPharmacies();
@@ -34,7 +33,6 @@ export default function SelectPharmacyPage() {
   }, []);
 
   function openPharmacy(pharmacyId: string) {
-    // Cette valeur servira a la prochaine connexion.
     localStorage.setItem(LAST_PHARMACY_KEY, pharmacyId);
     setState("redirecting");
     window.location.href = "/app/pharmacies/" + pharmacyId + "/dashboard";
@@ -42,70 +40,110 @@ export default function SelectPharmacyPage() {
 
   return (
     <MainLayout>
-      <section className="mx-auto flex min-h-[calc(100vh-73px)] max-w-6xl items-center px-4 py-10 sm:px-6 lg:px-8">
-        <div className="w-full">
-          {state === "loading" && <LoadingState />}
-          {state === "redirecting" && <RedirectingState />}
-          {state === "error" && <ErrorState message={errorMessage} />}
-          {state === "empty" && <EmptyState />}
-          {state === "ready" && (
-            <ReadyState pharmacies={pharmacies} onOpenPharmacy={openPharmacy} />
-          )}
+      <section className="border-b border-app-border bg-app-surface">
+        <div className="mx-auto flex max-w-6xl flex-col gap-5 px-4 py-8 sm:px-6 lg:px-8">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-primary-700">Espace de travail</p>
+              <h1 className="mt-2 text-3xl font-bold text-app-text">Mes pharmacies</h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-app-muted">
+                Sélectionnez une pharmacie associée à votre compte pour accéder à son
+                tableau de bord.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <LinkButton href="/app/pharmacies/create">Créer une pharmacie</LinkButton>
+              <LinkButton href="/app/pharmacies/join" variant="secondary">
+                Rejoindre une pharmacie
+              </LinkButton>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <SummaryTile label="Pharmacies accessibles" value={String(pharmacies.length)} />
+            <SummaryTile label="Session" value={state === "error" ? "À vérifier" : "Connectée"} />
+          </div>
         </div>
+      </section>
+
+      <section className="mx-auto min-h-[calc(100vh-235px)] max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+        {state === "loading" && <LoadingState />}
+        {state === "redirecting" && <RedirectingState />}
+        {state === "error" && <ErrorState message={errorMessage} />}
+        {state === "empty" && <EmptyState />}
+        {state === "ready" && (
+          <PharmacyList pharmacies={pharmacies} onOpenPharmacy={openPharmacy} />
+        )}
       </section>
     </MainLayout>
   );
 }
 
+function SummaryTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-app-border bg-app-card px-4 py-3">
+      <p className="text-xs font-semibold text-app-muted">{label}</p>
+      <p className="mt-1 truncate text-sm font-bold text-app-text">{value}</p>
+    </div>
+  );
+}
+
 function LoadingState() {
   return (
-    <CenteredCard>
+    <Panel>
       <p className="text-sm font-semibold text-primary-700">Chargement</p>
-      <h1 className="mt-3 text-2xl font-bold text-app-text">Préparation de votre espace</h1>
-      <p className="mt-3 text-sm leading-6 text-app-muted">
-        Nous récupérons les pharmacies accessibles à votre compte.
+      <h2 className="mt-2 text-xl font-bold text-app-text">Récupération des pharmacies</h2>
+      <p className="mt-2 text-sm leading-6 text-app-muted">
+        Kisinet interroge le backend pour afficher les pharmacies liées à votre session.
       </p>
-    </CenteredCard>
+    </Panel>
   );
 }
 
 function RedirectingState() {
   return (
-    <CenteredCard>
+    <Panel>
       <p className="text-sm font-semibold text-success-700">Redirection en cours</p>
-      <h1 className="mt-3 text-2xl font-bold text-app-text">Ouverture de votre pharmacie</h1>
-      <p className="mt-3 text-sm leading-6 text-app-muted">
-        Votre dernière pharmacie utilisée est encore accessible.
+      <h2 className="mt-2 text-xl font-bold text-app-text">Ouverture du tableau de bord</h2>
+      <p className="mt-2 text-sm leading-6 text-app-muted">
+        La pharmacie sélectionnée est enregistrée comme dernière pharmacie utilisée.
       </p>
-    </CenteredCard>
+    </Panel>
   );
 }
 
 function ErrorState({ message }: { message: string }) {
   return (
-    <CenteredCard>
+    <Panel tone="error">
       <p className="text-sm font-semibold text-red-600">Erreur de chargement</p>
-      <h1 className="mt-3 text-2xl font-bold text-app-text">Impossible de charger vos pharmacies</h1>
-      <p className="mt-3 text-sm leading-6 text-app-muted">{message}</p>
-      <LinkButton href="/" className="mt-6">
+      <h2 className="mt-2 text-xl font-bold text-app-text">Impossible de charger vos pharmacies</h2>
+      <p className="mt-2 text-sm leading-6 text-app-muted">{message}</p>
+      <LinkButton href="/" variant="secondary" className="mt-5">
         Retour à l’accueil
       </LinkButton>
-    </CenteredCard>
+    </Panel>
   );
 }
 
 function EmptyState() {
   return (
-    <CenteredCard>
-      <h1 className="text-3xl font-bold text-app-text">Bienvenue sur Kisinet</h1>
-      <p className="mt-3 text-base leading-7 text-app-muted">
-        Vous n’avez aucune pharmacie.
+    <Panel>
+      <p className="text-sm font-semibold text-primary-700">Aucune pharmacie</p>
+      <h2 className="mt-2 text-xl font-bold text-app-text">Aucune pharmacie trouvée</h2>
+      <p className="mt-2 text-sm leading-6 text-app-muted">
+        Votre compte n’est associé à aucune pharmacie pour le moment.
       </p>
-    </CenteredCard>
+      <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+        <LinkButton href="/app/pharmacies/create">Créer une pharmacie</LinkButton>
+        <LinkButton href="/app/pharmacies/join" variant="secondary">
+          Rejoindre une pharmacie
+        </LinkButton>
+      </div>
+    </Panel>
   );
 }
 
-function ReadyState({
+function PharmacyList({
   pharmacies,
   onOpenPharmacy,
 }: {
@@ -113,58 +151,106 @@ function ReadyState({
   onOpenPharmacy: (pharmacyId: string) => void;
 }) {
   return (
-    <div>
-      <div className="max-w-2xl">
-        <p className="text-sm font-semibold uppercase tracking-wide text-primary-700">
-          Espace de travail
-        </p>
-        <h1 className="mt-3 text-3xl font-bold text-app-text">Choisissez une pharmacie</h1>
-        <p className="mt-3 text-sm leading-6 text-app-muted sm:text-base">
-          Sélectionnez l’espace de travail que vous voulez utiliser.
-        </p>
-      </div>
-
-      <div className="mt-8 grid gap-4 md:grid-cols-2">
-        {pharmacies.map((pharmacy) => (
-          <article
-            key={pharmacy.id}
-            className="rounded-lg border border-app-border bg-app-card p-5 shadow-sm"
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-bold text-app-text">{pharmacy.name}</h2>
-                <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
-                  {pharmacy.role && (
-                    <span className="rounded-full bg-primary-50 px-3 py-1 text-primary-700 ring-1 ring-primary-100">
-                      {pharmacy.role}
-                    </span>
-                  )}
-                  {pharmacy.status && (
-                    <span className="rounded-full bg-success-50 px-3 py-1 text-success-700 ring-1 ring-success-100">
-                      {pharmacy.status}
-                    </span>
-                  )}
-                </div>
+    <div className="grid gap-4 md:grid-cols-2">
+      {pharmacies.map((pharmacy) => (
+        <article
+          key={pharmacy.id}
+          className="rounded-lg border border-app-border bg-app-card p-5 shadow-sm transition hover:border-primary-200 hover:shadow-soft"
+        >
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="truncate text-lg font-bold text-app-text">{pharmacy.name}</h2>
+                {pharmacy.subscriptionStatus && (
+                  <StatusBadge status={pharmacy.subscriptionStatus} />
+                )}
               </div>
-              <Button onClick={() => onOpenPharmacy(pharmacy.id)}>Ouvrir</Button>
+              {pharmacy.reference && (
+                <p className="mt-1 text-xs font-semibold text-app-muted">
+                  Référence {pharmacy.reference}
+                </p>
+              )}
             </div>
-          </article>
-        ))}
-      </div>
+            <Button onClick={() => onOpenPharmacy(pharmacy.id)} className="shrink-0">
+              Ouvrir
+            </Button>
+          </div>
 
-      <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-        <LinkButton href="/app/pharmacies/create">Créer une pharmacie</LinkButton>
-        <LinkButton href="/app/pharmacies/join" variant="secondary">
-          Rejoindre une pharmacie
-        </LinkButton>
-      </div>
+          <div className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
+            <InfoRow label="Abonnement" value={pharmacy.planName || "Non renseigné"} />
+            <InfoRow label="Fin d’essai" value={formatDate(pharmacy.trialEndsAt)} />
+            <InfoRow label="Email" value={pharmacy.email || "Non renseigné"} />
+            <InfoRow label="Téléphone" value={pharmacy.phoneNumber || "Non renseigné"} />
+          </div>
+
+          <div className="mt-4 border-t border-app-border pt-4">
+            <p className="text-xs font-semibold text-app-muted">Adresse</p>
+            <p className="mt-1 text-sm text-app-text">
+              {pharmacy.addressLine || "Adresse non renseignée"}
+            </p>
+          </div>
+        </article>
+      ))}
     </div>
   );
 }
 
-function CenteredCard({ children }: { children: React.ReactNode }) {
+function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="mx-auto max-w-xl rounded-lg border border-app-border bg-app-card px-6 py-10 text-center shadow-soft sm:px-10">
+    <div>
+      <p className="text-xs font-semibold text-app-muted">{label}</p>
+      <p className="mt-1 truncate font-medium text-app-text">{value}</p>
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const normalizedStatus = status.toLowerCase();
+  const isPositive = normalizedStatus === "active" || normalizedStatus === "trialing";
+
+  return (
+    <span
+      className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${
+        isPositive
+          ? "bg-success-50 text-success-700 ring-success-100"
+          : "bg-primary-50 text-primary-700 ring-primary-100"
+      }`}
+    >
+      {status}
+    </span>
+  );
+}
+
+function formatDate(value?: string) {
+  if (!value) {
+    return "Non renseignée";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleDateString("fr-FR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function Panel({
+  children,
+  tone = "default",
+}: {
+  children: React.ReactNode;
+  tone?: "default" | "error";
+}) {
+  return (
+    <div
+      className={`max-w-2xl rounded-lg border bg-app-card p-6 shadow-sm ${
+        tone === "error" ? "border-red-200" : "border-app-border"
+      }`}
+    >
       {children}
     </div>
   );

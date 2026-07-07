@@ -12,10 +12,10 @@ type PublicLayoutProps = {
 };
 
 const navLinks = [
-  { label: "Fonctionnalités", href: "#fonctionnalites" },
-  { label: "Tarifs", href: "#tarifs" },
-  { label: "FAQ", href: "#faq" },
-  { label: "Contact", href: "#contact" },
+  { label: "Fonctionnalités", href: "/#fonctionnalites" },
+  { label: "Tarifs", href: "/#tarifs" },
+  { label: "FAQ", href: "/#faq" },
+  { label: "Contact", href: "/#contact" },
 ];
 
 type UserMenuState = {
@@ -82,10 +82,10 @@ export function PublicLayout({ children, activePharmacy = null }: PublicLayoutPr
   }, []);
 
   return (
-    <div className="min-h-screen bg-app-background text-app-text">
-      <header className="sticky top-0 z-20 border-b border-app-border bg-app-surface/95 backdrop-blur">
+    <div className="min-h-screen bg-app-background pt-[77px] text-app-text">
+      <header className="fixed inset-x-0 top-0 z-20 border-b border-app-border bg-app-surface/95 backdrop-blur">
         <nav className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
-          <a href="#" className="flex items-center gap-3">
+          <a href="/" className="flex items-center gap-3">
             <span className="flex h-10 w-10 items-center justify-center rounded-md bg-primary-600 text-lg font-bold text-white">
               K
             </span>
@@ -120,7 +120,7 @@ export function PublicLayout({ children, activePharmacy = null }: PublicLayoutPr
 
       {children}
 
-      <footer id="contact" className="border-t border-app-border bg-app-surface">
+      <footer id="contact" className="scroll-mt-24 border-t border-app-border bg-app-surface">
         <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr] lg:px-8">
           <div>
             <p className="text-lg font-bold text-app-text">Kisinet</p>
@@ -132,10 +132,10 @@ export function PublicLayout({ children, activePharmacy = null }: PublicLayoutPr
           <FooterLinks
             title="Navigation"
             links={[
-              { label: "Fonctionnalités", href: "#fonctionnalites" },
-              { label: "Tarifs", href: "#tarifs" },
-              { label: "FAQ", href: "#faq" },
-              { label: "Contact", href: "#contact" },
+              { label: "Fonctionnalités", href: "/#fonctionnalites" },
+              { label: "Tarifs", href: "/#tarifs" },
+              { label: "FAQ", href: "/#faq" },
+              { label: "Contact", href: "/#contact" },
             ]}
           />
           <FooterLinks

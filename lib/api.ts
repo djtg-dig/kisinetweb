@@ -3,22 +3,51 @@ import { apiBaseUrl } from "@/lib/carri-account";
 
 export type PharmacySummary = {
   id: string;
+  reference?: string;
   name: string;
   role?: string;
   status?: string;
+  email?: string;
+  phoneNumber?: string;
+  addressLine?: string;
+  planName?: string;
+  subscriptionStatus?: string;
+  trialEndsAt?: string;
 };
 
 type UnknownRecord = Record<string, unknown>;
 
+function getText(value: unknown) {
+  return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function getRecord(value: unknown): UnknownRecord | null {
+  return value && typeof value === "object" ? (value as UnknownRecord) : null;
+}
+
 function normalizePharmacy(item: UnknownRecord): PharmacySummary {
   const id = item.reference ?? item.id ?? item.pk;
   const name = item.name ?? item.title ?? "Pharmacie sans nom";
+  const address = getRecord(item.adresse);
+  const subscription = getRecord(item.subscription);
+  const addressParts = [
+    getText(address?.street),
+    getText(address?.neighborhood),
+    getText(address?.formatted_address),
+  ].filter(Boolean);
 
   return {
     id: String(id),
+    reference: getText(item.reference) ?? String(id),
     name: String(name),
-    role: typeof item.role === "string" ? item.role : undefined,
-    status: typeof item.status === "string" ? item.status : undefined,
+    role: getText(item.role),
+    status: getText(item.status) ?? getText(subscription?.status),
+    email: getText(item.email),
+    phoneNumber: getText(item.phone_number),
+    addressLine: addressParts.join(", ") || undefined,
+    planName: getText(subscription?.plan_name) ?? getText(subscription?.plan_code),
+    subscriptionStatus: getText(subscription?.status),
+    trialEndsAt: getText(subscription?.trial_ends_at),
   };
 }
 
@@ -52,7 +81,12 @@ export async function getUserPharmacies(): Promise<PharmacySummary[]> {
     throw new Error(message);
   }
 
-  const data = await response.json();
+  const responseText = await response.text();
+  if (!responseText.trim()) {
+    return [];
+  }
+
+  const data = JSON.parse(responseText);
   const rows = Array.isArray(data) ? data : Array.isArray(data.results) ? data.results : [];
 
   return rows
