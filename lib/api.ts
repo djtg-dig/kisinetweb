@@ -15,6 +15,15 @@ export type PharmacySummary = {
   trialEndsAt?: string;
 };
 
+export type CreatePharmacyInput = {
+  name: string;
+  email?: string;
+  phoneNumber?: string;
+  country: string;
+  street?: string;
+  neighborhood?: string;
+};
+
 type UnknownRecord = Record<string, unknown>;
 
 function getText(value: unknown) {
@@ -93,4 +102,105 @@ export async function getUserPharmacies(): Promise<PharmacySummary[]> {
     .filter((item: unknown): item is UnknownRecord => Boolean(item) && typeof item === "object")
     .map(normalizePharmacy)
     .filter((pharmacy: PharmacySummary) => Boolean(pharmacy.id));
+}
+
+function getApiErrorMessages(data: unknown, fallback: string, path = ""): string[] {
+  const record = getRecord(data);
+  if (!record) {
+    if (Array.isArray(data)) {
+      return data.flatMap((item) => getApiErrorMessages(item, fallback, path));
+    }
+
+    if (typeof data === "string") {
+      return [path ? path + " : " + data : data];
+    }
+
+    return [fallback];
+  }
+
+  if (typeof record.detail === "string") {
+    return [record.detail];
+  }
+
+  const messages = Object.entries(record)
+    .flatMap(([field, value]) => {
+      const fieldPath = path ? path + "." + field : field;
+
+      if (Array.isArray(value)) {
+        return value.flatMap((item) => getApiErrorMessages(item, fallback, fieldPath));
+      }
+
+      if (typeof value === "string") {
+        return [fieldPath + " : " + value];
+      }
+
+      if (value && typeof value === "object") {
+        return getApiErrorMessages(value, fallback, fieldPath);
+      }
+
+      return [];
+    })
+    .filter(Boolean);
+
+  return messages.length ? messages : [fallback];
+}
+
+function getApiErrorMessage(data: unknown, fallback: string) {
+  return getApiErrorMessages(data, fallback).join("\n");
+}
+
+function parseJsonResponse(responseText: string) {
+  if (!responseText.trim()) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(responseText);
+  } catch {
+    return null;
+  }
+}
+
+export async function createPharmacy(input: CreatePharmacyInput): Promise<PharmacySummary> {
+  const accessToken = getAccessToken();
+  if (!accessToken) {
+    throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
+  }
+
+  const adresse = {
+    country: input.country,
+    street: input.street,
+    neighborhood: input.neighborhood,
+  };
+
+  const payload = {
+    name: input.name,
+    email: input.email || undefined,
+    phone_number: input.phoneNumber || undefined,
+    adresse,
+  };
+
+  const response = await fetch(apiBaseUrl.replace(/\/$/, "") + "/api/pharmacies/", {
+    method: "POST",
+    cache: "no-store",
+    headers: {
+      Authorization: "Bearer " + accessToken,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const responseText = await response.text();
+  const data = parseJsonResponse(responseText);
+
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(data, "Impossible de créer cette pharmacie."));
+  }
+
+  if (!data || typeof data !== "object") {
+    throw new Error("La pharmacie a été créée, mais la réponse du serveur est invalide.");
+  }
+
+  return normalizePharmacy(data as UnknownRecord);
 }
