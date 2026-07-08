@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { LinkButton } from "@/components/ui/link-button";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
+import { SiteFooter } from "@/components/layout/site-footer";
 import {
   getPharmacyProducts,
   getPharmacyPermissions,
@@ -93,7 +94,8 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
   const pageCount = Math.max(1, Math.ceil(totalProducts / 10));
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <>
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <header className="grid gap-5 border-b border-app-border pb-6 lg:grid-cols-[1fr_auto] lg:items-end">
         <div>
           <p className="text-sm font-semibold text-primary-700">Produits</p>
@@ -160,6 +162,9 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
         )}
       </section>
     </main>
+
+    <SiteFooter />
+  </>
   );
 }
 
@@ -356,10 +361,7 @@ function ProductsList({
             <div className="min-w-0">
               <h2 className="truncate font-bold text-app-text">{product.name}</h2>
               <p className="mt-1 text-xs font-semibold text-app-muted">
-                Référence {product.reference}
-              </p>
-              <p className="mt-2 line-clamp-2 text-sm leading-6 text-app-muted">
-                {formatValue(product.description)}
+                ID : {product.reference}
               </p>
             </div>
 

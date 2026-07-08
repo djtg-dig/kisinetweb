@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { LinkButton } from "@/components/ui/link-button";
+import { SiteFooter } from "@/components/layout/site-footer";
 import {
   createProduct,
   initialProductFormValues,
@@ -103,7 +104,8 @@ export default function CreateProductPage({ params }: CreatePageProps) {
   }
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
+    <>
+      <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
       <header className="grid gap-5 border-b border-app-border pb-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -238,6 +240,9 @@ export default function CreateProductPage({ params }: CreatePageProps) {
         </form>
       </section>
     </main>
+
+    <SiteFooter />
+  </>
   );
 }
 

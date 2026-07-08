@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { LinkButton } from "@/components/ui/link-button";
+import { SiteFooter } from "@/components/layout/site-footer";
 import { getUserPharmacies, type PharmacySummary } from "@/lib/api";
 import { carriAccountLoginUrl } from "@/lib/carri-account";
 import { getAccessToken, getActivePharmacyId, logout, saveTokensFromUrlHash } from "@/lib/auth";
@@ -30,36 +31,7 @@ export function PublicLayout({ children, activePharmacy = null }: PublicLayoutPr
 
       {children}
 
-      <footer id="contact" className="scroll-mt-24 border-t border-app-border bg-app-surface">
-        <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr] lg:px-8">
-          <div>
-            <p className="text-lg font-bold text-app-text">Kisinet</p>
-            <p className="mt-3 max-w-md text-sm leading-6 text-app-muted">
-              Plateforme SaaS pour organiser les pharmacies, les stocks, les
-              ventes, les factures, les rapports et les équipes.
-            </p>
-          </div>
-          <FooterLinks
-            title="Navigation"
-            links={[
-              { label: "Fonctionnalités", href: "/#fonctionnalites" },
-              { label: "Tarifs", href: "/#tarifs" },
-              { label: "FAQ", href: "/#faq" },
-              { label: "Contact", href: "/#contact" },
-            ]}
-          />
-          <FooterLinks
-            title="Légal"
-            links={[
-              { label: "Confidentialité", href: "#" },
-              { label: "Conditions d'utilisation", href: "#" },
-            ]}
-          />
-        </div>
-        <div className="border-t border-app-border px-4 py-5 text-center text-sm text-app-muted">
-          © 2026 Kisinet. Tous droits réservés.
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }
