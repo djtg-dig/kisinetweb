@@ -25,7 +25,7 @@ export function SiteFooter() {
         <div>
           <p className="text-lg font-bold text-app-text">Kisinet</p>
           <p className="mt-3 max-w-md text-sm leading-6 text-app-muted">
-            Plateforme SaaS pour organiser les pharmacies, les stocks, les
+            Plateforme Numerique pour organiser les pharmacies, les stocks, les
             ventes, les factures, les rapports et les équipes.
           </p>
         </div>

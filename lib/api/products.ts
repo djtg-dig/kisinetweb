@@ -32,6 +32,8 @@ export type Product = {
   sale_price: number;
   purchase_price?: number | null;
   current_stock: number;
+  is_deleted?: boolean;
+  deleted_at?: string | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -166,6 +168,41 @@ export async function createProduct(
 
   if (!data || typeof data !== "object") {
     throw new Error("Le produit a été créé, mais la réponse du serveur est invalide.");
+  }
+
+  return data as Product;
+}
+
+export async function getProductDetail(
+  pharmacyId: string,
+  reference: string,
+): Promise<Product> {
+  const accessToken = getAccessToken();
+  if (!accessToken) {
+    throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
+  }
+
+  const params = new URLSearchParams({ pharmacy_reference: pharmacyId });
+  const url =
+    apiBaseUrl.replace(/\/$/, "") + "/api/products/" + reference + "/?" + params.toString();
+
+  const response = await fetch(url, {
+    cache: "no-store",
+    headers: {
+      Authorization: "Bearer " + accessToken,
+      Accept: "application/json",
+    },
+  });
+
+  const responseText = await response.text();
+  const data = parseJsonResponse(responseText);
+
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(data, "Impossible de charger ce produit."));
+  }
+
+  if (!data || typeof data !== "object") {
+    throw new Error("La réponse du serveur est invalide.");
   }
 
   return data as Product;
