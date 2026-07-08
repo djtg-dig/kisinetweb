@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { LinkButton } from "@/components/ui/link-button";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { SiteFooter } from "@/components/layout/site-footer";
 import {
   getPharmacyProducts,
@@ -14,6 +15,7 @@ import {
   type ProductFilters,
   type ProductSummary,
 } from "@/lib/api";
+import { deleteProduct } from "@/lib/api/products";
 
 type ProductsPageProps = {
   params: Promise<{ pharmacyId: string }>;
@@ -45,6 +47,33 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
   });
   const [state, setState] = useState<PageState>("loading");
   const [errorMessage, setErrorMessage] = useState("");
+  const [deletingReference, setDeletingReference] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
+  const [pendingDelete, setPendingDelete] = useState<ProductSummary | null>(null);
+
+  function handleDeleteProduct(product: ProductSummary) {
+    setPendingDelete(product);
+  }
+
+  async function confirmDeleteProduct() {
+    if (!pendingDelete) {
+      return;
+    }
+
+    setDeletingReference(pendingDelete.reference);
+    setErrorMessage("");
+
+    try {
+      await deleteProduct(pharmacyId, pendingDelete.reference);
+      setReloadKey((key) => key + 1);
+      setPendingDelete(null);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Impossible de supprimer ce produit.");
+      setPendingDelete(null);
+    } finally {
+      setDeletingReference("");
+    }
+  }
 
   useEffect(() => {
     async function readParams() {
@@ -85,7 +114,7 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
     }
 
     loadProducts();
-  }, [pharmacyId, filters]);
+  }, [pharmacyId, filters, reloadKey]);
 
   const totalStock = useMemo(
     () => products.reduce((total, product) => total + product.currentStock, 0),
@@ -141,12 +170,19 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
             pharmacyId={pharmacyId}
           />
         )}
+        {state === "ready" && errorMessage && (
+          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4">
+            <p className="text-sm font-semibold text-red-600">{errorMessage}</p>
+          </div>
+        )}
         {state === "ready" && (
           <>
             <ProductsList
               permissions={permissions}
               products={products}
               pharmacyId={pharmacyId}
+              onDelete={handleDeleteProduct}
+              deletingReference={deletingReference}
             />
             <PaginationControls
               currentPage={currentPage}
@@ -161,6 +197,20 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
           </>
         )}
       </section>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="Supprimer le produit"
+        message={
+          pendingDelete
+            ? `Voulez-vous vraiment supprimer le produit « ${pendingDelete.name} » ? Ce produit sera déplacé dans la corbeille.`
+            : ""
+        }
+        confirmLabel="Supprimer"
+        loading={deletingReference !== ""}
+        onConfirm={confirmDeleteProduct}
+        onCancel={() => setPendingDelete(null)}
+      />
     </main>
 
     <SiteFooter />
@@ -336,10 +386,14 @@ function ProductsList({
   permissions,
   products,
   pharmacyId,
+  onDelete,
+  deletingReference,
 }: {
   permissions: PharmacyPermissions;
   products: ProductSummary[];
   pharmacyId: string;
+  onDelete: (product: ProductSummary) => void;
+  deletingReference: string;
 }) {
   return (
     <div className="overflow-hidden rounded-lg border border-app-border bg-app-card shadow-sm">
@@ -382,6 +436,8 @@ function ProductsList({
               permissions={permissions}
               pharmacyId={pharmacyId}
               product={product}
+              onDelete={onDelete}
+              isDeleting={deletingReference === product.reference}
             />
           </article>
         ))}
@@ -488,19 +544,18 @@ function ProductActions({
   permissions,
   pharmacyId,
   product,
+  onDelete,
+  isDeleting,
 }: {
   permissions: PharmacyPermissions;
   pharmacyId: string;
   product: ProductSummary;
+  onDelete: (product: ProductSummary) => void;
+  isDeleting: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const basePath = "/app/pharmacies/" + pharmacyId + "/products/" + product.reference;
   const actions = [
-    {
-      label: "Désactiver",
-      href: basePath + "/deactivate",
-      enabled: Boolean(permissions.product_update),
-    },
     {
       label: "Modifier",
       href: basePath + "/edit",
@@ -508,7 +563,7 @@ function ProductActions({
     },
     {
       label: "Supprimer",
-      href: basePath + "/delete",
+      isDelete: true,
       enabled: Boolean(permissions.product_delete),
     },
     {
@@ -540,14 +595,27 @@ function ProductActions({
         >
           {actions.map((action) =>
             action.enabled ? (
-              <a
-                key={action.label}
-                role="menuitem"
-                href={action.href}
-                className="block px-4 py-2.5 font-semibold text-app-text transition hover:bg-primary-50 hover:text-primary-700"
-              >
-                {action.label}
-              </a>
+              action.isDelete ? (
+                <button
+                  key={action.label}
+                  type="button"
+                  role="menuitem"
+                  disabled={isDeleting}
+                  onClick={() => onDelete(product)}
+                  className="block w-full px-4 py-2.5 text-left font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isDeleting ? "Suppression..." : action.label}
+                </button>
+              ) : (
+                <a
+                  key={action.label}
+                  role="menuitem"
+                  href={action.href}
+                  className="block px-4 py-2.5 font-semibold text-app-text transition hover:bg-primary-50 hover:text-primary-700"
+                >
+                  {action.label}
+                </a>
+              )
             ) : (
               <span
                 key={action.label}

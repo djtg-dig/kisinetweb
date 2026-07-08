@@ -207,3 +207,37 @@ export async function getProductDetail(
 
   return data as Product;
 }
+
+export async function deleteProduct(
+  pharmacyId: string,
+  reference: string,
+): Promise<void> {
+  const accessToken = getAccessToken();
+  if (!accessToken) {
+    throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
+  }
+
+  const params = new URLSearchParams({ pharmacy_reference: pharmacyId });
+  const url =
+    apiBaseUrl.replace(/\/$/, "") + "/api/products/" + reference + "/?" + params.toString();
+
+  const response = await fetch(url, {
+    method: "DELETE",
+    cache: "no-store",
+    headers: {
+      Authorization: "Bearer " + accessToken,
+      Accept: "application/json",
+    },
+  });
+
+  if (response.status === 204) {
+    return;
+  }
+
+  const responseText = await response.text();
+  const data = parseJsonResponse(responseText);
+
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(data, "Impossible de supprimer ce produit."));
+  }
+}

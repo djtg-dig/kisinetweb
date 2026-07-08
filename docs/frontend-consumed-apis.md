@@ -23,6 +23,7 @@ Ce fichier liste les endpoints backend déjà consommés par l'interface fronten
 - `GET /api/products/filter-options/?pharmacy_reference={pharmacy_id}`
 - `GET /api/products/{reference}/?pharmacy_reference={pharmacy_id}`
 - `POST /api/products/`
+- `DELETE /api/products/{reference}/?pharmacy_reference={pharmacy_id}`
 
 ### POST /api/products/
 
