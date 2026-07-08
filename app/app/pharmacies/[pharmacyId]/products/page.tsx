@@ -204,24 +204,6 @@ function ProductFiltersPanel({
           onChange={(value) => updateFilter("form", value)}
         />
         <FilterSelect
-          label="Public"
-          value={filters.targetGender || ""}
-          options={options.targetGenders}
-          onChange={(value) => updateFilter("targetGender", value)}
-        />
-        <FilterSelect
-          label="Âge"
-          value={filters.targetAgeGroup || ""}
-          options={options.targetAgeGroups}
-          onChange={(value) => updateFilter("targetAgeGroup", value)}
-        />
-        <FilterSelect
-          label="Stock"
-          value={filters.stockStatus || ""}
-          options={options.stockStatuses}
-          onChange={(value) => updateFilter("stockStatus", value)}
-        />
-        <FilterSelect
           label="Tri"
           value={filters.ordering || "name"}
           options={options.orderings}
@@ -248,6 +230,12 @@ function ProductFiltersPanel({
             value={filters.targetAgeGroup || ""}
             options={options.targetAgeGroups}
             onChange={(value) => updateFilter("targetAgeGroup", value)}
+          />
+          <FilterSelect
+            label="Stock"
+            value={filters.stockStatus || ""}
+            options={options.stockStatuses}
+            onChange={(value) => updateFilter("stockStatus", value)}
           />
           <FilterInput
             label="Stock min."

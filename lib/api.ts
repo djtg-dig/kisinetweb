@@ -439,11 +439,11 @@ function getApiErrorMessages(data: unknown, fallback: string, path = ""): string
   return messages.length ? messages : [fallback];
 }
 
-function getApiErrorMessage(data: unknown, fallback: string) {
+export function getApiErrorMessage(data: unknown, fallback: string) {
   return getApiErrorMessages(data, fallback).join("\n");
 }
 
-function parseJsonResponse(responseText: string) {
+export function parseJsonResponse(responseText: string) {
   if (!responseText.trim()) {
     return null;
   }
