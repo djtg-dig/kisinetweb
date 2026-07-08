@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { LinkButton } from "@/components/ui/link-button";
 import {
   createProduct,
@@ -23,7 +22,6 @@ const productsPath = (pharmacyId: string) =>
   "/app/pharmacies/" + pharmacyId + "/products";
 
 export default function CreateProductPage({ params }: CreatePageProps) {
-  const router = useRouter();
   const [pharmacyId, setPharmacyId] = useState("");
   const [values, setValues] = useState<ProductFormValues>(initialProductFormValues);
   const [status, setStatus] = useState<SubmitStatus>("idle");
@@ -88,13 +86,20 @@ export default function CreateProductPage({ params }: CreatePageProps) {
     try {
       await createProduct(pharmacyId, values);
       setStatus("success");
-      window.setTimeout(() => router.push(productsPath(pharmacyId)), 1200);
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Impossible de créer le produit.",
       );
       setStatus("error");
     }
+  }
+
+  // Réinitialise le formulaire pour enchaîner sur un nouveau produit.
+  function handleAddAnother() {
+    setValues(initialProductFormValues);
+    setFieldErrors({});
+    setErrorMessage("");
+    setStatus("idle");
   }
 
   return (
@@ -119,8 +124,20 @@ export default function CreateProductPage({ params }: CreatePageProps) {
           <div className="mb-6 rounded-lg border border-green-200 bg-green-50 p-4">
             <p className="text-sm font-semibold text-green-700">Produit créé</p>
             <p className="mt-1 text-sm text-green-700">
-              Le produit a bien été enregistré. Redirection en cours...
+              Le produit a bien été enregistré.
             </p>
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+              <LinkButton href={productsPath(pharmacyId)} variant="secondary">
+                Retour aux produits
+              </LinkButton>
+              <button
+                type="button"
+                onClick={handleAddAnother}
+                className="inline-flex min-h-11 items-center justify-center rounded-md bg-green-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-green-700 focus:outline-none focus:ring-4 focus:ring-green-200"
+              >
+                Ajouter un autre produit
+              </button>
+            </div>
           </div>
         )}
 
