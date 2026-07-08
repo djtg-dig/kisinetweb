@@ -36,7 +36,7 @@ export function PharmacyDashboard({ data }: PharmacyDashboardProps) {
 
   return (
     <>
-      <header className="border-b border-app-border bg-app-surface">
+      <header className="relative z-0 border-b border-app-border bg-app-surface">
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
           <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end">
             <div>
