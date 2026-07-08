@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { LinkButton } from "@/components/ui/link-button";
 import { getUserPharmacies, type PharmacySummary } from "@/lib/api";
 import { carriAccountLoginUrl } from "@/lib/carri-account";
-import { getAccessToken, LAST_PHARMACY_KEY, logout } from "@/lib/auth";
+import { getAccessToken, getActivePharmacyId, logout, saveTokensFromUrlHash } from "@/lib/auth";
 
 type PublicLayoutProps = {
   children: React.ReactNode;
@@ -24,99 +24,9 @@ type UserMenuState = {
 };
 
 export function PublicLayout({ children, activePharmacy = null }: PublicLayoutProps) {
-  const [userMenu, setUserMenu] = useState<UserMenuState>({
-    isLoggedIn: null,
-    contextPharmacy: activePharmacy,
-  });
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    async function loadUserMenu() {
-      const accessToken = getAccessToken();
-
-      if (!accessToken) {
-        setUserMenu({ isLoggedIn: false, contextPharmacy: null });
-        return;
-      }
-
-      if (activePharmacy) {
-        setUserMenu({ isLoggedIn: true, contextPharmacy: activePharmacy });
-        return;
-      }
-
-      setUserMenu({ isLoggedIn: true, contextPharmacy: null });
-
-      try {
-        const pharmacies = await getUserPharmacies();
-        const lastPharmacyId = localStorage.getItem(LAST_PHARMACY_KEY);
-        const lastPharmacy = pharmacies.find(
-          (pharmacy) => pharmacy.id === lastPharmacyId,
-        );
-
-        setUserMenu({
-          isLoggedIn: true,
-          contextPharmacy: lastPharmacy || null,
-        });
-      } catch {
-        setUserMenu({ isLoggedIn: true, contextPharmacy: null });
-      }
-    }
-
-    loadUserMenu();
-  }, [activePharmacy]);
-
-  useEffect(() => {
-    function closeMenuOnOutsideClick(event: MouseEvent) {
-      if (!menuRef.current || menuRef.current.contains(event.target as Node)) {
-        return;
-      }
-
-      setIsMenuOpen(false);
-    }
-
-    document.addEventListener("mousedown", closeMenuOnOutsideClick);
-    return () => {
-      document.removeEventListener("mousedown", closeMenuOnOutsideClick);
-    };
-  }, []);
-
   return (
     <div className="min-h-screen bg-app-background pt-[77px] text-app-text">
-      <header className="fixed inset-x-0 top-0 z-20 border-b border-app-border bg-app-surface/95 backdrop-blur">
-        <nav className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
-          <a href="/" className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-md bg-primary-600 text-lg font-bold text-white">
-              K
-            </span>
-            <span className="text-lg font-bold text-app-text">Kisinet</span>
-          </a>
-
-          <div className="hidden items-center gap-6 text-sm font-medium text-app-muted md:flex">
-            {navLinks.map((link) => (
-              <a key={link.href} href={link.href} className="hover:text-primary-700">
-                {link.label}
-              </a>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-2">
-            {userMenu.isLoggedIn === null ? (
-              <span aria-hidden="true" className="min-h-11 w-32" />
-            ) : userMenu.isLoggedIn ? (
-              <UserMenu
-                contextPharmacy={userMenu.contextPharmacy}
-                isOpen={isMenuOpen}
-                menuRef={menuRef}
-                onToggle={() => setIsMenuOpen((current) => !current)}
-                onClose={() => setIsMenuOpen(false)}
-              />
-            ) : (
-              <LinkButton href={carriAccountLoginUrl}>Se connecter</LinkButton>
-            )}
-          </div>
-        </nav>
-      </header>
+      <PublicNavbar activePharmacy={activePharmacy} />
 
       {children}
 
@@ -151,6 +61,104 @@ export function PublicLayout({ children, activePharmacy = null }: PublicLayoutPr
         </div>
       </footer>
     </div>
+  );
+}
+
+function PublicNavbar({ activePharmacy = null }: { activePharmacy?: PharmacySummary | null }) {
+  const [userMenu, setUserMenu] = useState<UserMenuState>({
+    isLoggedIn: null,
+    contextPharmacy: activePharmacy,
+  });
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    async function loadUserMenu() {
+      saveTokensFromUrlHash();
+
+      const accessToken = getAccessToken();
+
+      if (!accessToken) {
+        setUserMenu({ isLoggedIn: false, contextPharmacy: null });
+        return;
+      }
+
+      if (activePharmacy) {
+        setUserMenu({ isLoggedIn: true, contextPharmacy: activePharmacy });
+        return;
+      }
+
+      setUserMenu({ isLoggedIn: true, contextPharmacy: null });
+
+      try {
+        const pharmacies = await getUserPharmacies();
+        const lastPharmacyId = getActivePharmacyId();
+        const lastPharmacy = pharmacies.find(
+          (pharmacy) => pharmacy.id === lastPharmacyId,
+        );
+
+        setUserMenu({
+          isLoggedIn: true,
+          contextPharmacy: lastPharmacy || null,
+        });
+      } catch {
+        setUserMenu({ isLoggedIn: true, contextPharmacy: null });
+      }
+    }
+
+    loadUserMenu();
+  }, [activePharmacy]);
+
+  useEffect(() => {
+    function closeMenuOnOutsideClick(event: MouseEvent) {
+      if (!menuRef.current || menuRef.current.contains(event.target as Node)) {
+        return;
+      }
+
+      setIsMenuOpen(false);
+    }
+
+    document.addEventListener("mousedown", closeMenuOnOutsideClick);
+    return () => {
+      document.removeEventListener("mousedown", closeMenuOnOutsideClick);
+    };
+  }, []);
+
+  return (
+    <header className="fixed inset-x-0 top-0 z-20 border-b border-app-border bg-app-surface/95 backdrop-blur">
+      <nav className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+        <a href="/" className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-md bg-primary-600 text-lg font-bold text-white">
+            K
+          </span>
+          <span className="text-lg font-bold text-app-text">Kisinet</span>
+        </a>
+
+        <div className="hidden items-center gap-6 text-sm font-medium text-app-muted md:flex">
+          {navLinks.map((link) => (
+            <a key={link.href} href={link.href} className="hover:text-primary-700">
+              {link.label}
+            </a>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-2">
+          {userMenu.isLoggedIn === null ? (
+            <span aria-hidden="true" className="min-h-11 w-32" />
+          ) : userMenu.isLoggedIn ? (
+            <UserMenu
+              contextPharmacy={userMenu.contextPharmacy}
+              isOpen={isMenuOpen}
+              menuRef={menuRef}
+              onToggle={() => setIsMenuOpen((current) => !current)}
+              onClose={() => setIsMenuOpen(false)}
+            />
+          ) : (
+            <LinkButton href={carriAccountLoginUrl}>Se connecter</LinkButton>
+          )}
+        </div>
+      </nav>
+    </header>
   );
 }
 

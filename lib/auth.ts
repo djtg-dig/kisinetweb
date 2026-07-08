@@ -1,6 +1,7 @@
 export const ACCESS_TOKEN_KEY = "kisinet:access_token";
 export const REFRESH_TOKEN_KEY = "kisinet:refresh_token";
-export const LAST_PHARMACY_KEY = "kisinet:last_pharmacy_id";
+export const ACTIVE_PHARMACY_KEY = "kisinet:active_pharmacy_id";
+export const LAST_PHARMACY_KEY = ACTIVE_PHARMACY_KEY;
 
 export function saveTokensFromUrlHash() {
   // Carri/Kisinet renvoie les tokens dans le fragment URL: #access=...&refresh=...
@@ -32,6 +33,22 @@ export function getAccessToken() {
   return localStorage.getItem(ACCESS_TOKEN_KEY) || "";
 }
 
+export function getActivePharmacyId() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  return localStorage.getItem(ACTIVE_PHARMACY_KEY) || "";
+}
+
+export function setActivePharmacyId(pharmacyId: string) {
+  if (typeof window === "undefined" || !pharmacyId) {
+    return;
+  }
+
+  localStorage.setItem(ACTIVE_PHARMACY_KEY, pharmacyId);
+}
+
 export function logout() {
   if (typeof window === "undefined") {
     return;
@@ -39,7 +56,7 @@ export function logout() {
 
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
-  localStorage.removeItem(LAST_PHARMACY_KEY);
+  localStorage.removeItem(ACTIVE_PHARMACY_KEY);
 
   window.location.href = "/";
 }

@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { PharmacyDashboard } from "@/components/dashboard/pharmacy-dashboard";
-import { MainLayout } from "@/components/layout/main-layout";
 import { LinkButton } from "@/components/ui/link-button";
-import { LAST_PHARMACY_KEY } from "@/lib/auth";
+import { LoadingBubble } from "@/components/ui/loading-bubble";
+import { setActivePharmacyId } from "@/lib/auth";
 import { getPharmacyDashboard } from "@/lib/dashboard-api";
 import type { PharmacyDashboardData } from "@/lib/dashboard";
 
@@ -40,7 +40,7 @@ export default function PharmacyDashboardPage({ params }: DashboardPageProps) {
 
       try {
         const data = await getPharmacyDashboard(pharmacyId);
-        localStorage.setItem(LAST_PHARMACY_KEY, data.pharmacy.id);
+        setActivePharmacyId(data.pharmacy.id);
         setDashboardData(data);
         setState("ready");
       } catch (error) {
@@ -59,25 +59,19 @@ export default function PharmacyDashboardPage({ params }: DashboardPageProps) {
   }, [pharmacyId]);
 
   return (
-    <MainLayout>
+    <>
       {state === "loading" && <LoadingDashboard />}
       {state === "error" && <ErrorDashboard message={errorMessage} />}
       {state === "empty" && <EmptyDashboard />}
       {state === "ready" && dashboardData && <PharmacyDashboard data={dashboardData} />}
-    </MainLayout>
+    </>
   );
 }
 
 function LoadingDashboard() {
   return (
-    <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
-      <Panel>
-        <p className="text-sm font-semibold text-primary-700">Chargement</p>
-        <h1 className="mt-2 text-2xl font-bold text-app-text">Ouverture du dashboard</h1>
-        <p className="mt-2 text-sm leading-6 text-app-muted">
-          Kisinet récupère les informations de la pharmacie.
-        </p>
-      </Panel>
+    <section className="mx-auto flex min-h-[calc(100vh-160px)] max-w-6xl items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
+      <LoadingBubble label="Chargement du dashboard" className="min-h-0" />
     </section>
   );
 }

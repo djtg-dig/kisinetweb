@@ -27,6 +27,22 @@ export type CreatePharmacyInput = {
   neighborhood?: string;
 };
 
+export type ProductSummary = {
+  reference: string;
+  pharmacyReference: string;
+  name: string;
+  description?: string;
+  form?: string;
+  targetGender?: string;
+  targetAgeGroup?: string;
+  therapeuticCategory?: string;
+  salePrice: number;
+  purchasePrice?: number;
+  currentStock: number;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 export type CountryOption = {
   id: number;
   name: string;
@@ -76,6 +92,29 @@ function normalizePharmacy(item: UnknownRecord): PharmacySummary {
     planName: getText(subscription?.plan_name) ?? getText(subscription?.plan_code),
     subscriptionStatus: getText(subscription?.status),
     trialEndsAt: getText(subscription?.trial_ends_at),
+  };
+}
+
+function normalizeProduct(item: UnknownRecord): ProductSummary {
+  const reference = item.reference ?? item.id ?? item.pk;
+
+  return {
+    reference: String(reference),
+    pharmacyReference: String(item.pharmacy_reference || ""),
+    name: String(item.name || "Produit sans nom"),
+    description: getText(item.description),
+    form: getText(item.form),
+    targetGender: getText(item.target_gender),
+    targetAgeGroup: getText(item.target_age_group),
+    therapeuticCategory: getText(item.therapeutic_category),
+    salePrice: Number(item.sale_price || 0),
+    purchasePrice:
+      item.purchase_price === null || item.purchase_price === undefined
+        ? undefined
+        : Number(item.purchase_price || 0),
+    currentStock: Number(item.current_stock || 0),
+    createdAt: getText(item.created_at),
+    updatedAt: getText(item.updated_at),
   };
 }
 
@@ -182,6 +221,25 @@ export async function getCitiesOrProvinces(country: string): Promise<CityOrProvi
       code: getText(item.code),
     }))
     .filter((city) => city.id && city.name);
+}
+
+export async function getPharmacyProducts(pharmacyId: string): Promise<ProductSummary[]> {
+  const params = new URLSearchParams({ pharmacy_reference: pharmacyId });
+  const data = await fetchApiJson<unknown>(
+    "/api/products/?" + params.toString(),
+    "Impossible de charger les produits.",
+  );
+  const dataRecord = getRecord(data);
+  const rows: unknown[] = Array.isArray(data)
+    ? data
+    : Array.isArray(dataRecord?.results)
+      ? dataRecord.results
+      : [];
+
+  return rows
+    .filter((item: unknown): item is UnknownRecord => Boolean(item) && typeof item === "object")
+    .map(normalizeProduct)
+    .filter((product: ProductSummary) => Boolean(product.reference));
 }
 
 function getApiErrorMessages(data: unknown, fallback: string, path = ""): string[] {

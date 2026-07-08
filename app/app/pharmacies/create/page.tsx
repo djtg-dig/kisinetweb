@@ -11,7 +11,7 @@ import {
   type CityOrProvinceOption,
   type CountryOption,
 } from "@/lib/api";
-import { LAST_PHARMACY_KEY } from "@/lib/auth";
+import { setActivePharmacyId } from "@/lib/auth";
 
 type FormState = {
   name: string;
@@ -168,7 +168,7 @@ export default function CreatePharmacyPage() {
         neighborhood: form.neighborhood.trim(),
       });
 
-      localStorage.setItem(LAST_PHARMACY_KEY, pharmacy.id);
+      setActivePharmacyId(pharmacy.id);
       window.location.href = "/app/pharmacies/" + pharmacy.id + "/dashboard";
     } catch (error) {
       const message = error instanceof Error ? error.message : "";

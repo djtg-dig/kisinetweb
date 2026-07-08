@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { LinkButton } from "@/components/ui/link-button";
 import { Button } from "@/components/ui/button";
+import { LoadingBubble } from "@/components/ui/loading-bubble";
 import { getUserPharmacies, type PharmacySummary } from "@/lib/api";
-import { LAST_PHARMACY_KEY, saveTokensFromUrlHash } from "@/lib/auth";
+import { saveTokensFromUrlHash, setActivePharmacyId } from "@/lib/auth";
 
 type PageState = "loading" | "error" | "empty" | "ready" | "redirecting";
 
@@ -33,7 +34,7 @@ export default function SelectPharmacyPage() {
   }, []);
 
   function openPharmacy(pharmacyId: string) {
-    localStorage.setItem(LAST_PHARMACY_KEY, pharmacyId);
+    setActivePharmacyId(pharmacyId);
     setState("redirecting");
     window.location.href = "/app/pharmacies/" + pharmacyId + "/dashboard";
   }
@@ -101,15 +102,7 @@ function LoadingState() {
 }
 
 function RedirectingState() {
-  return (
-    <Panel>
-      <p className="text-sm font-semibold text-success-700">Redirection en cours</p>
-      <h2 className="mt-2 text-xl font-bold text-app-text">Ouverture du tableau de bord</h2>
-      <p className="mt-2 text-sm leading-6 text-app-muted">
-        La pharmacie sélectionnée est enregistrée comme dernière pharmacie utilisée.
-      </p>
-    </Panel>
-  );
+  return <LoadingBubble label="Ouverture de la pharmacie" />;
 }
 
 function ErrorState({ message }: { message: string }) {
