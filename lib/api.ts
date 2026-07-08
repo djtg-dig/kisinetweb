@@ -43,6 +43,75 @@ export type ProductSummary = {
   updatedAt?: string;
 };
 
+export type PaginatedProducts = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: ProductSummary[];
+};
+
+export type ProductFilters = {
+  search?: string;
+  reference?: string;
+  name?: string;
+  form?: string;
+  targetGender?: string;
+  targetAgeGroup?: string;
+  therapeuticCategory?: string;
+  stockStatus?: string;
+  minStock?: string;
+  maxStock?: string;
+  minSalePrice?: string;
+  maxSalePrice?: string;
+  minPurchasePrice?: string;
+  maxPurchasePrice?: string;
+  createdFrom?: string;
+  createdTo?: string;
+  updatedFrom?: string;
+  updatedTo?: string;
+  ordering?: string;
+  page?: string;
+};
+
+export type FilterOption = {
+  value: string;
+  label: string;
+};
+
+export type ProductFilterOptions = {
+  forms: FilterOption[];
+  targetGenders: FilterOption[];
+  targetAgeGroups: FilterOption[];
+  therapeuticCategories: FilterOption[];
+  stockStatuses: FilterOption[];
+  orderings: FilterOption[];
+};
+
+export type PharmacyPermissions = {
+  pharmacy_view?: boolean;
+  pharmacy_update?: boolean;
+  pharmacy_delete?: boolean;
+  member_view?: boolean;
+  member_invite?: boolean;
+  member_update?: boolean;
+  member_suspend?: boolean;
+  member_delete?: boolean;
+  member_manage_permissions?: boolean;
+  join_request_view?: boolean;
+  join_request_accept?: boolean;
+  join_request_reject?: boolean;
+  product_view?: boolean;
+  product_create?: boolean;
+  product_update?: boolean;
+  product_delete?: boolean;
+  stock_view?: boolean;
+  stock_adjust?: boolean;
+  stock_transfer?: boolean;
+  sale_view?: boolean;
+  sale_create?: boolean;
+  sale_cancel?: boolean;
+};
+
 export type CountryOption = {
   id: number;
   name: string;
@@ -102,7 +171,11 @@ function normalizeProduct(item: UnknownRecord): ProductSummary {
     reference: String(reference),
     pharmacyReference: String(item.pharmacy_reference || ""),
     name: String(item.name || "Produit sans nom"),
-    description: getText(item.description),
+    description:
+      getText(item.description) ??
+      getText(item.product_description) ??
+      getText(item.short_description) ??
+      getText(item.details),
     form: getText(item.form),
     targetGender: getText(item.target_gender),
     targetAgeGroup: getText(item.target_age_group),
@@ -116,6 +189,31 @@ function normalizeProduct(item: UnknownRecord): ProductSummary {
     createdAt: getText(item.created_at),
     updatedAt: getText(item.updated_at),
   };
+}
+
+function normalizeFilterOptions(data: unknown): ProductFilterOptions {
+  const record = getRecord(data) || {};
+
+  return {
+    forms: normalizeOptions(record.forms),
+    targetGenders: normalizeOptions(record.target_genders),
+    targetAgeGroups: normalizeOptions(record.target_age_groups),
+    therapeuticCategories: normalizeOptions(record.therapeutic_categories),
+    stockStatuses: normalizeOptions(record.stock_statuses),
+    orderings: normalizeOptions(record.orderings),
+  };
+}
+
+function normalizeOptions(value: unknown): FilterOption[] {
+  const rows = Array.isArray(value) ? value : [];
+
+  return rows
+    .filter((item: unknown): item is UnknownRecord => Boolean(item) && typeof item === "object")
+    .map((item) => ({
+      value: String(item.value || ""),
+      label: String(item.label || item.value || ""),
+    }))
+    .filter((option) => option.value && option.label);
 }
 
 export async function getUserPharmacies(): Promise<PharmacySummary[]> {
@@ -223,8 +321,32 @@ export async function getCitiesOrProvinces(country: string): Promise<CityOrProvi
     .filter((city) => city.id && city.name);
 }
 
-export async function getPharmacyProducts(pharmacyId: string): Promise<ProductSummary[]> {
+export async function getPharmacyProducts(
+  pharmacyId: string,
+  filters: ProductFilters = {},
+): Promise<PaginatedProducts> {
   const params = new URLSearchParams({ pharmacy_reference: pharmacyId });
+  appendFilter(params, "search", filters.search);
+  appendFilter(params, "reference", filters.reference);
+  appendFilter(params, "name", filters.name);
+  appendFilter(params, "form", filters.form);
+  appendFilter(params, "target_gender", filters.targetGender);
+  appendFilter(params, "target_age_group", filters.targetAgeGroup);
+  appendFilter(params, "therapeutic_category", filters.therapeuticCategory);
+  appendFilter(params, "stock_status", filters.stockStatus);
+  appendFilter(params, "min_stock", filters.minStock);
+  appendFilter(params, "max_stock", filters.maxStock);
+  appendFilter(params, "min_sale_price", filters.minSalePrice);
+  appendFilter(params, "max_sale_price", filters.maxSalePrice);
+  appendFilter(params, "min_purchase_price", filters.minPurchasePrice);
+  appendFilter(params, "max_purchase_price", filters.maxPurchasePrice);
+  appendFilter(params, "created_from", filters.createdFrom);
+  appendFilter(params, "created_to", filters.createdTo);
+  appendFilter(params, "updated_from", filters.updatedFrom);
+  appendFilter(params, "updated_to", filters.updatedTo);
+  appendFilter(params, "ordering", filters.ordering);
+  appendFilter(params, "page", filters.page);
+
   const data = await fetchApiJson<unknown>(
     "/api/products/?" + params.toString(),
     "Impossible de charger les produits.",
@@ -235,11 +357,45 @@ export async function getPharmacyProducts(pharmacyId: string): Promise<ProductSu
     : Array.isArray(dataRecord?.results)
       ? dataRecord.results
       : [];
-
-  return rows
+  const results = rows
     .filter((item: unknown): item is UnknownRecord => Boolean(item) && typeof item === "object")
     .map(normalizeProduct)
     .filter((product: ProductSummary) => Boolean(product.reference));
+
+  return {
+    count: Number(dataRecord?.count ?? results.length),
+    next: getText(dataRecord?.next) || null,
+    previous: getText(dataRecord?.previous) || null,
+    results,
+  };
+}
+
+export async function getProductFilterOptions(pharmacyId: string): Promise<ProductFilterOptions> {
+  const params = new URLSearchParams({ pharmacy_reference: pharmacyId });
+  const data = await fetchApiJson<unknown>(
+    "/api/products/filter-options/?" + params.toString(),
+    "Impossible de charger les filtres produits.",
+  );
+
+  return normalizeFilterOptions(data);
+}
+
+function appendFilter(params: URLSearchParams, name: string, value?: string) {
+  if (value && value.trim()) {
+    params.set(name, value.trim());
+  }
+}
+
+export async function getPharmacyPermissions(pharmacyId: string): Promise<PharmacyPermissions> {
+  const data = await fetchApiJson<unknown>(
+    "/api/pharmacies/" + pharmacyId + "/permissions/",
+    "Impossible de charger vos permissions.",
+  );
+  const record = getRecord(data) || {};
+
+  return Object.fromEntries(
+    Object.entries(record).map(([key, value]) => [key, Boolean(value)]),
+  ) as PharmacyPermissions;
 }
 
 function getApiErrorMessages(data: unknown, fallback: string, path = ""): string[] {
