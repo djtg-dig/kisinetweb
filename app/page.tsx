@@ -16,7 +16,7 @@ const quickBenefits = [
 const steps = [
   {
     title: "Connectez-vous avec Carri Account",
-    description: "Utilisez votre identité Carri Account pour accéder à Kisinet.",
+    description: "Utilisez votre identité Carri Business pour accéder à Kisinet.",
   },
   {
     title: "Ajoutez votre pharmacie",

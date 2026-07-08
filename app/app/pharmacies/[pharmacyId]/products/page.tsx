@@ -396,8 +396,8 @@ function ProductsList({
   deletingReference: string;
 }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-app-border bg-app-card shadow-sm">
-      <div className="hidden grid-cols-[1.4fr_1fr_0.7fr_0.7fr_0.8fr_0.8fr] gap-4 border-b border-app-border bg-app-surface px-5 py-3 text-xs font-bold uppercase text-app-muted lg:grid">
+    <div className="rounded-lg border border-app-border bg-app-card shadow-sm">
+      <div className="hidden grid-cols-[1.4fr_1fr_0.7fr_0.7fr_0.8fr_0.8fr] gap-4 rounded-t-lg border-b border-app-border bg-app-surface px-5 py-3 text-xs font-bold uppercase text-app-muted lg:grid">
         <span>Produit</span>
         <span>Catégorie</span>
         <span>Forme</span>
@@ -407,7 +407,7 @@ function ProductsList({
       </div>
 
       <div className="divide-y divide-app-border">
-        {products.map((product) => (
+        {products.map((product, index) => (
           <article
             key={product.reference}
             className="grid gap-4 px-5 py-4 lg:grid-cols-[1.4fr_1fr_0.7fr_0.7fr_0.8fr_0.8fr] lg:items-center"
@@ -438,6 +438,7 @@ function ProductsList({
               product={product}
               onDelete={onDelete}
               isDeleting={deletingReference === product.reference}
+              isLast={index === products.length - 1}
             />
           </article>
         ))}
@@ -546,12 +547,14 @@ function ProductActions({
   product,
   onDelete,
   isDeleting,
+  isLast,
 }: {
   permissions: PharmacyPermissions;
   pharmacyId: string;
   product: ProductSummary;
   onDelete: (product: ProductSummary) => void;
   isDeleting: boolean;
+  isLast: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const basePath = "/app/pharmacies/" + pharmacyId + "/products/" + product.reference;
@@ -591,7 +594,9 @@ function ProductActions({
       {isOpen && (
         <div
           role="menu"
-          className="absolute right-auto z-20 mt-2 w-44 overflow-hidden rounded-lg border border-app-border bg-app-card py-2 text-sm shadow-soft lg:right-0"
+          className={`absolute right-auto z-20 mt-2 w-44 overflow-hidden rounded-lg border border-app-border bg-app-card py-2 text-sm shadow-soft lg:right-0 ${
+            isLast ? "bottom-full mb-2 mt-0" : ""
+          }`}
         >
           {actions.map((action) =>
             action.enabled ? (

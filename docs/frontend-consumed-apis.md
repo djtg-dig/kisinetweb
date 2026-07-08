@@ -8,6 +8,8 @@ Ce fichier liste les endpoints backend déjà consommés par l'interface fronten
 
 ## Pharmacies
 
+- `GET /api/pharmacies/public/`
+- `GET /api/pharmacies/public/filter-options/`
 - `GET /api/pharmacies/`
 - `POST /api/pharmacies/`
 - `GET /api/pharmacies/countries/`
@@ -16,6 +18,39 @@ Ce fichier liste les endpoints backend déjà consommés par l'interface fronten
 - `GET /api/pharmacies/{pharmacy_id}/dashboard/`
 - `GET /api/pharmacies/{pharmacy_id}/stock/alerts/`
 - `GET /api/pharmacies/{pharmacy_id}/invoices/pending/`
+
+### GET /api/pharmacies/public/
+
+- **Objectif** : afficher l'annuaire public des pharmacies non archivées.
+- **Méthode HTTP** : `GET`
+- **URL** : `/api/pharmacies/public/`
+- **Page frontend** : `/pharmacies`
+- **Service frontend** : `getPublicPharmacies(filters)` dans `lib/api`
+- **Authentification** : non requise.
+- **Pagination** : 10 pharmacies par page avec le paramètre `page`.
+- **Query params** : `search`, `reference`, `name`, `country`, `city_or_province`,
+  `neighborhood`, `has_email`, `has_phone`, `ordering`, `page`.
+- **Réponse attendue (200)** : objet paginé `{ count, next, previous, results }`.
+  Chaque élément de `results` contient `reference`, `name`, `slug`, `email`,
+  `phone_number`, `adresse` et `created_at`.
+
+#### Exemple de requête
+
+```http
+GET /api/pharmacies/public/?search=gombe&country=1&ordering=name&page=1
+Accept: application/json
+```
+
+### GET /api/pharmacies/public/filter-options/
+
+- **Objectif** : récupérer les options de filtres de l'annuaire public.
+- **Méthode HTTP** : `GET`
+- **URL** : `/api/pharmacies/public/filter-options/`
+- **Page frontend** : `/pharmacies`
+- **Service frontend** : `getPublicPharmacyFilterOptions()` dans `lib/api`
+- **Authentification** : non requise.
+- **Réponse attendue (200)** : `countries`, `cities_or_provinces`,
+  `neighborhoods`, `orderings`.
 
 ## Produits
 
@@ -186,4 +221,3 @@ Content-Type: application/json
 > Note : `{pharmacy_id}` dans les URLs pharmacies correspond à la **référence** publique
 > de la pharmacie (ex. `PH0UKUI3NQ`), jamais à l'identifiant interne. Le frontend utilise
 > dynamiquement le `pharmacyId` de l'URL, jamais une valeur en dur.
-

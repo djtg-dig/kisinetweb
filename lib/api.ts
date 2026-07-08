@@ -11,6 +11,14 @@ export type PharmacySummary = {
   email?: string;
   phoneNumber?: string;
   addressLine?: string;
+  country?: string;
+  countryId?: string;
+  cityOrProvince?: string;
+  cityOrProvinceId?: string;
+  neighborhood?: string;
+  street?: string;
+  latitude?: string;
+  longitude?: string;
   planName?: string;
   subscriptionStatus?: string;
   trialEndsAt?: string;
@@ -127,6 +135,33 @@ export type CityOrProvinceOption = {
   code?: string;
 };
 
+export type PublicPharmacyFilters = {
+  search?: string;
+  reference?: string;
+  name?: string;
+  country?: string;
+  cityOrProvince?: string;
+  neighborhood?: string;
+  hasEmail?: string;
+  hasPhone?: string;
+  ordering?: string;
+  page?: string;
+};
+
+export type PaginatedPublicPharmacies = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: PharmacySummary[];
+};
+
+export type PublicPharmacyFilterOptions = {
+  countries: FilterOption[];
+  citiesOrProvinces: (FilterOption & { country?: string; countryName?: string })[];
+  neighborhoods: FilterOption[];
+  orderings: FilterOption[];
+};
+
 type UnknownRecord = Record<string, unknown>;
 
 function getText(value: unknown) {
@@ -141,11 +176,15 @@ function normalizePharmacy(item: UnknownRecord): PharmacySummary {
   const id = item.reference ?? item.id ?? item.pk;
   const name = item.name ?? item.title ?? "Pharmacie sans nom";
   const address = getRecord(item.adresse);
+  const country = getRecord(address?.country);
+  const cityOrProvince = getRecord(address?.city_or_province);
   const subscription = getRecord(item.subscription);
   const addressParts = [
+    getText(address?.formatted_address),
     getText(address?.street),
     getText(address?.neighborhood),
-    getText(address?.formatted_address),
+    getText(cityOrProvince?.name),
+    getText(country?.name),
   ].filter(Boolean);
 
   return {
@@ -158,6 +197,15 @@ function normalizePharmacy(item: UnknownRecord): PharmacySummary {
     email: getText(item.email),
     phoneNumber: getText(item.phone_number),
     addressLine: addressParts.join(", ") || undefined,
+    country: getText(country?.name),
+    countryId: country?.id === undefined ? undefined : String(country.id),
+    cityOrProvince: getText(cityOrProvince?.name),
+    cityOrProvinceId:
+      cityOrProvince?.id === undefined ? undefined : String(cityOrProvince.id),
+    neighborhood: getText(address?.neighborhood),
+    street: getText(address?.street),
+    latitude: address?.latitude === undefined || address?.latitude === null ? undefined : String(address.latitude),
+    longitude: address?.longitude === undefined || address?.longitude === null ? undefined : String(address.longitude),
     planName: getText(subscription?.plan_name) ?? getText(subscription?.plan_code),
     subscriptionStatus: getText(subscription?.status),
     trialEndsAt: getText(subscription?.trial_ends_at),
@@ -204,6 +252,17 @@ function normalizeFilterOptions(data: unknown): ProductFilterOptions {
   };
 }
 
+function normalizePublicPharmacyFilterOptions(data: unknown): PublicPharmacyFilterOptions {
+  const record = getRecord(data) || {};
+
+  return {
+    countries: normalizeOptions(record.countries),
+    citiesOrProvinces: normalizeOptionsWithMeta(record.cities_or_provinces),
+    neighborhoods: normalizeOptions(record.neighborhoods),
+    orderings: normalizeOptions(record.orderings),
+  };
+}
+
 function normalizeOptions(value: unknown): FilterOption[] {
   const rows = Array.isArray(value) ? value : [];
 
@@ -212,6 +271,22 @@ function normalizeOptions(value: unknown): FilterOption[] {
     .map((item) => ({
       value: String(item.value || ""),
       label: String(item.label || item.value || ""),
+    }))
+    .filter((option) => option.value && option.label);
+}
+
+function normalizeOptionsWithMeta(
+  value: unknown,
+): (FilterOption & { country?: string; countryName?: string })[] {
+  const rows = Array.isArray(value) ? value : [];
+
+  return rows
+    .filter((item: unknown): item is UnknownRecord => Boolean(item) && typeof item === "object")
+    .map((item) => ({
+      value: String(item.value || ""),
+      label: String(item.label || item.value || ""),
+      country: item.country === undefined || item.country === null ? undefined : String(item.country),
+      countryName: getText(item.country_name),
     }))
     .filter((option) => option.value && option.label);
 }
@@ -282,6 +357,72 @@ async function fetchApiJson<T>(path: string, fallbackMessage: string): Promise<T
   }
 
   return data as T;
+}
+
+async function fetchPublicApiJson<T>(path: string, fallbackMessage: string): Promise<T> {
+  const response = await fetch(apiBaseUrl.replace(/\/$/, "") + path, {
+    cache: "no-store",
+    headers: {
+      Accept: "application/json",
+    },
+  });
+
+  const responseText = await response.text();
+  const data = parseJsonResponse(responseText);
+
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(data, fallbackMessage));
+  }
+
+  return data as T;
+}
+
+export async function getPublicPharmacies(
+  filters: PublicPharmacyFilters = {},
+): Promise<PaginatedPublicPharmacies> {
+  const params = new URLSearchParams();
+  appendFilter(params, "search", filters.search);
+  appendFilter(params, "reference", filters.reference);
+  appendFilter(params, "name", filters.name);
+  appendFilter(params, "country", filters.country);
+  appendFilter(params, "city_or_province", filters.cityOrProvince);
+  appendFilter(params, "neighborhood", filters.neighborhood);
+  appendFilter(params, "has_email", filters.hasEmail);
+  appendFilter(params, "has_phone", filters.hasPhone);
+  appendFilter(params, "ordering", filters.ordering);
+  appendFilter(params, "page", filters.page);
+
+  const path = "/api/pharmacies/public/" + (params.size ? "?" + params.toString() : "");
+  const data = await fetchPublicApiJson<unknown>(
+    path,
+    "Impossible de charger les pharmacies publiques.",
+  );
+  const dataRecord = getRecord(data);
+  const rows: unknown[] = Array.isArray(data)
+    ? data
+    : Array.isArray(dataRecord?.results)
+      ? dataRecord.results
+      : [];
+  const results = rows
+    .filter((item: unknown): item is UnknownRecord => Boolean(item) && typeof item === "object")
+    .map(normalizePharmacy)
+    .filter((pharmacy: PharmacySummary) => Boolean(pharmacy.id));
+
+  return {
+    count: Number(dataRecord?.count ?? results.length),
+    next: getText(dataRecord?.next) || null,
+    previous: getText(dataRecord?.previous) || null,
+    results,
+  };
+}
+
+export async function getPublicPharmacyFilterOptions(): Promise<PublicPharmacyFilterOptions> {
+  const data = await fetchPublicApiJson<unknown>(
+    "/api/pharmacies/public/filter-options/",
+    "Impossible de charger les filtres pharmacies.",
+  );
+
+  return normalizePublicPharmacyFilterOptions(data);
 }
 
 export async function getCountries(): Promise<CountryOption[]> {

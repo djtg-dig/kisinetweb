@@ -13,6 +13,7 @@ type PublicLayoutProps = {
 };
 
 const navLinks = [
+  { label: "Pharmacies", href: "/pharmacies" },
   { label: "Fonctionnalités", href: "/#fonctionnalites" },
   { label: "Tarifs", href: "/#tarifs" },
   { label: "FAQ", href: "/#faq" },
