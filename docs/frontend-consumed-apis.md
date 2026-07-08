@@ -111,3 +111,79 @@ Content-Type: application/json
   "updated_at": "2026-07-08T12:00:00Z"
 }
 ```
+
+### GET /api/products/
+
+- **Objectif** : lister les produits d'une pharmacie (avec pagination et filtres).
+- **Méthode HTTP** : `GET`
+- **URL** : `/api/products/?pharmacy_reference={pharmacy_id}`
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/products`
+- **Service frontend** : `getPharmacyProducts(pharmacyId, filters)` dans `lib/api`
+- **Paramètre query obligatoire** : `pharmacy_reference` (référence PHXXXXXXXX de la pharmacie).
+- **Autres query params** : `search`, `reference`, `name`, `form`, `target_gender`,
+  `target_age_group`, `therapeutic_category`, `stock_status`, `min_stock`, `max_stock`,
+  `min_sale_price`, `max_sale_price`, `min_purchase_price`, `max_purchase_price`,
+  `created_from`, `created_to`, `updated_from`, `updated_to`, `ordering`, `page`.
+- **Réponse attendue (200)** : objet paginé `{ count, next, previous, results }` où
+  chaque `result` est un produit (serializer de lecture).
+- **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden`.
+- **Endpoint compagnon** : `GET /api/products/filter-options/?pharmacy_reference={pharmacy_id}`
+  (`getProductFilterOptions`) renvoie les options des filtres (formes, catégories, etc.).
+
+### GET /api/products/{reference}/
+
+- **Objectif** : consulter le détail complet d'un produit.
+- **Méthode HTTP** : `GET`
+- **URL** : `/api/products/{reference}/?pharmacy_reference={pharmacy_id}`
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/products/[reference]`
+- **Service frontend** : `getProductDetail(pharmacyId, reference)` dans `lib/api/products.ts`
+- **Paramètre query obligatoire** : `pharmacy_reference`.
+- **Réponse attendue (200)** : produit complet (serializer de lecture), incluant
+  `reference`, `pharmacy_reference`, `name`, `description`, `form`, `target_gender`,
+  `target_age_group`, `therapeutic_category`, `sale_price`, `purchase_price`,
+  `current_stock`, `is_deleted`, `deleted_at`, `created_at`, `updated_at`.
+- **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden`, `404 Not Found`.
+
+### DELETE /api/products/{reference}/
+
+- **Objectif** : suppression logique d'un produit (le produit passe `is_deleted=true`).
+- **Méthode HTTP** : `DELETE`
+- **URL** : `/api/products/{reference}/?pharmacy_reference={pharmacy_id}`
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/products` (bouton « Supprimer » du menu Actions)
+- **Service frontend** : `deleteProduct(pharmacyId, reference)` dans `lib/api/products.ts`
+- **Paramètre query obligatoire** : `pharmacy_reference`.
+- **Réponse attendue** : `204 No Content` (aucun corps).
+- **Erreurs possibles** : `400 Bad Request` (paramètre manquant), `401 Unauthorized`,
+  `403 Forbidden`, `404 Not Found`.
+
+## Permissions et dashboard
+
+### GET /api/pharmacies/{pharmacy_id}/permissions/
+
+- **Objectif** : récupérer les permissions de l'utilisateur connecté dans la pharmacie.
+- **Méthode HTTP** : `GET`
+- **URL** : `/api/pharmacies/{pharmacy_id}/permissions/`
+- **Pages frontend** : `/app/pharmacies/[pharmacyId]/products`,
+  `/app/pharmacies/[pharmacyId]/products/create`
+- **Service frontend** : `getPharmacyPermissions(pharmacyId)` dans `lib/api`
+- **Réponse attendue (200)** : objet dont les clés sont les permissions (ex.
+  `product_view`, `product_create`, `product_update`, `product_delete`) avec des
+  valeurs booléennes.
+- **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden`.
+
+### GET /api/pharmacies/{pharmacy_id}/dashboard/
+
+- **Objectif** : synthèse globale du dashboard d'une pharmacie (stats, alertes, ventes, etc.).
+- **Méthode HTTP** : `GET`
+- **URL** : `/api/pharmacies/{pharmacy_id}/dashboard/`
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/dashboard`
+- **Service frontend** : `getPharmacyDashboard(pharmacyId)` dans `lib/dashboard-api`
+- **Réponse attendue (200)** : payload contenant `pharmacy` (avec `id` = référence de la
+  pharmacie), `stats`, `alerts`, `sales_last_7_days`, `top_products`, `latest_sales`,
+  `restock_products`, `recent_activity`.
+- **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden`, `404 Not Found`.
+
+> Note : `{pharmacy_id}` dans les URLs pharmacies correspond à la **référence** publique
+> de la pharmacie (ex. `PH0UKUI3NQ`), jamais à l'identifiant interne. Le frontend utilise
+> dynamiquement le `pharmacyId` de l'URL, jamais une valeur en dur.
+
