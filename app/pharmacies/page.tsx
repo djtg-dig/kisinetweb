@@ -34,7 +34,6 @@ export default function PublicPharmaciesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [openPharmacy, setOpenPharmacy] = useState<string | null>(null);
 
   const selectedCountry = filters.country || appliedFilters.country;
   const cityOptions = useMemo(() => {
@@ -125,20 +124,17 @@ export default function PublicPharmaciesPage() {
   function submitFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setAppliedFilters({ ...filters, page: "1" });
-    setOpenPharmacy(null);
   }
 
   function resetFilters() {
     setFilters(initialFilters);
     setAppliedFilters(initialFilters);
-    setOpenPharmacy(null);
   }
 
   function goToPage(nextPage: number) {
     const normalizedPage = String(Math.min(Math.max(nextPage, 1), totalPages));
     setFilters((current) => ({ ...current, page: normalizedPage }));
     setAppliedFilters((current) => ({ ...current, page: normalizedPage }));
-    setOpenPharmacy(null);
   }
 
   return (
@@ -296,12 +292,6 @@ export default function PublicPharmaciesPage() {
                   <PharmacyCard
                     key={pharmacy.id}
                     pharmacy={pharmacy}
-                    isOpen={openPharmacy === pharmacy.id}
-                    onToggle={() =>
-                      setOpenPharmacy((current) =>
-                        current === pharmacy.id ? null : pharmacy.id,
-                      )
-                    }
                   />
                 ))}
               </div>
@@ -343,15 +333,7 @@ export default function PublicPharmaciesPage() {
   );
 }
 
-function PharmacyCard({
-  pharmacy,
-  isOpen,
-  onToggle,
-}: {
-  pharmacy: PharmacySummary;
-  isOpen: boolean;
-  onToggle: () => void;
-}) {
+function PharmacyCard({ pharmacy }: { pharmacy: PharmacySummary }) {
   return (
     <article className="rounded-lg border border-app-border bg-app-card p-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -364,13 +346,12 @@ function PharmacyCard({
             {pharmacy.addressLine || "Adresse non renseignée"}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onToggle}
-          className="w-full rounded-md bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-700 sm:w-auto"
+        <a
+          href={"/pharmacies/" + encodeURIComponent(pharmacy.reference || pharmacy.id)}
+          className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-700 sm:w-auto"
         >
-          Voir
-        </button>
+          Plus
+        </a>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
@@ -386,28 +367,7 @@ function PharmacyCard({
         )}
       </div>
 
-      {isOpen && (
-        <div className="mt-5 grid gap-3 border-t border-app-border pt-4 text-sm sm:grid-cols-2">
-          <Detail label="Email" value={pharmacy.email} />
-          <Detail label="Téléphone" value={pharmacy.phoneNumber} />
-          <Detail label="Quartier" value={pharmacy.neighborhood} />
-          <Detail label="Rue" value={pharmacy.street} />
-          <Detail label="Latitude" value={pharmacy.latitude} />
-          <Detail label="Longitude" value={pharmacy.longitude} />
-        </div>
-      )}
     </article>
-  );
-}
-
-function Detail({ label, value }: { label: string; value?: string }) {
-  return (
-    <div>
-      <p className="text-xs font-semibold uppercase tracking-wide text-app-muted">
-        {label}
-      </p>
-      <p className="mt-1 font-medium text-app-text">{value || "Non renseigné"}</p>
-    </div>
   );
 }
 

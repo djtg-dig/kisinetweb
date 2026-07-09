@@ -3,6 +3,7 @@ import { apiBaseUrl } from "@/lib/carri-account";
 
 export type PharmacySummary = {
   id: string;
+  databaseId?: string;
   reference?: string;
   name: string;
   devise?: string;
@@ -33,6 +34,21 @@ export type CreatePharmacyInput = {
   cityOrProvince?: string;
   street?: string;
   neighborhood?: string;
+};
+
+export type CreatePharmacyJoinRequestInput = {
+  pharmacy: string;
+  requestedRole?: "MANAGER" | "PHARMACIST" | "EMPLOYEE";
+  message?: string;
+};
+
+export type PharmacyJoinRequestSummary = {
+  id?: number;
+  pharmacy?: string;
+  pharmacyName?: string;
+  requestedRole?: string;
+  message?: string;
+  status?: string;
 };
 
 export type ProductSummary = {
@@ -174,6 +190,7 @@ function getRecord(value: unknown): UnknownRecord | null {
 
 function normalizePharmacy(item: UnknownRecord): PharmacySummary {
   const id = item.reference ?? item.id ?? item.pk;
+  const databaseId = item.id ?? item.pk;
   const name = item.name ?? item.title ?? "Pharmacie sans nom";
   const address = getRecord(item.adresse);
   const country = getRecord(address?.country);
@@ -189,6 +206,8 @@ function normalizePharmacy(item: UnknownRecord): PharmacySummary {
 
   return {
     id: String(id),
+    databaseId:
+      databaseId === undefined || databaseId === null ? undefined : String(databaseId),
     reference: getText(item.reference) ?? String(id),
     name: String(name),
     devise: getText(item.devise) ?? "USD",
@@ -236,6 +255,17 @@ function normalizeProduct(item: UnknownRecord): ProductSummary {
     currentStock: Number(item.current_stock || 0),
     createdAt: getText(item.created_at),
     updatedAt: getText(item.updated_at),
+  };
+}
+
+function normalizePharmacyJoinRequest(item: UnknownRecord): PharmacyJoinRequestSummary {
+  return {
+    id: item.id === undefined || item.id === null ? undefined : Number(item.id),
+    pharmacy: item.pharmacy === undefined || item.pharmacy === null ? undefined : String(item.pharmacy),
+    pharmacyName: getText(item.pharmacy_name),
+    requestedRole: getText(item.requested_role),
+    message: getText(item.message),
+    status: getText(item.status),
   };
 }
 
@@ -414,6 +444,24 @@ export async function getPublicPharmacies(
     previous: getText(dataRecord?.previous) || null,
     results,
   };
+}
+
+export async function getPublicPharmacyByReference(
+  reference: string,
+): Promise<PharmacySummary | null> {
+  const data = await getPublicPharmacies({
+    reference,
+    page: "1",
+  });
+  const normalizedReference = reference.trim().toUpperCase();
+
+  return (
+    data.results.find(
+      (pharmacy) => pharmacy.reference?.toUpperCase() === normalizedReference,
+    ) ||
+    data.results.find((pharmacy) => pharmacy.id.toUpperCase() === normalizedReference) ||
+    null
+  );
 }
 
 export async function getPublicPharmacyFilterOptions(): Promise<PublicPharmacyFilterOptions> {
@@ -640,4 +688,48 @@ export async function createPharmacy(input: CreatePharmacyInput): Promise<Pharma
   }
 
   return normalizePharmacy(data as UnknownRecord);
+}
+
+export async function createPharmacyJoinRequest(
+  input: CreatePharmacyJoinRequestInput,
+): Promise<PharmacyJoinRequestSummary> {
+  const accessToken = getAccessToken();
+  if (!accessToken) {
+    throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
+  }
+
+  const payload = {
+    pharmacy: input.pharmacy,
+    requested_role: input.requestedRole || "EMPLOYEE",
+    message: input.message || "",
+  };
+
+  const response = await fetch(
+    apiBaseUrl.replace(/\/$/, "") + "/api/pharmacies/join-requests/",
+    {
+      method: "POST",
+      cache: "no-store",
+      headers: {
+        Authorization: "Bearer " + accessToken,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+
+  const responseText = await response.text();
+  const data = parseJsonResponse(responseText);
+
+  if (!response.ok) {
+    throw new Error(
+      getApiErrorMessage(data, "Impossible d'envoyer cette demande d'adhésion."),
+    );
+  }
+
+  if (!data || typeof data !== "object") {
+    return {};
+  }
+
+  return normalizePharmacyJoinRequest(data as UnknownRecord);
 }

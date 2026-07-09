@@ -10,6 +10,7 @@ Ce fichier liste les endpoints backend déjà consommés par l'interface fronten
 
 - `GET /api/pharmacies/public/`
 - `GET /api/pharmacies/public/filter-options/`
+- `POST /api/pharmacies/join-requests/`
 - `GET /api/pharmacies/`
 - `POST /api/pharmacies/`
 - `GET /api/pharmacies/countries/`
@@ -24,20 +25,33 @@ Ce fichier liste les endpoints backend déjà consommés par l'interface fronten
 - **Objectif** : afficher l'annuaire public des pharmacies non archivées.
 - **Méthode HTTP** : `GET`
 - **URL** : `/api/pharmacies/public/`
-- **Page frontend** : `/pharmacies`
+- **Pages frontend** : `/pharmacies`, `/pharmacies/[reference]`
 - **Service frontend** : `getPublicPharmacies(filters)` dans `lib/api`
 - **Authentification** : non requise.
 - **Pagination** : 10 pharmacies par page avec le paramètre `page`.
 - **Query params** : `search`, `reference`, `name`, `country`, `city_or_province`,
   `neighborhood`, `has_email`, `has_phone`, `ordering`, `page`.
 - **Réponse attendue (200)** : objet paginé `{ count, next, previous, results }`.
-  Chaque élément de `results` contient `reference`, `name`, `slug`, `email`,
+  Chaque élément de `results` contient `id`, `reference`, `name`, `slug`, `email`,
   `phone_number`, `adresse` et `created_at`.
+- **Usage détail public** : la page `/pharmacies/[reference]` utilise
+  `getPublicPharmacyByReference(reference)` dans `lib/api`, qui interroge cet endpoint
+  avec le filtre `reference` puis sélectionne la pharmacie exacte.
+- **Navigation frontend** : sur `/pharmacies`, le bouton `Plus` des cartes mène vers
+  `/pharmacies/{reference}`. La demande d'intégration n'est plus envoyée depuis la liste,
+  mais depuis cette page détail.
 
 #### Exemple de requête
 
 ```http
 GET /api/pharmacies/public/?search=gombe&country=1&ordering=name&page=1
+Accept: application/json
+```
+
+#### Exemple de requête pour la page détail publique
+
+```http
+GET /api/pharmacies/public/?reference=PH0UKUI3NQ&page=1
 Accept: application/json
 ```
 
@@ -51,6 +65,54 @@ Accept: application/json
 - **Authentification** : non requise.
 - **Réponse attendue (200)** : `countries`, `cities_or_provinces`,
   `neighborhoods`, `orderings`.
+
+### POST /api/pharmacies/join-requests/
+
+- **Objectif** : créer une demande d'adhésion/d'intégration à une pharmacie.
+- **Méthode HTTP** : `POST`
+- **URL** : `/api/pharmacies/join-requests/`
+- **Page frontend** : `/pharmacies/[reference]` (bouton `Devenir employé`)
+- **Service frontend** : `createPharmacyJoinRequest(input)` dans `lib/api`
+- **Authentification** : requise avec `Authorization: Bearer <access_token>`.
+- **Déclenchement UI** : la page détail publique ouvre un modal de demande
+  (`components/pharmacies/join-request-modal.tsx`).
+
+#### Payload envoyé (JSON)
+
+| Champ            | Type   | Obligatoire | Remarque |
+| ---------------- | ------ | ----------- | -------- |
+| `pharmacy`       | string | oui         | Identifiant interne de la pharmacie (`id` renvoyé par l'annuaire public). |
+| `requested_role` | string | non         | `EMPLOYEE`, `PHARMACIST` ou `MANAGER`. Défaut frontend : `EMPLOYEE`. |
+| `message`        | string | non         | Message facultatif, 1000 caractères maximum. |
+
+> Remarque importante : pour cette API, le backend attend l'identifiant interne
+> de la pharmacie dans `pharmacy`, pas la référence publique `PHXXXXXXXX`.
+> C'est pourquoi `GET /api/pharmacies/public/` expose aussi `id`.
+
+#### Réponse attendue (201 Created)
+
+Demande créée avec les informations de suivi disponibles côté backend, notamment
+`id`, `pharmacy`, `pharmacy_name`, `requested_role`, `message` et `status`.
+
+#### Erreurs possibles
+
+- `400 Bad Request` : données invalides, utilisateur déjà membre de la pharmacie,
+  ou demande déjà en attente pour cette pharmacie.
+- `401 Unauthorized` : token d'accès absent ou invalide.
+
+#### Exemple de requête
+
+```http
+POST /api/pharmacies/join-requests/
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+  "pharmacy": "12",
+  "requested_role": "EMPLOYEE",
+  "message": "Je souhaite rejoindre cette pharmacie."
+}
+```
 
 ## Produits
 
