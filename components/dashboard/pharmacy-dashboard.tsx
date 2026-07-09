@@ -12,7 +12,6 @@ type PharmacyDashboardProps = {
 
 const quickActions = [
   { label: "Nouvelle vente", path: "/sales/create", tone: "primary" },
-  { label: "Ajouter un produit", path: "/products/create", tone: "success" },
   { label: "Entrée de stock", path: "/stock/entries/create", tone: "info" },
   { label: "Inviter un employé", path: "/members/invite", tone: "secondary" },
 ];
