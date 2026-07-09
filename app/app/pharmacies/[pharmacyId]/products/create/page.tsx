@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { LinkButton } from "@/components/ui/link-button";
-import { SiteFooter } from "@/components/layout/site-footer";
 import {
   createProduct,
   initialProductFormValues,
@@ -241,7 +240,6 @@ export default function CreateProductPage({ params }: CreatePageProps) {
       </section>
     </main>
 
-    <SiteFooter />
   </>
   );
 }

@@ -142,6 +142,25 @@ export type PharmacyPermissions = {
   sale_cancel?: boolean;
 };
 
+export type PharmacyMemberRole = "OWNER" | "MANAGER" | "PHARMACIST" | "EMPLOYEE";
+
+export type PharmacyMember = {
+  id: number;
+  pharmacy: string;
+  user: string;
+  userEmail?: string;
+  userFullName?: string;
+  role: PharmacyMemberRole;
+  isSuspended: boolean;
+  permissions: PharmacyPermissions;
+  joinedAt?: string;
+};
+
+export type UpdatePharmacyMemberInput = {
+  role?: PharmacyMemberRole;
+  isSuspended?: boolean;
+};
+
 export type CountryOption = {
   id: number;
   name: string;
@@ -278,6 +297,24 @@ function normalizePharmacyJoinRequest(item: UnknownRecord): PharmacyJoinRequestS
     reviewerEmail: getText(item.reviewer_email),
     reviewedAt: getText(item.reviewed_at),
     createdAt: getText(item.created_at),
+  };
+}
+
+function normalizePharmacyMember(item: UnknownRecord): PharmacyMember {
+  const permissions = getRecord(item.permissions) || {};
+
+  return {
+    id: Number(item.id),
+    pharmacy: String(item.pharmacy || ""),
+    user: String(item.user || ""),
+    userEmail: getText(item.user_email),
+    userFullName: getText(item.user_full_name),
+    role: String(item.role || "EMPLOYEE") as PharmacyMemberRole,
+    isSuspended: Boolean(item.is_suspended),
+    permissions: Object.fromEntries(
+      Object.entries(permissions).map(([key, value]) => [key, Boolean(value)]),
+    ) as PharmacyPermissions,
+    joinedAt: getText(item.joined_at),
   };
 }
 
@@ -432,6 +469,43 @@ async function postApiJson<T>(path: string, fallbackMessage: string): Promise<T>
       Authorization: "Bearer " + accessToken,
       Accept: "application/json",
     },
+  });
+
+  const responseText = await response.text();
+  const data = parseJsonResponse(responseText);
+
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(data, fallbackMessage));
+  }
+
+  return data as T;
+}
+
+async function sendApiJson<T>(
+  path: string,
+  method: "PATCH" | "PUT" | "DELETE",
+  fallbackMessage: string,
+  body?: unknown,
+): Promise<T> {
+  const accessToken = getAccessToken();
+  if (!accessToken) {
+    throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
+  }
+
+  const headers: HeadersInit = {
+    Authorization: "Bearer " + accessToken,
+    Accept: "application/json",
+  };
+
+  if (body !== undefined) {
+    headers["Content-Type"] = "application/json";
+  }
+
+  const response = await fetch(apiBaseUrl.replace(/\/$/, "") + path, {
+    method,
+    cache: "no-store",
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body),
   });
 
   const responseText = await response.text();
@@ -622,6 +696,73 @@ export async function getPharmacyPermissions(pharmacyId: string): Promise<Pharma
   return Object.fromEntries(
     Object.entries(record).map(([key, value]) => [key, Boolean(value)]),
   ) as PharmacyPermissions;
+}
+
+export async function getPharmacyMembers(pharmacyId: string): Promise<PharmacyMember[]> {
+  const data = await fetchApiJson<unknown>(
+    "/api/pharmacies/" + pharmacyId + "/members/",
+    "Impossible de charger les membres.",
+  );
+  const rows = Array.isArray(data) ? data : [];
+
+  return rows
+    .filter((item: unknown): item is UnknownRecord => Boolean(item) && typeof item === "object")
+    .map(normalizePharmacyMember)
+    .filter((member) => Boolean(member.id));
+}
+
+export async function updatePharmacyMember(
+  pharmacyId: string,
+  memberId: number,
+  input: UpdatePharmacyMemberInput,
+): Promise<PharmacyMember> {
+  const payload = {
+    role: input.role,
+    is_suspended: input.isSuspended,
+  };
+  const data = await sendApiJson<unknown>(
+    "/api/pharmacies/" + pharmacyId + "/members/" + memberId + "/",
+    "PATCH",
+    "Impossible de modifier ce membre.",
+    payload,
+  );
+
+  return normalizePharmacyMember((data || {}) as UnknownRecord);
+}
+
+export async function suspendPharmacyMember(
+  pharmacyId: string,
+  memberId: number,
+): Promise<PharmacyMember> {
+  const data = await postApiJson<unknown>(
+    "/api/pharmacies/" + pharmacyId + "/members/" + memberId + "/suspend/",
+    "Impossible de suspendre ce membre.",
+  );
+
+  return normalizePharmacyMember((data || {}) as UnknownRecord);
+}
+
+export async function deletePharmacyMember(pharmacyId: string, memberId: number) {
+  await sendApiJson<unknown>(
+    "/api/pharmacies/" + pharmacyId + "/members/" + memberId + "/",
+    "DELETE",
+    "Impossible de supprimer ce membre.",
+  );
+}
+
+export async function assignPharmacyMemberPermissions(
+  pharmacyId: string,
+  memberId: number,
+  permissions: PharmacyPermissions,
+): Promise<PharmacyMember> {
+  const data = await sendApiJson<unknown>(
+    "/api/pharmacies/" + pharmacyId + "/members/" + memberId + "/permissions/",
+    "PUT",
+    "Le backend n'a pas renvoyé la raison de cette erreur.",
+    permissions,
+  );
+
+  return normalizePharmacyMember((data || {}) as UnknownRecord);
 }
 
 export async function getPharmacyJoinRequests(

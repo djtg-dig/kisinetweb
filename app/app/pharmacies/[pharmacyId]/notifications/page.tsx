@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { SiteFooter } from "@/components/layout/site-footer";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
 import {
   acceptPharmacyJoinRequest,
@@ -198,7 +197,6 @@ export default function PharmacyNotificationsPage({ params }: NotificationsPageP
           )}
         </main>
       )}
-      <SiteFooter />
     </>
   );
 }

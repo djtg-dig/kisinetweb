@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { LinkButton } from "@/components/ui/link-button";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
-import { SiteFooter } from "@/components/layout/site-footer";
 import {
   getProductDetail,
   PRODUCT_FORMS,
@@ -100,8 +99,6 @@ export default function ProductDetailPage({ params }: DetailPageProps) {
           )}
         </section>
       </main>
-
-      <SiteFooter />
     </>
   );
 }

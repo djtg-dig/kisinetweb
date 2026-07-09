@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { PharmacyDashboard } from "@/components/dashboard/pharmacy-dashboard";
 import { LinkButton } from "@/components/ui/link-button";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
-import { SiteFooter } from "@/components/layout/site-footer";
 import { setActivePharmacyId } from "@/lib/auth";
 import { getPharmacyDashboard } from "@/lib/dashboard-api";
 import type { PharmacyDashboardData } from "@/lib/dashboard";
@@ -65,7 +64,6 @@ export default function PharmacyDashboardPage({ params }: DashboardPageProps) {
       {state === "error" && <ErrorDashboard message={errorMessage} />}
       {state === "empty" && <EmptyDashboard />}
       {state === "ready" && dashboardData && <PharmacyDashboard data={dashboardData} />}
-      <SiteFooter />
     </>
   );
 }

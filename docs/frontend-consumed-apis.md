@@ -20,6 +20,11 @@ Ce fichier liste les endpoints backend déjà consommés par l'interface fronten
 - `GET /api/pharmacies/countries/`
 - `GET /api/pharmacies/cities-or-provinces/`
 - `GET /api/pharmacies/{pharmacy_id}/permissions/`
+- `GET /api/pharmacies/{pharmacy_id}/members/`
+- `PATCH /api/pharmacies/{pharmacy_id}/members/{member_id}/`
+- `DELETE /api/pharmacies/{pharmacy_id}/members/{member_id}/`
+- `POST /api/pharmacies/{pharmacy_id}/members/{member_id}/suspend/`
+- `PUT /api/pharmacies/{pharmacy_id}/members/{member_id}/permissions/`
 - `GET /api/pharmacies/{pharmacy_id}/dashboard/`
 - `GET /api/pharmacies/{pharmacy_id}/stock/alerts/`
 - `GET /api/pharmacies/{pharmacy_id}/invoices/pending/`
@@ -178,6 +183,118 @@ Content-Type: application/json
 - **Réponse attendue (200)** : demande archivée côté pharmacie.
 - **Comportement frontend** : la carte est retirée de la liste après succès.
 
+### GET /api/pharmacies/{pharmacy_id}/members/
+
+- **Objectif** : lister les membres d'une pharmacie.
+- **Méthode HTTP** : `GET`
+- **URL** : `/api/pharmacies/{pharmacy_id}/members/`
+- **Pages frontend** : `/app/pharmacies/[pharmacyId]/settings/human-resources`,
+  `/app/pharmacies/[pharmacyId]/settings/human-resources/[memberId]`
+- **Service frontend** : `getPharmacyMembers(pharmacyId)` dans `lib/api`
+- **Authentification** : requise avec `Authorization: Bearer <access_token>`.
+- **Permission backend** : propriétaire ou `member_view`.
+- **Réponse attendue (200)** : liste de membres avec `id`, `pharmacy`, `user`,
+  `user_email`, `user_full_name`, `role`, `is_suspended`, `permissions`, `joined_at`.
+- **Comportement frontend** : la liste RH alimente le tableau des employés. L'action
+  `Voir` ouvre une page détail qui retrouve le membre dans cette réponse.
+
+#### Exemple de requête
+
+```http
+GET /api/pharmacies/PH0UKUI3NQ/members/
+Authorization: Bearer <access_token>
+Accept: application/json
+```
+
+### PATCH /api/pharmacies/{pharmacy_id}/members/{member_id}/
+
+- **Objectif** : modifier le rôle et/ou le statut de suspension d'un membre.
+- **Méthode HTTP** : `PATCH`
+- **URL** : `/api/pharmacies/{pharmacy_id}/members/{member_id}/`
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/settings/human-resources`
+- **Service frontend** : `updatePharmacyMember(pharmacyId, memberId, input)` dans `lib/api`
+- **Authentification** : requise.
+- **Permission backend** : propriétaire ou `member_update`.
+- **Payload envoyé (JSON)** : `role` et/ou `is_suspended`.
+- **Réponse attendue (200)** : membre mis à jour.
+- **Erreurs possibles** : `400 Bad Request`, `401 Unauthorized`, `403 Forbidden`, `404 Not Found`.
+
+#### Exemple de requête
+
+```http
+PATCH /api/pharmacies/PH0UKUI3NQ/members/12/
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+  "role": "MANAGER",
+  "is_suspended": false
+}
+```
+
+### DELETE /api/pharmacies/{pharmacy_id}/members/{member_id}/
+
+- **Objectif** : supprimer un membre de la pharmacie.
+- **Méthode HTTP** : `DELETE`
+- **URL** : `/api/pharmacies/{pharmacy_id}/members/{member_id}/`
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/settings/human-resources`
+- **Service frontend** : `deletePharmacyMember(pharmacyId, memberId)` dans `lib/api`
+- **Authentification** : requise.
+- **Permission backend** : propriétaire ou `member_delete`.
+- **Réponse attendue** : `204 No Content`.
+- **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden`, `404 Not Found`.
+
+### POST /api/pharmacies/{pharmacy_id}/members/{member_id}/suspend/
+
+- **Objectif** : suspendre un membre.
+- **Méthode HTTP** : `POST`
+- **URL** : `/api/pharmacies/{pharmacy_id}/members/{member_id}/suspend/`
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/settings/human-resources`
+- **Service frontend** : `suspendPharmacyMember(pharmacyId, memberId)` dans `lib/api`
+- **Authentification** : requise.
+- **Permission backend** : propriétaire ou `member_suspend`.
+- **Payload** : aucun corps requis.
+- **Réponse attendue (200)** : membre mis à jour avec `is_suspended = true`.
+- **Comportement frontend** : l'action `Suspendre` est proposée dans la liste
+  déroulante `Actions` et devient non cliquable si l'utilisateur n'a pas le droit
+  `member_suspend`, si le membre est propriétaire ou s'il est déjà suspendu.
+
+### PUT /api/pharmacies/{pharmacy_id}/members/{member_id}/permissions/
+
+- **Objectif** : remplacer les permissions d'un membre.
+- **Méthode HTTP** : `PUT`
+- **URL** : `/api/pharmacies/{pharmacy_id}/members/{member_id}/permissions/`
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/settings/human-resources`
+- **Vue backend** : `PharmacyMemberPermissionAssignView`
+- **Service frontend** : `assignPharmacyMemberPermissions(pharmacyId, memberId, permissions)` dans `lib/api`
+- **Authentification** : requise.
+- **Permission backend** : propriétaire ou `member_manage_permissions`.
+- **Payload envoyé (JSON)** : objet de permissions booléennes (`product_view`,
+  `sale_create`, `member_update`, etc.).
+- **Réponse attendue (200)** : membre mis à jour avec ses permissions recalculées.
+- **Règle backend** : un membre ne peut attribuer que les permissions qu'il possède.
+- **Erreurs backend** : la vue renvoie `detail` pour expliquer pourquoi l'affectation
+  est refusée, par exemple si l'utilisateur tente d'accorder une permission qu'il
+  ne possède pas.
+- **Comportement frontend** : les permissions ne sont plus affichées dans la page
+  principale RH. Elles sont consultées et modifiées dans le modal ouvert via
+  `Actions` > `Permissions`. L'option est visible mais non cliquable sans
+  `member_manage_permissions` ou pour un propriétaire.
+
+#### Exemple de requête
+
+```http
+PUT /api/pharmacies/PH0UKUI3NQ/members/12/permissions/
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+  "product_view": true,
+  "product_create": true,
+  "sale_view": true
+}
+```
+
 ## Produits
 
 - `GET /api/products/?pharmacy_reference={pharmacy_id}`
@@ -324,8 +441,10 @@ Content-Type: application/json
 - **Objectif** : récupérer les permissions de l'utilisateur connecté dans la pharmacie.
 - **Méthode HTTP** : `GET`
 - **URL** : `/api/pharmacies/{pharmacy_id}/permissions/`
+- **Vue backend** : `MyPharmacyPermissionListView`
 - **Pages frontend** : `/app/pharmacies/[pharmacyId]/products`,
-  `/app/pharmacies/[pharmacyId]/products/create`
+  `/app/pharmacies/[pharmacyId]/products/create`,
+  `/app/pharmacies/[pharmacyId]/settings/human-resources`
 - **Service frontend** : `getPharmacyPermissions(pharmacyId)` dans `lib/api`
 - **Réponse attendue (200)** : objet dont les clés sont les permissions (ex.
   `product_view`, `product_create`, `product_update`, `product_delete`) avec des

@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { LinkButton } from "@/components/ui/link-button";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { SiteFooter } from "@/components/layout/site-footer";
 import {
   getPharmacyProducts,
   getPharmacyPermissions,
@@ -213,7 +212,6 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
       />
     </main>
 
-    <SiteFooter />
   </>
   );
 }

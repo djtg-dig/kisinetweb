@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import { SiteFooter } from "@/components/layout/site-footer";
 import { logout, setActivePharmacyId } from "@/lib/auth";
 
 type AppLayoutProps = {
@@ -27,7 +28,10 @@ export function AppLayout({ children, pharmacyId }: AppLayoutProps) {
   return (
     <div className="min-h-screen overflow-x-hidden bg-app-background pt-16 text-app-text lg:pt-[72px]">
       <AppNavbar pharmacyId={pharmacyId} />
-      <div className="relative z-0">{children}</div>
+      <div className="relative z-0 flex min-h-[calc(100vh-4rem)] flex-col lg:min-h-[calc(100vh-4.5rem)]">
+        <div className="flex-1">{children}</div>
+        <SiteFooter />
+      </div>
     </div>
   );
 }
