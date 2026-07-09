@@ -14,6 +14,7 @@ import {
   type UpdatePharmacyAddressInput,
   type UpdatePharmacyInput,
 } from "@/lib/api";
+import { LoadingBubble } from "@/components/ui/loading-bubble";
 
 type SettingsDetailsPageProps = {
   params: Promise<{ pharmacyId: string }>;
@@ -387,8 +388,8 @@ export default function SettingsDetailsPage({ params }: SettingsDetailsPageProps
       )}
 
       {state === "loading" && (
-        <section className="mt-6 rounded-lg border border-app-border bg-app-card p-8 text-center text-sm font-semibold text-app-muted">
-          Chargement des informations...
+        <section className="mt-6 rounded-lg border border-app-border bg-app-card p-8">
+          <LoadingBubble label="Chargement des informations" className="min-h-[180px]" />
         </section>
       )}
 
