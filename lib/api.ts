@@ -42,6 +42,7 @@ export type PharmacyDetail = {
   id?: number;
   reference?: string;
   ownerReference?: string;
+  ownerFullName?: string;
   invitedByReference?: string | null;
   name?: string;
   slug?: string;
@@ -303,6 +304,7 @@ function normalizePharmacyDetail(item: UnknownRecord): PharmacyDetail {
       item.id === undefined || item.id === null ? undefined : Number(item.id),
     reference: getText(item.reference),
     ownerReference: getText(item.owner_reference),
+    ownerFullName: getText(item.owner_full_name),
     invitedByReference:
       item.invited_by_reference === null ? null : getText(item.invited_by_reference),
     name: getText(item.name),

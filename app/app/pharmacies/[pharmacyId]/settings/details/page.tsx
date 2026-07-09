@@ -225,6 +225,7 @@ function DetailBody({
           <Detail label="Référence" value={pharmacy.reference} />
           <Detail label="Statut" value={pharmacy.isArchivedAt ? "Archivée" : "Active"} />
           <Detail label="Référence propriétaire" value={pharmacy.ownerReference} />
+          <Detail label="Propriétaire" value={pharmacy.ownerFullName} />
           <Detail label="Parrain" value={pharmacy.invitedByReference} />
           <Detail label="Slug" value={pharmacy.slug} />
           <Detail label="Créée le" value={pharmacy.createdAt} />
