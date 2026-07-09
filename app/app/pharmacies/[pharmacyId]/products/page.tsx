@@ -122,8 +122,7 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
   const pageCount = Math.max(1, Math.ceil(totalProducts / 10));
 
   return (
-    <>
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <main className="mx-auto min-h-[calc(100vh-4rem)] max-w-7xl px-4 py-8 text-app-text sm:px-6 lg:min-h-[calc(100vh-4.5rem)] lg:px-8">
       <header className="grid gap-5 border-b border-app-border pb-6 lg:grid-cols-[1fr_auto] lg:items-end">
         <div>
           <p className="text-sm font-semibold text-primary-700">Produits</p>
@@ -161,7 +160,11 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
             }}
           />
         )}
-        {state === "loading" && <LoadingBubble label="Chargement des produits" />}
+        {state === "loading" && (
+          <section className="rounded-lg border border-app-border bg-app-card p-8 shadow-sm">
+            <LoadingBubble label="Chargement des produits" className="min-h-[220px]" />
+          </section>
+        )}
         {state === "error" && <ErrorState message={errorMessage} pharmacyId={pharmacyId} />}
         {state === "empty" && (
           <EmptyState
@@ -211,8 +214,6 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
         onCancel={() => setPendingDelete(null)}
       />
     </main>
-
-  </>
   );
 }
 

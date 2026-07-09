@@ -139,72 +139,69 @@ export default function PharmacyNotificationsPage({ params }: NotificationsPageP
   }
 
   return (
-    <>
-      {state === "loading" && <LoadingNotifications />}
-      {state !== "loading" && (
-        <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          <section className="rounded-lg border border-app-border bg-app-card p-5">
-            <p className="text-sm font-semibold uppercase tracking-wide text-primary-700">
-              Notifications
+    <main className="mx-auto min-h-[calc(100vh-4rem)] max-w-7xl px-4 py-8 text-app-text sm:px-6 lg:min-h-[calc(100vh-4.5rem)] lg:px-8">
+      <section className="rounded-lg border border-app-border bg-app-card p-5">
+        <p className="text-sm font-semibold uppercase tracking-wide text-primary-700">
+          Notifications
+        </p>
+        <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-app-text sm:text-3xl">
+              Demandes d'intégration
+            </h1>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-app-muted">
+              Consultez et traitez les demandes d'adhésion envoyées à
+              {pharmacy ? " " + pharmacy.name : " cette pharmacie"}.
             </p>
-            <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <h1 className="text-2xl font-bold text-app-text sm:text-3xl">
-                  Demandes d'intégration
-                </h1>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-app-muted">
-                  Consultez et traitez les demandes d'adhésion envoyées à
-                  {pharmacy ? " " + pharmacy.name : " cette pharmacie"}.
-                </p>
-              </div>
-              <div className="grid gap-2 rounded-lg border border-app-border bg-app-background px-4 py-3 text-sm">
-                <span className="font-semibold text-app-text">
-                  {pendingCount} en attente
-                </span>
-                <span className="text-app-muted">
-                  {joinRequests.length} notification{joinRequests.length > 1 ? "s" : ""}
-                </span>
-              </div>
-            </div>
-          </section>
+          </div>
+          <div className="grid gap-2 rounded-lg border border-app-border bg-app-background px-4 py-3 text-sm">
+            <span className="font-semibold text-app-text">
+              {pendingCount} en attente
+            </span>
+            <span className="text-app-muted">
+              {joinRequests.length} notification{joinRequests.length > 1 ? "s" : ""}
+            </span>
+          </div>
+        </div>
+      </section>
 
-          {errorMessage && (
-            <div className="mt-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-semibold leading-6 text-red-700">
-              {errorMessage}
-            </div>
-          )}
-
-          {state === "error" && !joinRequests.length && (
-            <EmptyPanel title="Notifications indisponibles" />
-          )}
-
-          {state === "empty" && (
-            <EmptyPanel title="Aucune notification" />
-          )}
-
-          {state === "ready" && (
-            <section className="mt-6 grid gap-4">
-              {joinRequests.map((joinRequest) => (
-                <JoinRequestCard
-                  key={joinRequest.id}
-                  joinRequest={joinRequest}
-                  permissions={permissions}
-                  runningAction={runningAction}
-                  onAction={runAction}
-                />
-              ))}
-            </section>
-          )}
-        </main>
+      {errorMessage && (
+        <div className="mt-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-semibold leading-6 text-red-700">
+          {errorMessage}
+        </div>
       )}
-    </>
+
+      {state === "loading" && <LoadingNotifications />}
+
+      {state === "error" && !joinRequests.length && (
+        <EmptyPanel title="Notifications indisponibles" />
+      )}
+
+      {state === "empty" && (
+        <EmptyPanel title="Aucune notification" />
+      )}
+
+      {state === "ready" && (
+        <section className="mt-6 grid gap-4">
+          {joinRequests.map((joinRequest) => (
+            <JoinRequestCard
+              key={joinRequest.id}
+              joinRequest={joinRequest}
+              permissions={permissions}
+              runningAction={runningAction}
+              onAction={runAction}
+            />
+          ))}
+        </section>
+      )}
+    </main>
   );
 }
 
 function LoadingNotifications() {
   return (
-    <section className="mx-auto flex min-h-[calc(100vh-160px)] max-w-6xl items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
-      <LoadingBubble label="Chargement des notifications" className="min-h-0" />
+    <section className="mt-6 rounded-lg border border-app-border bg-app-card p-8 shadow-sm">
+      <LoadingBubble label="Chargement des notifications" className="min-h-[220px]" />
     </section>
   );
 }

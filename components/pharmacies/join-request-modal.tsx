@@ -5,6 +5,7 @@ import {
   createPharmacyJoinRequest,
   type PharmacySummary,
 } from "@/lib/api";
+import { carriAccountLoginUrl } from "@/lib/carri-account";
 
 type RequestedRole = "MANAGER" | "PHARMACIST" | "EMPLOYEE";
 
@@ -12,6 +13,9 @@ type JoinRequestModalProps = {
   pharmacy: PharmacySummary | null;
   onClose: () => void;
 };
+
+const loginRequiredMessage =
+  "Veuillez d'abord vous connecter pour effectuer cette action.";
 
 export function JoinRequestModal({ pharmacy, onClose }: JoinRequestModalProps) {
   const [requestedRole, setRequestedRole] = useState<RequestedRole>("EMPLOYEE");
@@ -67,11 +71,12 @@ export function JoinRequestModal({ pharmacy, onClose }: JoinRequestModalProps) {
       });
       setState("success");
     } catch (currentError) {
+      const message = currentError instanceof Error ? currentError.message : "";
       setState("idle");
       setError(
-        currentError instanceof Error
-          ? currentError.message
-          : "Impossible d'envoyer cette demande d'adhésion.",
+        message.toLowerCase().includes("session introuvable")
+          ? loginRequiredMessage
+          : message || "Impossible d'envoyer cette demande d'adhésion.",
       );
     }
   }
@@ -183,7 +188,15 @@ export function JoinRequestModal({ pharmacy, onClose }: JoinRequestModalProps) {
 
             {error && (
               <div className="mt-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-semibold leading-6 text-red-700">
-                {error}
+                <p>{error}</p>
+                {error === loginRequiredMessage && (
+                  <a
+                    href={carriAccountLoginUrl}
+                    className="mt-3 inline-flex min-h-10 items-center justify-center rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-100"
+                  >
+                    Se connecter
+                  </a>
+                )}
               </div>
             )}
 

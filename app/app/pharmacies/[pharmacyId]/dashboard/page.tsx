@@ -59,52 +59,64 @@ export default function PharmacyDashboardPage({ params }: DashboardPageProps) {
   }, [pharmacyId]);
 
   return (
-    <>
-      {state === "loading" && <LoadingDashboard />}
-      {state === "error" && <ErrorDashboard message={errorMessage} />}
-      {state === "empty" && <EmptyDashboard />}
+    <div className="min-h-[calc(100vh-4rem)] bg-app-background text-app-text lg:min-h-[calc(100vh-4.5rem)]">
+      {state === "loading" && <DashboardPlaceholder />}
+      {state === "error" && <DashboardPlaceholder message={errorMessage} tone="error" />}
+      {state === "empty" && <DashboardPlaceholder tone="empty" />}
       {state === "ready" && dashboardData && <PharmacyDashboard data={dashboardData} />}
+    </div>
+  );
+}
+
+function DashboardPlaceholder({
+  message,
+  tone = "loading",
+}: {
+  message?: string;
+  tone?: "loading" | "error" | "empty";
+}) {
+  return (
+    <>
+      <header className="relative z-0 border-b border-app-border bg-app-surface">
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+          <p className="text-sm font-semibold text-primary-700">Tableau de bord</p>
+          <h1 className="mt-2 text-3xl font-bold text-app-text">Dashboard pharmacie</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-app-muted">
+            Chargement de l'aperçu, des ventes et des alertes importantes.
+          </p>
+        </div>
+      </header>
+
+      <main className="mx-auto grid max-w-7xl gap-6 px-4 py-8 sm:px-6 lg:px-8">
+        {tone === "loading" && (
+          <section className="rounded-lg border border-app-border bg-app-card p-8 shadow-sm">
+            <LoadingBubble label="Chargement du dashboard" className="min-h-[220px]" />
+          </section>
+        )}
+        {tone === "error" && (
+          <Panel tone="error">
+            <p className="text-sm font-semibold text-red-600">Erreur</p>
+            <h2 className="mt-2 text-2xl font-bold text-app-text">Dashboard indisponible</h2>
+            <p className="mt-2 text-sm leading-6 text-app-muted">{message}</p>
+            <LinkButton href="/app/select-pharmacy" variant="secondary" className="mt-5">
+              Retour
+            </LinkButton>
+          </Panel>
+        )}
+        {tone === "empty" && (
+          <Panel>
+            <p className="text-sm font-semibold text-primary-700">Aucune donnée</p>
+            <h2 className="mt-2 text-2xl font-bold text-app-text">Pharmacie introuvable</h2>
+            <p className="mt-2 text-sm leading-6 text-app-muted">
+              Cette pharmacie est introuvable ou n'est plus accessible avec votre compte.
+            </p>
+            <LinkButton href="/app/select-pharmacy" variant="secondary" className="mt-5">
+              Retour
+            </LinkButton>
+          </Panel>
+        )}
+      </main>
     </>
-  );
-}
-
-function LoadingDashboard() {
-  return (
-    <section className="mx-auto flex min-h-[calc(100vh-160px)] max-w-6xl items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
-      <LoadingBubble label="Chargement du dashboard" className="min-h-0" />
-    </section>
-  );
-}
-
-function ErrorDashboard({ message }: { message: string }) {
-  return (
-    <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
-      <Panel tone="error">
-        <p className="text-sm font-semibold text-red-600">Erreur</p>
-        <h1 className="mt-2 text-2xl font-bold text-app-text">Dashboard indisponible</h1>
-        <p className="mt-2 text-sm leading-6 text-app-muted">{message}</p>
-        <LinkButton href="/app/select-pharmacy" variant="secondary" className="mt-5">
-          Retour
-        </LinkButton>
-      </Panel>
-    </section>
-  );
-}
-
-function EmptyDashboard() {
-  return (
-    <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
-      <Panel>
-        <p className="text-sm font-semibold text-primary-700">Aucune donnée</p>
-        <h1 className="mt-2 text-2xl font-bold text-app-text">Pharmacie introuvable</h1>
-        <p className="mt-2 text-sm leading-6 text-app-muted">
-          Cette pharmacie est introuvable ou n'est plus accessible avec votre compte.
-        </p>
-        <LinkButton href="/app/select-pharmacy" variant="secondary" className="mt-5">
-          Retour
-        </LinkButton>
-      </Panel>
-    </section>
   );
 }
 

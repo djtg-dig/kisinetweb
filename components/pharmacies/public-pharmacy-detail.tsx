@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { JoinRequestModal } from "@/components/pharmacies/join-request-modal";
 import type { PharmacySummary } from "@/lib/api";
+import { getAccessToken } from "@/lib/auth";
 
 type PublicPharmacyDetailProps = {
   pharmacy: PharmacySummary;
@@ -10,9 +11,35 @@ type PublicPharmacyDetailProps = {
 
 export function PublicPharmacyDetail({ pharmacy }: PublicPharmacyDetailProps) {
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
+  const [loginToast, setLoginToast] = useState("");
+
+  useEffect(() => {
+    if (!loginToast) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setLoginToast("");
+    }, 3500);
+
+    return () => clearTimeout(timer);
+  }, [loginToast]);
+
+  function openJoinRequest() {
+    if (!getAccessToken()) {
+      setLoginToast("Veuillez d'abord vous connecter.");
+      return;
+    }
+
+    setIsJoinModalOpen(true);
+  }
 
   return (
     <>
+      {loginToast && (
+        <ToastMessage onClose={() => setLoginToast("")}>{loginToast}</ToastMessage>
+      )}
+
       <main className="bg-app-background">
         <section className="border-b border-app-border bg-app-surface">
           <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
@@ -45,7 +72,7 @@ export function PublicPharmacyDetail({ pharmacy }: PublicPharmacyDetailProps) {
                 </p>
                 <button
                   type="button"
-                  onClick={() => setIsJoinModalOpen(true)}
+                  onClick={openJoinRequest}
                   className="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-md bg-success-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-success-700 focus:outline-none focus:ring-4 focus:ring-success-100"
                 >
                   Devenir employé
@@ -103,6 +130,34 @@ function Detail({ label, value }: { label: string; value?: string }) {
         {label}
       </p>
       <p className="mt-1 font-medium text-app-text">{value || "Non renseigné"}</p>
+    </div>
+  );
+}
+
+function ToastMessage({
+  children,
+  onClose,
+}: {
+  children: React.ReactNode;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-x-3 top-20 z-[1200] sm:left-auto sm:right-5 sm:w-[min(420px,calc(100vw-40px))] lg:top-24">
+      <div
+        role="status"
+        aria-live="polite"
+        className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-800 shadow-soft"
+      >
+        <p className="min-w-0 flex-1">{children}</p>
+        <button
+          type="button"
+          onClick={onClose}
+          className="shrink-0 rounded-md px-2 py-1 text-xs font-bold transition hover:bg-white/60 focus:outline-none focus:ring-2 focus:ring-primary-100"
+          aria-label="Fermer le message"
+        >
+          X
+        </button>
+      </div>
     </div>
   );
 }

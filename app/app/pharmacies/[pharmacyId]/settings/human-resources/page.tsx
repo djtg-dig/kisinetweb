@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ChangeEvent, type ReactNode } from "react";
+import { LoadingBubble } from "@/components/ui/loading-bubble";
 import {
   assignPharmacyMemberPermissions,
   deletePharmacyMember,
@@ -237,7 +238,7 @@ export default function HumanResourcesSettingsPage({
   }
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <main className="mx-auto min-h-[calc(100vh-4rem)] max-w-7xl px-4 py-8 text-app-text sm:px-6 lg:min-h-[calc(100vh-4.5rem)] lg:px-8">
       <a
         href={pharmacyId ? "/app/pharmacies/" + pharmacyId + "/settings" : "#"}
         className="text-sm font-semibold text-primary-700 transition hover:text-primary-800"
@@ -268,8 +269,8 @@ export default function HumanResourcesSettingsPage({
       )}
 
       {state === "loading" && (
-        <section className="mt-6 rounded-lg border border-app-border bg-app-card p-8 text-center text-sm font-semibold text-app-muted">
-          Chargement des membres...
+        <section className="mt-6 rounded-lg border border-app-border bg-app-card p-8 shadow-sm">
+          <LoadingBubble label="Chargement des membres" className="min-h-[220px]" />
         </section>
       )}
 
