@@ -54,6 +54,30 @@ export default function SettingsDetailsPage({ params }: SettingsDetailsPageProps
   const [cities, setCities] = useState<CityOrProvinceOption[]>([]);
 
   useEffect(() => {
+    if (!successMessage) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setSuccessMessage("");
+    }, 3500);
+
+    return () => clearTimeout(timer);
+  }, [successMessage]);
+
+  useEffect(() => {
+    if (!errorMessage) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setErrorMessage("");
+    }, 6000);
+
+    return () => clearTimeout(timer);
+  }, [errorMessage]);
+
+  useEffect(() => {
     async function readParams() {
       const resolvedParams = await params;
       setPharmacyId(resolvedParams.pharmacyId);
@@ -360,19 +384,22 @@ export default function SettingsDetailsPage({ params }: SettingsDetailsPageProps
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <a
-        href={pharmacyId ? "/app/pharmacies/" + pharmacyId + "/settings" : "#"}
-        className="text-sm font-semibold text-primary-700 transition hover:text-primary-800"
-      >
-        Retour aux paramètres
-      </a>
-
-      <section className="mt-6 rounded-lg border border-app-border bg-app-card p-6 shadow-sm">
-        <p className="text-sm font-semibold text-primary-700">Détails pharmacie</p>
-        <h1 className="mt-2 text-3xl font-bold text-app-text">Informations générales</h1>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-app-muted">
-          Consultez et modifiez les informations générales de la pharmacie.
-        </p>
+      <section className="rounded-lg border border-app-border bg-app-card p-6 shadow-sm">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-primary-700">Détails pharmacie</p>
+            <h1 className="mt-2 text-3xl font-bold text-app-text">Informations générales</h1>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-app-muted">
+              Consultez et modifiez les informations générales de la pharmacie.
+            </p>
+          </div>
+          <a
+            href={pharmacyId ? "/app/pharmacies/" + pharmacyId + "/settings" : "#"}
+            className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-md border border-app-border bg-app-surface px-4 py-2.5 text-sm font-semibold text-app-text transition hover:bg-primary-50 hover:text-primary-700 focus:outline-none focus:ring-4 focus:ring-primary-100"
+          >
+            Retour
+          </a>
+        </div>
       </section>
 
       {errorMessage && (

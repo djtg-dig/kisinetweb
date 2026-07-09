@@ -20,7 +20,7 @@ export function PublicPharmacyDetail({ pharmacy }: PublicPharmacyDetailProps) {
               href="/pharmacies"
               className="text-sm font-semibold text-primary-700 transition hover:text-primary-800"
             >
-              Retour aux pharmacies
+              Retour
             </a>
             <div className="mt-6 grid gap-8 lg:grid-cols-[1fr_360px] lg:items-start">
               <div>

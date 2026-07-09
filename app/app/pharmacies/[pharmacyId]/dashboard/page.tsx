@@ -84,7 +84,7 @@ function ErrorDashboard({ message }: { message: string }) {
         <h1 className="mt-2 text-2xl font-bold text-app-text">Dashboard indisponible</h1>
         <p className="mt-2 text-sm leading-6 text-app-muted">{message}</p>
         <LinkButton href="/app/select-pharmacy" variant="secondary" className="mt-5">
-          Retour aux pharmacies
+          Retour
         </LinkButton>
       </Panel>
     </section>
@@ -101,7 +101,7 @@ function EmptyDashboard() {
           Cette pharmacie est introuvable ou n'est plus accessible avec votre compte.
         </p>
         <LinkButton href="/app/select-pharmacy" variant="secondary" className="mt-5">
-          Retour aux pharmacies
+          Retour
         </LinkButton>
       </Panel>
     </section>

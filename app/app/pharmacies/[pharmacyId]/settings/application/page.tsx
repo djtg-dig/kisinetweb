@@ -31,7 +31,7 @@ function SettingsPlaceholder({
         href={"/app/pharmacies/" + pharmacyId + "/settings"}
         className="text-sm font-semibold text-primary-700 transition hover:text-primary-800"
       >
-        Retour aux paramètres
+        Retour
       </a>
       <section className="mt-6 rounded-lg border border-app-border bg-app-card p-6 shadow-sm">
         <p className="text-sm font-semibold text-primary-700">Paramètres</p>
