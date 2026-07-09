@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react";
 import { PublicLayout } from "@/components/layout/public-layout";
 import { PublicAuthLink } from "@/components/auth/public-auth-link";
+import { LinkButton } from "@/components/ui/link-button";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
 import { getPharmacyPlans, type PharmacyPlan } from "@/lib/api";
+import { PlanElements } from "@/components/pricing/plan-elements";
 
 type PageState = "loading" | "error" | "ready";
 
@@ -32,28 +34,34 @@ export default function TarifsPage() {
   return (
     <PublicLayout>
       <main>
-        <section className="bg-app-surface">
-          <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:px-8">
-            <p className="text-sm font-semibold uppercase tracking-wide text-primary-700">
-              Tarifs
-            </p>
-            <h1 className="mt-3 text-3xl font-bold text-app-text sm:text-4xl">
-              Des plans préparés pour chaque étape
-            </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-app-muted sm:text-base">
-              Choisissez l'offre qui correspond à la taille et aux besoins de votre
-              pharmacie.
-            </p>
+        <section className="relative overflow-hidden bg-gradient-to-b from-primary-50 via-app-surface to-app-background">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -top-24 left-1/2 h-72 w-[42rem] -translate-x-1/2 rounded-full bg-primary-200/30 blur-3xl"
+          />
+          <div className="relative mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
+            <div className="mx-auto max-w-2xl text-center">
+              <span className="inline-flex w-fit rounded-full bg-primary-100 px-3 py-1 text-sm font-semibold text-primary-700 ring-1 ring-primary-200">
+                Tarifs
+              </span>
+              <h1 className="mt-5 text-3xl font-bold leading-tight text-app-text sm:text-4xl lg:text-5xl">
+                Des plans préparés pour chaque étape
+              </h1>
+              <p className="mt-4 text-sm leading-6 text-app-muted sm:text-base">
+                Choisissez l'offre qui correspond à la taille et aux besoins de votre
+                pharmacie.
+              </p>
+            </div>
 
-            <div className="mt-10">
+            <div className="mt-12">
               {state === "loading" && <LoadingBubble label="Chargement des tarifs" />}
 
               {state === "error" && (
-                <div className="rounded-lg border border-red-200 bg-app-card p-6 shadow-sm">
-                  <p className="text-sm font-semibold text-red-600">
-                    Erreur de chargement
-                  </p>
-                  <h2 className="mt-2 text-xl font-bold text-app-text">
+                <div className="mx-auto max-w-2xl rounded-2xl border border-red-200 bg-app-card p-8 text-center shadow-sm">
+                  <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-2xl text-red-500 ring-1 ring-red-100">
+                    !
+                  </span>
+                  <h2 className="mt-4 text-xl font-bold text-app-text">
                     Impossible de charger les tarifs
                   </h2>
                   <p className="mt-2 text-sm leading-6 text-app-muted">
@@ -61,7 +69,7 @@ export default function TarifsPage() {
                   </p>
                   <PublicAuthLink
                     variant="secondary"
-                    className="mt-5"
+                    className="mx-auto mt-6 w-fit"
                     loggedInHref="/app/select-pharmacy"
                     loggedInLabel="Ouvrir Kisinet"
                   >
@@ -71,57 +79,75 @@ export default function TarifsPage() {
               )}
 
               {state === "ready" && (
-                <div className="grid gap-4 md:grid-cols-3">
+                <div className="grid items-stretch gap-6 md:grid-cols-3">
                   {plans.map((plan) => (
                     <article
                       key={plan.id || plan.name}
-                      className={`flex flex-col rounded-lg border p-6 ${
+                      className={`relative flex flex-col rounded-2xl border p-7 transition duration-200 hover:-translate-y-1 hover:shadow-soft ${
                         plan.highlighted
-                          ? "border-primary-600 bg-primary-50 shadow-soft"
-                          : "border-app-border bg-app-card"
+                          ? "border-primary-600 bg-app-card shadow-soft ring-1 ring-primary-200"
+                          : "border-app-border bg-app-card shadow-sm"
                       }`}
                     >
-                      <h2 className="text-xl font-bold text-app-text">{plan.name}</h2>
-                      <p className="mt-3 text-sm leading-6 text-app-muted">
+                      {plan.highlighted && (
+                        <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary-600 px-4 py-1 text-xs font-semibold text-white shadow-sm">
+                          Populaire
+                        </span>
+                      )}
+
+                      <div className="flex items-center gap-3">
+                        <span
+                          className={`flex h-11 w-11 items-center justify-center rounded-xl text-lg font-bold ${
+                            plan.highlighted
+                              ? "bg-primary-600 text-white"
+                              : "bg-primary-50 text-primary-700 ring-1 ring-primary-100"
+                          }`}
+                        >
+                          {plan.name.charAt(0).toUpperCase()}
+                        </span>
+                        <div>
+                          <h2 className="text-xl font-bold text-app-text">{plan.name}</h2>
+                          <p className="text-xs font-medium uppercase tracking-wide text-app-muted">
+                            {plan.code}
+                          </p>
+                        </div>
+                      </div>
+
+                      <p className="mt-4 min-h-[2.5rem] text-sm leading-6 text-app-muted">
                         {plan.description}
                       </p>
 
-                      <p className="mt-6 text-2xl font-bold text-app-text">
-                        {plan.priceMonthly ? (
-                          <>
-                            {plan.priceMonthly}
-                            {plan.currency ? (
-                              <span className="ml-1 text-base font-medium text-app-muted">
-                                {plan.currency}
+                      <div className="mt-5 border-t border-app-border pt-5">
+                        <p className="flex items-baseline gap-1 text-3xl font-bold text-app-text">
+                          {plan.priceMonthly ? (
+                            <>
+                              {plan.priceMonthly}
+                              {plan.currency ? (
+                                <span className="text-base font-medium text-app-muted">
+                                  {plan.currency}
+                                </span>
+                              ) : null}
+                              <span className="text-sm font-medium text-app-muted">
+                                {" "}
+                                / mois
                               </span>
-                            ) : null}
-                            <span className="text-sm font-medium text-app-muted">
-                              {" "}
-                              / mois
-                            </span>
-                          </>
-                        ) : (
-                          "Prix à définir"
-                        )}
-                      </p>
+                            </>
+                          ) : (
+                            "Prix à définir"
+                          )}
+                        </p>
+                      </div>
 
                       <PlanElements plan={plan} />
 
-                      <div className="mt-auto pt-6">
-                        <PublicAuthLink
+                      <div className="mt-auto pt-7">
+                        <LinkButton
+                          href={"/tarifs/" + encodeURIComponent(plan.name)}
                           variant={plan.highlighted ? "primary" : "secondary"}
                           className="w-full"
-                          loggedInHref={
-                            plan.highlighted
-                              ? "/app/subscription"
-                              : "/app/select-pharmacy"
-                          }
-                          loggedInLabel={
-                            plan.highlighted ? "Voir mon abonnement" : "Ouvrir Kisinet"
-                          }
                         >
-                          {plan.highlighted ? "Choisir ce plan" : "Se connecter"}
-                        </PublicAuthLink>
+                          Sélectionner
+                        </LinkButton>
                       </div>
                     </article>
                   ))}
@@ -132,57 +158,5 @@ export default function TarifsPage() {
         </section>
       </main>
     </PublicLayout>
-  );
-}
-
-type PlanElement = { label: string; value: string };
-
-function buildPlanElements(plan: PharmacyPlan): PlanElement[] {
-  const elements: PlanElement[] = [];
-
-  if (plan.unlimitedUsers) {
-    elements.push({ label: "Utilisateurs", value: "Illimité" });
-  } else if (plan.maxUsers && plan.maxUsers !== 0) {
-    elements.push({ label: "Utilisateurs", value: String(plan.maxUsers) });
-  }
-
-  if (plan.unlimitedProducts) {
-    elements.push({ label: "Produits", value: "Illimité" });
-  }
-
-  if (plan.unlimitedBranches) {
-    elements.push({ label: "Succursales", value: "Illimité" });
-  } else if (plan.maxBranches && plan.maxBranches !== 0) {
-    elements.push({ label: "Succursales", value: String(plan.maxBranches) });
-  }
-
-  for (const feature of plan.features) {
-    if (feature.enabled) {
-      elements.push({ label: feature.label, value: "Inclus" });
-    }
-  }
-
-  return elements;
-}
-
-function PlanElements({ plan }: { plan: PharmacyPlan }) {
-  const elements = buildPlanElements(plan);
-
-  if (elements.length === 0) {
-    return null;
-  }
-
-  return (
-    <ul className="mt-5 grid gap-2 border-t border-app-border pt-5 text-sm">
-      {elements.map((element) => (
-        <li key={element.label} className="flex items-center justify-between gap-3">
-          <span className="flex items-center gap-2 text-app-muted">
-            <span className="text-success-600">●</span>
-            {element.label}
-          </span>
-          <span className="font-semibold text-app-text">{element.value}</span>
-        </li>
-      ))}
-    </ul>
   );
 }

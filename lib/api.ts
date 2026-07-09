@@ -754,6 +754,13 @@ export type PharmacyPlanFeature = {
   enabled: boolean;
 };
 
+export type PharmacyPlanDuration = {
+  durationMonths: number;
+  label: string;
+  discountPercentage: number;
+  totalAmount: string;
+};
+
 export type PharmacyPlan = {
   id: number;
   code: string;
@@ -767,8 +774,46 @@ export type PharmacyPlan = {
   unlimitedProducts: boolean;
   unlimitedBranches: boolean;
   features: PharmacyPlanFeature[];
+  durations: PharmacyPlanDuration[];
   highlighted?: boolean;
 };
+
+function normalizePharmacyPlan(item: UnknownRecord): PharmacyPlan {
+  return {
+    id: Number(item.id),
+    code: String(item.code || ""),
+    name: String(item.name || item.label || ""),
+    description: String(item.description || item.tagline || ""),
+    priceMonthly: getText(item.price_monthly ?? item.price ?? item.monthly_price),
+    currency: String(item.currency || ""),
+    maxUsers: item.max_users === null ? null : Number(item.max_users),
+    maxBranches: item.max_branches === null ? null : Number(item.max_branches),
+    unlimitedUsers: Boolean(item.unlimited_users),
+    unlimitedProducts: Boolean(item.unlimited_products),
+    unlimitedBranches: Boolean(item.unlimited_branches),
+    features: Array.isArray(item.features)
+      ? item.features.map((feature: unknown) => {
+          const featureRecord = feature as UnknownRecord;
+          return {
+            label: String(featureRecord.label || featureRecord.key || ""),
+            enabled: Boolean(featureRecord.enabled),
+          };
+        })
+      : [],
+    durations: Array.isArray(item.durations)
+      ? item.durations.map((duration: unknown) => {
+          const durationRecord = duration as UnknownRecord;
+          return {
+            durationMonths: Number(durationRecord.duration_months),
+            label: String(durationRecord.label || ""),
+            discountPercentage: Number(durationRecord.discount_percentage),
+            totalAmount: String(durationRecord.total_amount ?? ""),
+          };
+        })
+      : [],
+    highlighted: Boolean(item.highlighted ?? item.is_popular ?? item.popular),
+  };
+}
 
 export async function getPharmacyPlans(): Promise<PharmacyPlan[]> {
   const data = await fetchPublicApiJson<unknown>(
@@ -784,30 +829,17 @@ export async function getPharmacyPlans(): Promise<PharmacyPlan[]> {
 
   return rows
     .filter((item: unknown): item is UnknownRecord => Boolean(item) && typeof item === "object")
-    .map((item: UnknownRecord) => ({
-      id: Number(item.id),
-      code: String(item.code || ""),
-      name: String(item.name || item.label || ""),
-      description: String(item.description || item.tagline || ""),
-      priceMonthly: getText(item.price_monthly ?? item.price ?? item.monthly_price),
-      currency: String(item.currency || ""),
-      maxUsers: item.max_users === null ? null : Number(item.max_users),
-      maxBranches: item.max_branches === null ? null : Number(item.max_branches),
-      unlimitedUsers: Boolean(item.unlimited_users),
-      unlimitedProducts: Boolean(item.unlimited_products),
-      unlimitedBranches: Boolean(item.unlimited_branches),
-      features: Array.isArray(item.features)
-        ? item.features.map((feature: unknown) => {
-            const featureRecord = feature as UnknownRecord;
-            return {
-              label: String(featureRecord.label || featureRecord.key || ""),
-              enabled: Boolean(featureRecord.enabled),
-            };
-          })
-        : [],
-      highlighted: Boolean(item.highlighted ?? item.is_popular ?? item.popular),
-    }))
+    .map((item: UnknownRecord) => normalizePharmacyPlan(item))
     .filter((plan: PharmacyPlan) => Boolean(plan.id) || Boolean(plan.name));
+}
+
+export async function getPharmacyPlan(name: string): Promise<PharmacyPlan> {
+  const data = await fetchPublicApiJson<UnknownRecord>(
+    "/api/paiements/pharmacy-plans/" + encodeURIComponent(name) + "/",
+    "Impossible de charger le plan pharmacie.",
+  );
+
+  return normalizePharmacyPlan(data);
 }
 
 export async function getCitiesOrProvinces(country: string): Promise<CityOrProvinceOption[]> {
