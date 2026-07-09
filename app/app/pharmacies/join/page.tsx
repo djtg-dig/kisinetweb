@@ -12,7 +12,7 @@ export default function JoinPharmacyPage() {
             Cette page temporaire accueillera la demande pour rejoindre une pharmacie.
           </p>
           <LinkButton href="/app/select-pharmacy" variant="secondary" className="mt-6">
-            Retour à la sélection
+            Retour
           </LinkButton>
         </div>
       </section>

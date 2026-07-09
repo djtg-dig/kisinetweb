@@ -27,7 +27,12 @@ export type PharmacySummary = {
 
 export type PharmacyAddress = {
   country?: string | number;
+  countryId?: string;
+  countryPhoneCode?: string;
+  countryName?: string;
   cityOrProvince?: string | number;
+  cityOrProvinceId?: string;
+  cityOrProvinceName?: string;
   neighborhood?: string;
   street?: string;
   complementAdresse?: string;
@@ -56,11 +61,22 @@ export type PharmacyDetail = {
   updatedAt?: string;
 };
 
+export type UpdatePharmacyAddressInput = {
+  country?: string;
+  cityOrProvince?: string | number | null;
+  neighborhood?: string;
+  street?: string;
+  complementAdresse?: string;
+  postalCode?: string;
+  proximiteTransports?: string;
+  formattedAddress?: string;
+};
+
 export type UpdatePharmacyInput = {
   name?: string;
   email?: string;
   phoneNumber?: string;
-  devise?: string;
+  address?: UpdatePharmacyAddressInput;
 };
 
 export type CreatePharmacyInput = {
@@ -298,6 +314,17 @@ function normalizePharmacyDetail(item: UnknownRecord): PharmacyDetail {
   const address = getRecord(item.adresse);
   const country = address?.country;
   const cityOrProvince = address?.city_or_province;
+  const countryRecord = getRecord(country);
+  const cityOrProvinceRecord = getRecord(cityOrProvince);
+  const countryPhoneCode =
+    getText(countryRecord?.phone_code) ||
+    (country === undefined || country === null ? undefined : String(country));
+  const cityOrProvinceId =
+    cityOrProvinceRecord?.id === undefined || cityOrProvinceRecord?.id === null
+      ? cityOrProvince === undefined || cityOrProvince === null
+        ? undefined
+        : String(cityOrProvince)
+      : String(cityOrProvinceRecord.id);
 
   return {
     id:
@@ -314,12 +341,16 @@ function normalizePharmacyDetail(item: UnknownRecord): PharmacyDetail {
     devise: getText(item.devise),
     address: address
       ? {
-          country:
-            country === undefined || country === null ? undefined : String(country),
-          cityOrProvince:
-            cityOrProvince === undefined || cityOrProvince === null
+          country: countryPhoneCode,
+          countryId:
+            countryRecord?.id === undefined || countryRecord?.id === null
               ? undefined
-              : String(cityOrProvince),
+              : String(countryRecord.id),
+          countryPhoneCode,
+          countryName: getText(countryRecord?.name),
+          cityOrProvince: cityOrProvinceId,
+          cityOrProvinceId,
+          cityOrProvinceName: getText(cityOrProvinceRecord?.name),
           neighborhood: getText(address.neighborhood),
           street: getText(address.street),
           complementAdresse: getText(address.complement_adresse),
@@ -829,12 +860,26 @@ export async function updatePharmacy(
   pharmacyId: string,
   input: UpdatePharmacyInput,
 ): Promise<PharmacyDetail> {
-  const payload = {
+  const payload: Record<string, unknown> = {
     name: input.name,
     email: input.email,
     phone_number: input.phoneNumber,
-    devise: input.devise,
   };
+
+  // L'adresse est imbriquee : on l'envoie uniquement si fournie.
+  if (input.address) {
+    payload.adresse = {
+      country: input.address.country,
+      city_or_province: input.address.cityOrProvince ?? null,
+      neighborhood: input.address.neighborhood,
+      street: input.address.street,
+      complement_adresse: input.address.complementAdresse,
+      postal_code: input.address.postalCode,
+      proximite_transports: input.address.proximiteTransports,
+      formatted_address: input.address.formattedAddress,
+    };
+  }
+
   const data = await sendApiJson<unknown>(
     "/api/pharmacies/" + pharmacyId + "/",
     "PUT",

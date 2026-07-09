@@ -17,13 +17,14 @@ Ce fichier liste les endpoints backend déjà consommés par l'interface fronten
 - `POST /api/pharmacies/{pharmacy_pk}/join-requests/{join_request_id}/archive/`
 - `GET /api/pharmacies/`
 - `POST /api/pharmacies/`
+- `GET /api/pharmacies/{pharmacy_id}/`
+- `PUT /api/pharmacies/{pharmacy_id}/`
 - `GET /api/pharmacies/countries/`
-- `GET /api/pharmacies/cities-or-provinces/`
+- `GET /api/pharmacies/cities-or-provinces/` (paramètre `country` requis : indicatif, ISO2 ou id)
 - `GET /api/pharmacies/{pharmacy_id}/permissions/`
 - `GET /api/pharmacies/{pharmacy_id}/members/`
-- `PATCH /api/pharmacies/{pharmacy_id}/members/{member_id}/`
+- `POST /api/pharmacies/{pharmacy_id}/members/{member_id}/`
 - `DELETE /api/pharmacies/{pharmacy_id}/members/{member_id}/`
-- `POST /api/pharmacies/{pharmacy_id}/members/{member_id}/suspend/`
 - `PUT /api/pharmacies/{pharmacy_id}/members/{member_id}/permissions/`
 - `GET /api/pharmacies/{pharmacy_id}/dashboard/`
 - `GET /api/pharmacies/{pharmacy_id}/stock/alerts/`
@@ -206,29 +207,44 @@ Authorization: Bearer <access_token>
 Accept: application/json
 ```
 
-### PATCH /api/pharmacies/{pharmacy_id}/members/{member_id}/
+### POST /api/pharmacies/{pharmacy_id}/members/{member_id}/
 
-- **Objectif** : modifier le rôle et/ou le statut de suspension d'un membre.
-- **Méthode HTTP** : `PATCH`
+- **Objectif** : modifier le rôle **et/ou** le statut de suspension d'un membre en une
+  seule requête. Cette route remplace l'ancien `PATCH` sur le même endpoint ainsi que
+  l'ancienne route `/suspend/` (supprimée).
+- **Méthode HTTP** : `POST`
 - **URL** : `/api/pharmacies/{pharmacy_id}/members/{member_id}/`
 - **Page frontend** : `/app/pharmacies/[pharmacyId]/settings/human-resources`
-- **Service frontend** : `updatePharmacyMember(pharmacyId, memberId, input)` dans `lib/api`
+- **Service frontend** : `updatePharmacyMember(pharmacyId, memberId, input)` (changement de
+  rôle) et `suspendPharmacyMember(pharmacyId, memberId)` (suspension) dans `lib/api`
 - **Authentification** : requise.
-- **Permission backend** : propriétaire ou `member_update`.
+- **Permission backend** : `member_update` (si le rôle change) et/ou `member_suspend`
+  (si le statut de suspension change). Le propriétaire passe toujours.
 - **Payload envoyé (JSON)** : `role` et/ou `is_suspended`.
-- **Réponse attendue (200)** : membre mis à jour.
+- **Réponse attendue (200)** : membre mis à jour (`PharmacyMemberDetailSerializer`).
 - **Erreurs possibles** : `400 Bad Request`, `401 Unauthorized`, `403 Forbidden`, `404 Not Found`.
 
-#### Exemple de requête
+#### Exemple de requête (changement de rôle)
 
 ```http
-PATCH /api/pharmacies/PH0UKUI3NQ/members/12/
+POST /api/pharmacies/PH0UKUI3NQ/members/12/
 Authorization: Bearer <access_token>
 Content-Type: application/json
 
 {
-  "role": "MANAGER",
-  "is_suspended": false
+  "role": "MANAGER"
+}
+```
+
+#### Exemple de requête (suspension)
+
+```http
+POST /api/pharmacies/PH0UKUI3NQ/members/12/
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+  "is_suspended": true
 }
 ```
 
@@ -243,21 +259,6 @@ Content-Type: application/json
 - **Permission backend** : propriétaire ou `member_delete`.
 - **Réponse attendue** : `204 No Content`.
 - **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden`, `404 Not Found`.
-
-### POST /api/pharmacies/{pharmacy_id}/members/{member_id}/suspend/
-
-- **Objectif** : suspendre un membre.
-- **Méthode HTTP** : `POST`
-- **URL** : `/api/pharmacies/{pharmacy_id}/members/{member_id}/suspend/`
-- **Page frontend** : `/app/pharmacies/[pharmacyId]/settings/human-resources`
-- **Service frontend** : `suspendPharmacyMember(pharmacyId, memberId)` dans `lib/api`
-- **Authentification** : requise.
-- **Permission backend** : propriétaire ou `member_suspend`.
-- **Payload** : aucun corps requis.
-- **Réponse attendue (200)** : membre mis à jour avec `is_suspended = true`.
-- **Comportement frontend** : l'action `Suspendre` est proposée dans la liste
-  déroulante `Actions` et devient non cliquable si l'utilisateur n'a pas le droit
-  `member_suspend`, si le membre est propriétaire ou s'il est déjà suspendu.
 
 ### PUT /api/pharmacies/{pharmacy_id}/members/{member_id}/permissions/
 
@@ -292,6 +293,97 @@ Content-Type: application/json
   "product_view": true,
   "product_create": true,
   "sale_view": true
+}
+```
+
+## Pharmacie (détail)
+
+### GET /api/pharmacies/{pharmacy_id}/
+
+- **Objectif** : consulter le détail complet d'une pharmacie (page « Détails pharmacie »).
+- **Méthode HTTP** : `GET`
+- **URL** : `/api/pharmacies/{pharmacy_id}/`
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/settings/details`
+- **Service frontend** : `getPharmacyDetail(pharmacyId)` dans `lib/api`
+- **Authentification** : requise avec `Authorization: Bearer <access_token>`.
+- **Identifiant** : `{pharmacy_id}` accepte la **référence** publique (`PHXXXXXXXX`) ou
+  l'identifiant interne. La route a été harmonisée avec les autres sous-ressources pour
+  accepter la référence.
+- **Permission backend** : `pharmacy_view` (le propriétaire passe toujours). En cas de
+  refus, l'API renvoie un message explicite dans `detail` (ex. « Vous n'avez pas la
+  permission de consulter cette pharmacie. ») que le frontend affiche tel quel.
+- **Réponse attendue (200)** : `PharmacyDetailSerializer` avec `reference`, `owner_reference`,
+  `owner_full_name` (nom complet du propriétaire), `invited_by_reference`, `name`, `slug`,
+  `email`, `phone_number`, `devise`, `adresse` (pays, ville/province, quartier, rue, etc.),
+  `subscription`, `is_archived_at`, `created_at`, `updated_at`.
+- **Format des dates** : `YYYY-MM-DD HH:MM:SS` (ex. `2026-08-02 14:11:02`), sans fuseau
+  ni microsecondes.
+- **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden`, `404 Not Found`.
+
+> Note : cette même route est aussi celle utilisée par l'édition (voir `PUT` ci-dessous).
+
+#### Exemple de requête
+
+```http
+GET /api/pharmacies/PH0UKUI3NQ/
+Authorization: Bearer <access_token>
+Accept: application/json
+```
+
+### PUT /api/pharmacies/{pharmacy_id}/
+
+- **Objectif** : modifier les coordonnées et/ou l'adresse d'une pharmacie.
+- **Méthode HTTP** : `PUT`
+- **URL** : `/api/pharmacies/{pharmacy_id}/`
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/settings/details`
+- **Service frontend** : `updatePharmacy(pharmacyId, input)` dans `lib/api`
+- **Authentification** : requise.
+- **Permission backend** : propriétaire ou `pharmacy_update`.
+- **Champs immuables** : côté backend, le modèle `Pharmacy` interdit la modification de
+  `owner`, `reference`, `invited_by`, `devise` et `created_at`. Le serializer retire ces
+  champs de la validation, donc le frontend n'envoie **pas** `devise`. La `devise` est
+  affichée en lecture seule dans le formulaire.
+- **Payload envoyé (JSON)** :
+  - Champs simples : `name`, `email`, `phone_number`.
+  - Adresse imbriquée `adresse` (optionnelle) : `country` (indicatif téléphonique, ex.
+    `+243`), `city_or_province` (id), `neighborhood`, `street`, `complement_adresse`,
+    `postal_code`, `proximite_transports`, `formatted_address`. Le frontend renvoie le
+    pays et la ville existants (non modifiables ici) avec les champs d'adresse édités.
+- **Réponse attendue (200)** : pharmacie mise à jour (`PharmacyDetailSerializer`).
+- **Erreurs possibles** : `400 Bad Request`, `401 Unauthorized`, `403 Forbidden`, `404 Not Found`.
+
+#### Exemple de requête (coordonnées)
+
+```http
+PUT /api/pharmacies/PH0UKUI3NQ/
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+  "name": "Pharmacie de Gombe",
+  "email": "contact@pharmacie-gombe.cd",
+  "phone_number": "+243812345678"
+}
+```
+
+#### Exemple de requête (adresse)
+
+```http
+PUT /api/pharmacies/PH0UKUI3NQ/
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+  "adresse": {
+    "country": "+243",
+    "city_or_province": 5,
+    "neighborhood": "Gombe",
+    "street": "Avenue des Trois Z",
+    "complement_adresse": "Immeuble B",
+    "postal_code": "00242",
+    "proximite_transports": "Arrêt Gare centrale",
+    "formatted_address": "Avenue des Trois Z, Gombe, Kinshasa"
+  }
 }
 ```
 

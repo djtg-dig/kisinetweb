@@ -191,7 +191,7 @@ export default function CreatePharmacyPage() {
               </p>
             </div>
             <LinkButton href="/app/select-pharmacy" variant="secondary">
-              Retour à la sélection
+              Retour
             </LinkButton>
           </div>
         </div>
