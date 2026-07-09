@@ -11,6 +11,10 @@ Ce fichier liste les endpoints backend déjà consommés par l'interface fronten
 - `GET /api/pharmacies/public/`
 - `GET /api/pharmacies/public/filter-options/`
 - `POST /api/pharmacies/join-requests/`
+- `GET /api/pharmacies/{pharmacy_pk}/join-requests/`
+- `POST /api/pharmacies/{pharmacy_pk}/join-requests/{join_request_id}/accept/`
+- `POST /api/pharmacies/{pharmacy_pk}/join-requests/{join_request_id}/reject/`
+- `POST /api/pharmacies/{pharmacy_pk}/join-requests/{join_request_id}/archive/`
 - `GET /api/pharmacies/`
 - `POST /api/pharmacies/`
 - `GET /api/pharmacies/countries/`
@@ -113,6 +117,66 @@ Content-Type: application/json
   "message": "Je souhaite rejoindre cette pharmacie."
 }
 ```
+
+### GET /api/pharmacies/{pharmacy_pk}/join-requests/
+
+- **Objectif** : lister les demandes d'adhésion visibles par une pharmacie.
+- **Méthode HTTP** : `GET`
+- **URL** : `/api/pharmacies/{pharmacy_pk}/join-requests/`
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/notifications`
+- **Service frontend** : `getPharmacyJoinRequests(pharmacyDatabaseId)` dans `lib/api`
+- **Authentification** : requise avec `Authorization: Bearer <access_token>`.
+- **Permission backend** : propriétaire ou `join_request_view`.
+- **Effet backend** : les demandes non vues sont marquées comme vues.
+- **Réponse attendue (200)** : liste de demandes, avec notamment `id`, `pharmacy`,
+  `pharmacy_name`, `user`, `user_email`, `requested_role`, `message`, `status`,
+  `is_seen`, `reviewer_email`, `reviewed_at`, `created_at`.
+
+> Remarque : ces endpoints management attendent l'identifiant interne numérique
+> de la pharmacie (`pharmacy_pk`). La page frontend part de la référence publique
+> `[pharmacyId]` (`PHXXXXXXXX`), puis récupère l'id interne via
+> `getPublicPharmacyByReference(pharmacyId)`.
+
+### POST /api/pharmacies/{pharmacy_pk}/join-requests/{join_request_id}/accept/
+
+- **Objectif** : accepter une demande d'adhésion en attente.
+- **Méthode HTTP** : `POST`
+- **URL** : `/api/pharmacies/{pharmacy_pk}/join-requests/{join_request_id}/accept/`
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/notifications`
+- **Service frontend** : `acceptPharmacyJoinRequest(pharmacyDatabaseId, joinRequestId)` dans `lib/api`
+- **Authentification** : requise.
+- **Permission backend** : propriétaire ou `join_request_accept`.
+- **Payload** : aucun corps requis.
+- **Réponse attendue (200)** : demande mise à jour avec `status = ACCEPTED`.
+- **Erreurs possibles** : `400 Bad Request` si la demande n'est plus en attente,
+  `401 Unauthorized`, `403 Forbidden`, `404 Not Found`.
+
+### POST /api/pharmacies/{pharmacy_pk}/join-requests/{join_request_id}/reject/
+
+- **Objectif** : refuser une demande d'adhésion en attente.
+- **Méthode HTTP** : `POST`
+- **URL** : `/api/pharmacies/{pharmacy_pk}/join-requests/{join_request_id}/reject/`
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/notifications`
+- **Service frontend** : `rejectPharmacyJoinRequest(pharmacyDatabaseId, joinRequestId)` dans `lib/api`
+- **Authentification** : requise.
+- **Permission backend** : propriétaire ou `join_request_reject`.
+- **Payload** : aucun corps requis.
+- **Réponse attendue (200)** : demande mise à jour avec `status = REJECTED`.
+- **Erreurs possibles** : `400 Bad Request` si la demande n'est plus en attente,
+  `401 Unauthorized`, `403 Forbidden`, `404 Not Found`.
+
+### POST /api/pharmacies/{pharmacy_pk}/join-requests/{join_request_id}/archive/
+
+- **Objectif** : archiver une demande uniquement côté pharmacie.
+- **Méthode HTTP** : `POST`
+- **URL** : `/api/pharmacies/{pharmacy_pk}/join-requests/{join_request_id}/archive/`
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/notifications`
+- **Service frontend** : `archivePharmacyJoinRequest(pharmacyDatabaseId, joinRequestId)` dans `lib/api`
+- **Authentification** : requise.
+- **Permission backend** : propriétaire ou `join_request_view`.
+- **Payload** : aucun corps requis.
+- **Réponse attendue (200)** : demande archivée côté pharmacie.
+- **Comportement frontend** : la carte est retirée de la liste après succès.
 
 ## Produits
 

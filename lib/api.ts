@@ -46,9 +46,15 @@ export type PharmacyJoinRequestSummary = {
   id?: number;
   pharmacy?: string;
   pharmacyName?: string;
+  user?: string;
+  userEmail?: string;
   requestedRole?: string;
   message?: string;
   status?: string;
+  isSeen?: boolean;
+  reviewerEmail?: string;
+  reviewedAt?: string;
+  createdAt?: string;
 };
 
 export type ProductSummary = {
@@ -263,9 +269,15 @@ function normalizePharmacyJoinRequest(item: UnknownRecord): PharmacyJoinRequestS
     id: item.id === undefined || item.id === null ? undefined : Number(item.id),
     pharmacy: item.pharmacy === undefined || item.pharmacy === null ? undefined : String(item.pharmacy),
     pharmacyName: getText(item.pharmacy_name),
+    user: item.user === undefined || item.user === null ? undefined : String(item.user),
+    userEmail: getText(item.user_email),
     requestedRole: getText(item.requested_role),
     message: getText(item.message),
     status: getText(item.status),
+    isSeen: item.is_seen === undefined ? undefined : Boolean(item.is_seen),
+    reviewerEmail: getText(item.reviewer_email),
+    reviewedAt: getText(item.reviewed_at),
+    createdAt: getText(item.created_at),
   };
 }
 
@@ -393,6 +405,31 @@ async function fetchPublicApiJson<T>(path: string, fallbackMessage: string): Pro
   const response = await fetch(apiBaseUrl.replace(/\/$/, "") + path, {
     cache: "no-store",
     headers: {
+      Accept: "application/json",
+    },
+  });
+
+  const responseText = await response.text();
+  const data = parseJsonResponse(responseText);
+
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(data, fallbackMessage));
+  }
+
+  return data as T;
+}
+
+async function postApiJson<T>(path: string, fallbackMessage: string): Promise<T> {
+  const accessToken = getAccessToken();
+  if (!accessToken) {
+    throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
+  }
+
+  const response = await fetch(apiBaseUrl.replace(/\/$/, "") + path, {
+    method: "POST",
+    cache: "no-store",
+    headers: {
+      Authorization: "Bearer " + accessToken,
       Accept: "application/json",
     },
   });
@@ -585,6 +622,63 @@ export async function getPharmacyPermissions(pharmacyId: string): Promise<Pharma
   return Object.fromEntries(
     Object.entries(record).map(([key, value]) => [key, Boolean(value)]),
   ) as PharmacyPermissions;
+}
+
+export async function getPharmacyJoinRequests(
+  pharmacyDatabaseId: string,
+): Promise<PharmacyJoinRequestSummary[]> {
+  const data = await fetchApiJson<unknown>(
+    "/api/pharmacies/" + pharmacyDatabaseId + "/join-requests/",
+    "Impossible de charger les notifications.",
+  );
+  const rows = Array.isArray(data) ? data : [];
+
+  return rows
+    .filter((item: unknown): item is UnknownRecord => Boolean(item) && typeof item === "object")
+    .map(normalizePharmacyJoinRequest)
+    .filter((joinRequest) => Boolean(joinRequest.id));
+}
+
+export async function acceptPharmacyJoinRequest(
+  pharmacyDatabaseId: string,
+  joinRequestId: number,
+): Promise<PharmacyJoinRequestSummary> {
+  const data = await postApiJson<unknown>(
+    "/api/pharmacies/" + pharmacyDatabaseId + "/join-requests/" + joinRequestId + "/accept/",
+    "Impossible d'accepter cette demande.",
+  );
+
+  return data && typeof data === "object"
+    ? normalizePharmacyJoinRequest(data as UnknownRecord)
+    : {};
+}
+
+export async function rejectPharmacyJoinRequest(
+  pharmacyDatabaseId: string,
+  joinRequestId: number,
+): Promise<PharmacyJoinRequestSummary> {
+  const data = await postApiJson<unknown>(
+    "/api/pharmacies/" + pharmacyDatabaseId + "/join-requests/" + joinRequestId + "/reject/",
+    "Impossible de refuser cette demande.",
+  );
+
+  return data && typeof data === "object"
+    ? normalizePharmacyJoinRequest(data as UnknownRecord)
+    : {};
+}
+
+export async function archivePharmacyJoinRequest(
+  pharmacyDatabaseId: string,
+  joinRequestId: number,
+): Promise<PharmacyJoinRequestSummary> {
+  const data = await postApiJson<unknown>(
+    "/api/pharmacies/" + pharmacyDatabaseId + "/join-requests/" + joinRequestId + "/archive/",
+    "Impossible d'archiver cette demande.",
+  );
+
+  return data && typeof data === "object"
+    ? normalizePharmacyJoinRequest(data as UnknownRecord)
+    : {};
 }
 
 function getApiErrorMessages(data: unknown, fallback: string, path = ""): string[] {

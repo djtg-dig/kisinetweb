@@ -15,6 +15,7 @@ const appNavItems = [
   { label: "Stock", path: "/stock" },
   { label: "Ventes", path: "/sales" },
   { label: "Rapports", path: "/reports" },
+  { label: "Notification", path: "/notifications", icon: "bell" },
   { label: "Paramètres", path: "/settings" },
 ];
 
@@ -79,6 +80,7 @@ function DesktopNav({ basePath }: { basePath: string }) {
             key={item.path}
             href={basePath + item.path}
             isActive={isActivePath(pathname, basePath + item.path, item.path)}
+            icon={item.icon}
           >
             {item.label}
           </NavLink>
@@ -183,7 +185,10 @@ function MenuPanel({
         <>
           {appNavItems.map((item) => (
             <MenuLink key={item.path} href={basePath + item.path} onClose={onClose}>
-              {item.label}
+              <span className="inline-flex items-center gap-2">
+                {item.icon === "bell" && <BellIcon className="h-4 w-4" />}
+                {item.label}
+              </span>
             </MenuLink>
           ))}
           <div className="my-2 border-t border-app-border" />
@@ -216,19 +221,22 @@ function MenuPanel({
 function NavLink({
   href,
   isActive,
+  icon,
   children,
 }: {
   href: string;
   isActive: boolean;
+  icon?: string;
   children: React.ReactNode;
 }) {
   return (
     <a
       href={href}
-      className={`shrink-0 rounded-md px-3 py-2 transition hover:bg-primary-50 hover:text-primary-700 ${
+      className={`inline-flex shrink-0 items-center gap-2 rounded-md px-3 py-2 transition hover:bg-primary-50 hover:text-primary-700 ${
         isActive ? "bg-primary-50 text-primary-700" : ""
       }`}
     >
+      {icon === "bell" && <BellIcon className="h-4 w-4" />}
       {children}
     </a>
   );
@@ -257,4 +265,22 @@ function MenuLink({
 
 function isActivePath(pathname: string, href: string, path: string) {
   return path === "/dashboard" ? pathname === href : pathname.startsWith(href);
+}
+
+function BellIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </svg>
+  );
 }
