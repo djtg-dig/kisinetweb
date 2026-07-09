@@ -749,6 +749,67 @@ export async function getCountries(): Promise<CountryOption[]> {
     .filter((country, index, list) => list.findIndex((item) => item.phoneCode === country.phoneCode) === index);
 }
 
+export type PharmacyPlanFeature = {
+  label: string;
+  enabled: boolean;
+};
+
+export type PharmacyPlan = {
+  id: number;
+  code: string;
+  name: string;
+  description: string;
+  priceMonthly?: string;
+  currency?: string;
+  maxUsers: number | null;
+  maxBranches: number | null;
+  unlimitedUsers: boolean;
+  unlimitedProducts: boolean;
+  unlimitedBranches: boolean;
+  features: PharmacyPlanFeature[];
+  highlighted?: boolean;
+};
+
+export async function getPharmacyPlans(): Promise<PharmacyPlan[]> {
+  const data = await fetchPublicApiJson<unknown>(
+    "/api/paiements/pharmacy-plans/",
+    "Impossible de charger les plans pharmacie.",
+  );
+  const record = data as UnknownRecord | null;
+  const rows = Array.isArray(data)
+    ? data
+    : Array.isArray(record?.results)
+      ? record.results
+      : [];
+
+  return rows
+    .filter((item: unknown): item is UnknownRecord => Boolean(item) && typeof item === "object")
+    .map((item: UnknownRecord) => ({
+      id: Number(item.id),
+      code: String(item.code || ""),
+      name: String(item.name || item.label || ""),
+      description: String(item.description || item.tagline || ""),
+      priceMonthly: getText(item.price_monthly ?? item.price ?? item.monthly_price),
+      currency: String(item.currency || ""),
+      maxUsers: item.max_users === null ? null : Number(item.max_users),
+      maxBranches: item.max_branches === null ? null : Number(item.max_branches),
+      unlimitedUsers: Boolean(item.unlimited_users),
+      unlimitedProducts: Boolean(item.unlimited_products),
+      unlimitedBranches: Boolean(item.unlimited_branches),
+      features: Array.isArray(item.features)
+        ? item.features.map((feature: unknown) => {
+            const featureRecord = feature as UnknownRecord;
+            return {
+              label: String(featureRecord.label || featureRecord.key || ""),
+              enabled: Boolean(featureRecord.enabled),
+            };
+          })
+        : [],
+      highlighted: Boolean(item.highlighted ?? item.is_popular ?? item.popular),
+    }))
+    .filter((plan: PharmacyPlan) => Boolean(plan.id) || Boolean(plan.name));
+}
+
 export async function getCitiesOrProvinces(country: string): Promise<CityOrProvinceOption[]> {
   const params = new URLSearchParams();
   if (country) {

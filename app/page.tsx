@@ -37,27 +37,6 @@ const strengths = [
   "Organisation claire des données",
 ];
 
-const plans = [
-  {
-    name: "Gratuit",
-    description: "Pour commencer",
-    buttonLabel: "Se connecter",
-    highlighted: false,
-  },
-  {
-    name: "Professionnel",
-    description: "Pour les pharmacies en croissance",
-    buttonLabel: "Choisir ce plan",
-    highlighted: true,
-  },
-  {
-    name: "Entreprise",
-    description: "Pour les grandes structures",
-    buttonLabel: "Contacter Kisinet",
-    highlighted: false,
-  },
-];
-
 const faqs = [
   {
     question: "Kisinet est-il une pharmacie en ligne ?",
@@ -93,7 +72,7 @@ export default function HomePage() {
         <section className="mx-auto grid max-w-6xl gap-10 px-4 py-14 sm:px-6 md:py-18 lg:grid-cols-[1.05fr_0.95fr] lg:px-8 lg:py-20">
           <div className="flex flex-col justify-center">
             <span className="w-fit rounded-full bg-primary-50 px-3 py-1 text-sm font-semibold text-primary-700 ring-1 ring-primary-100">
-              SaaS de gestion pharmaceutique
+              Systeme de gestion pharmaceutique
             </span>
             <h1 className="mt-5 max-w-3xl text-4xl font-bold leading-tight text-app-text sm:text-5xl">
               Gérez votre pharmacie simplement, rapidement et en toute sécurité.
@@ -187,44 +166,6 @@ export default function HomePage() {
                 <p className="font-semibold text-app-text">{strength}</p>
               </div>
             ))}
-          </div>
-        </section>
-
-        <section id="tarifs" className="scroll-mt-24 bg-app-surface">
-          <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:px-8">
-            <SectionHeading
-              eyebrow="Tarifs"
-              title="Des plans préparés pour chaque étape"
-              description="Les prix définitifs seront précisés plus tard. La structure permet déjà de présenter clairement les offres."
-            />
-            <div className="mt-8 grid gap-4 md:grid-cols-3">
-              {plans.map((plan) => (
-                <article
-                  key={plan.name}
-                  className={`rounded-lg border p-6 ${
-                    plan.highlighted
-                      ? "border-primary-600 bg-primary-50 shadow-soft"
-                      : "border-app-border bg-app-card"
-                  }`}
-                >
-                  <h3 className="text-xl font-bold text-app-text">{plan.name}</h3>
-                  <p className="mt-3 text-sm leading-6 text-app-muted">
-                    {plan.description}
-                  </p>
-                  <p className="mt-6 text-sm font-semibold text-app-text">
-                    Prix à définir
-                  </p>
-                  <PublicAuthLink
-                    variant={plan.highlighted ? "primary" : "secondary"}
-                    className="mt-6 w-full"
-                    loggedInHref={plan.highlighted ? "/app/subscription" : "/app/select-pharmacy"}
-                    loggedInLabel={plan.highlighted ? "Voir mon abonnement" : "Ouvrir Kisinet"}
-                  >
-                    {plan.buttonLabel}
-                  </PublicAuthLink>
-                </article>
-              ))}
-            </div>
           </div>
         </section>
 

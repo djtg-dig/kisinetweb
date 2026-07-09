@@ -33,7 +33,7 @@ export function SiteFooter() {
           title="Navigation"
           links={[
             { label: "Fonctionnalités", href: "/#fonctionnalites" },
-            { label: "Tarifs", href: "/#tarifs" },
+            { label: "Tarifs", href: "/tarifs" },
             { label: "FAQ", href: "/#faq" },
             { label: "Contact", href: "/#contact" },
           ]}
