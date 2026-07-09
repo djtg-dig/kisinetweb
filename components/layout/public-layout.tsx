@@ -198,9 +198,6 @@ function UserMenu({
           <MenuLink href="/app/pharmacies/create" onClose={onClose}>
             Créer une pharmacie
           </MenuLink>
-          <MenuLink href="/app/pharmacies/join" onClose={onClose}>
-            Rejoindre une pharmacie
-          </MenuLink>
           <MenuLink href="/app/profile" onClose={onClose}>
             Mon profil
           </MenuLink>

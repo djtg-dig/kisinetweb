@@ -745,7 +745,8 @@ export async function getCountries(): Promise<CountryOption[]> {
       iso2: String(item.iso2 || ""),
       phoneCode: String(item.phone_code || ""),
     }))
-    .filter((country) => country.id && country.name && country.phoneCode);
+    .filter((country) => country.id && country.name && country.phoneCode)
+    .filter((country, index, list) => list.findIndex((item) => item.phoneCode === country.phoneCode) === index);
 }
 
 export async function getCitiesOrProvinces(country: string): Promise<CityOrProvinceOption[]> {

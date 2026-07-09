@@ -54,9 +54,6 @@ export default function SelectPharmacyPage() {
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
               <LinkButton href="/app/pharmacies/create">Créer une pharmacie</LinkButton>
-              <LinkButton href="/app/pharmacies/join" variant="secondary">
-                Rejoindre une pharmacie
-              </LinkButton>
             </div>
           </div>
 
@@ -68,7 +65,7 @@ export default function SelectPharmacyPage() {
       </section>
 
       <section className="mx-auto min-h-[calc(100vh-235px)] max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-        {state === "loading" && <LoadingState />}
+        {state === "loading" && <LoadingBubble label="Récupération des pharmacies" />}
         {state === "redirecting" && <RedirectingState />}
         {state === "error" && <ErrorState message={errorMessage} />}
         {state === "empty" && <EmptyState />}
@@ -86,18 +83,6 @@ function SummaryTile({ label, value }: { label: string; value: string }) {
       <p className="text-xs font-semibold text-app-muted">{label}</p>
       <p className="mt-1 truncate text-sm font-bold text-app-text">{value}</p>
     </div>
-  );
-}
-
-function LoadingState() {
-  return (
-    <Panel>
-      <p className="text-sm font-semibold text-primary-700">Chargement</p>
-      <h2 className="mt-2 text-xl font-bold text-app-text">Récupération des pharmacies</h2>
-      <p className="mt-2 text-sm leading-6 text-app-muted">
-        Kisinet interroge le backend pour afficher les pharmacies liées à votre session.
-      </p>
-    </Panel>
   );
 }
 
@@ -128,9 +113,6 @@ function EmptyState() {
       </p>
       <div className="mt-5 flex flex-col gap-3 sm:flex-row">
         <LinkButton href="/app/pharmacies/create">Créer une pharmacie</LinkButton>
-        <LinkButton href="/app/pharmacies/join" variant="secondary">
-          Rejoindre une pharmacie
-        </LinkButton>
       </div>
     </Panel>
   );
