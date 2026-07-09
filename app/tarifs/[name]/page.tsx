@@ -48,7 +48,7 @@ export default function PlanDetailPage({ params }: PlanDetailPageProps) {
             aria-hidden="true"
             className="pointer-events-none absolute -top-24 left-1/2 h-72 w-[42rem] -translate-x-1/2 rounded-full bg-primary-200/30 blur-3xl"
           />
-          <div className="relative mx-auto max-w-3xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
+          <div className="relative mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
             <LinkButton href="/tarifs" variant="secondary" className="mb-8">
               ← Retour
             </LinkButton>
