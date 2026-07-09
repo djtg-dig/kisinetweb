@@ -74,7 +74,7 @@ export default function ProductDetailPage({ params }: DetailPageProps) {
             </p>
           </div>
           <LinkButton href={productsPath(pharmacyId)} variant="secondary" className="self-start">
-            Retour aux produits
+            Retour
           </LinkButton>
         </header>
 
@@ -89,7 +89,7 @@ export default function ProductDetailPage({ params }: DetailPageProps) {
                 {errorMessage}
               </p>
               <LinkButton href={productsPath(pharmacyId)} variant="secondary" className="mt-5">
-                Retour aux produits
+                Retour
               </LinkButton>
             </div>
           )}

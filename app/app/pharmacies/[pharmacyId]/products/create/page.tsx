@@ -115,7 +115,7 @@ export default function CreateProductPage({ params }: CreatePageProps) {
             </p>
           </div>
           <LinkButton href={productsPath(pharmacyId)} variant="secondary" className="self-start">
-            Retour aux produits
+            Retour
           </LinkButton>
         </div>
       </header>
@@ -129,7 +129,7 @@ export default function CreateProductPage({ params }: CreatePageProps) {
             </p>
             <div className="mt-4 flex flex-col gap-3 sm:flex-row">
               <LinkButton href={productsPath(pharmacyId)} variant="secondary">
-                Retour aux produits
+                Retour
               </LinkButton>
               <button
                 type="button"
@@ -233,7 +233,7 @@ export default function CreateProductPage({ params }: CreatePageProps) {
               disabled={status === "submitting"}
               className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-700 focus:outline-none focus:ring-4 focus:ring-primary-200 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {status === "submitting" ? "Enregistrement..." : "Enregistrer le produit"}
+              {status === "submitting" ? "Enregistrement..." : "Enregistrer"}
             </button>
           </div>
         </form>

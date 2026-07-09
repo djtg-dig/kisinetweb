@@ -25,6 +25,43 @@ export type PharmacySummary = {
   trialEndsAt?: string;
 };
 
+export type PharmacyAddress = {
+  country?: string | number;
+  cityOrProvince?: string | number;
+  neighborhood?: string;
+  street?: string;
+  complementAdresse?: string;
+  postalCode?: string;
+  proximiteTransports?: string;
+  formattedAddress?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+};
+
+export type PharmacyDetail = {
+  id?: number;
+  reference?: string;
+  ownerReference?: string;
+  invitedByReference?: string | null;
+  name?: string;
+  slug?: string;
+  email?: string;
+  phoneNumber?: string;
+  devise?: string;
+  address?: PharmacyAddress;
+  subscription?: unknown;
+  isArchivedAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type UpdatePharmacyInput = {
+  name?: string;
+  email?: string;
+  phoneNumber?: string;
+  devise?: string;
+};
+
 export type CreatePharmacyInput = {
   name: string;
   email?: string;
@@ -256,6 +293,54 @@ function normalizePharmacy(item: UnknownRecord): PharmacySummary {
   };
 }
 
+function normalizePharmacyDetail(item: UnknownRecord): PharmacyDetail {
+  const address = getRecord(item.adresse);
+  const country = address?.country;
+  const cityOrProvince = address?.city_or_province;
+
+  return {
+    id:
+      item.id === undefined || item.id === null ? undefined : Number(item.id),
+    reference: getText(item.reference),
+    ownerReference: getText(item.owner_reference),
+    invitedByReference:
+      item.invited_by_reference === null ? null : getText(item.invited_by_reference),
+    name: getText(item.name),
+    slug: getText(item.slug),
+    email: getText(item.email),
+    phoneNumber: getText(item.phone_number),
+    devise: getText(item.devise),
+    address: address
+      ? {
+          country:
+            country === undefined || country === null ? undefined : String(country),
+          cityOrProvince:
+            cityOrProvince === undefined || cityOrProvince === null
+              ? undefined
+              : String(cityOrProvince),
+          neighborhood: getText(address.neighborhood),
+          street: getText(address.street),
+          complementAdresse: getText(address.complement_adresse),
+          postalCode: getText(address.postal_code),
+          proximiteTransports: getText(address.proximite_transports),
+          formattedAddress: getText(address.formatted_address),
+          latitude:
+            address.latitude === undefined || address.latitude === null
+              ? null
+              : Number(address.latitude),
+          longitude:
+            address.longitude === undefined || address.longitude === null
+              ? null
+              : Number(address.longitude),
+        }
+      : undefined,
+    subscription: item.subscription,
+    isArchivedAt: getText(item.is_archived_at) ?? null,
+    createdAt: getText(item.created_at),
+    updatedAt: getText(item.updated_at),
+  };
+}
+
 function normalizeProduct(item: UnknownRecord): ProductSummary {
   const reference = item.reference ?? item.id ?? item.pk;
 
@@ -469,6 +554,37 @@ async function postApiJson<T>(path: string, fallbackMessage: string): Promise<T>
       Authorization: "Bearer " + accessToken,
       Accept: "application/json",
     },
+  });
+
+  const responseText = await response.text();
+  const data = parseJsonResponse(responseText);
+
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(data, fallbackMessage));
+  }
+
+  return data as T;
+}
+
+async function postJson<T>(
+  path: string,
+  fallbackMessage: string,
+  body?: unknown,
+): Promise<T> {
+  const accessToken = getAccessToken();
+  if (!accessToken) {
+    throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
+  }
+
+  const response = await fetch(apiBaseUrl.replace(/\/$/, "") + path, {
+    method: "POST",
+    cache: "no-store",
+    headers: {
+      Authorization: "Bearer " + accessToken,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
   });
 
   const responseText = await response.text();
@@ -698,6 +814,35 @@ export async function getPharmacyPermissions(pharmacyId: string): Promise<Pharma
   ) as PharmacyPermissions;
 }
 
+export async function getPharmacyDetail(pharmacyId: string): Promise<PharmacyDetail> {
+  const data = await fetchApiJson<unknown>(
+    "/api/pharmacies/" + pharmacyId + "/",
+    "Impossible de charger les informations de la pharmacie.",
+  );
+
+  return normalizePharmacyDetail((data || {}) as UnknownRecord);
+}
+
+export async function updatePharmacy(
+  pharmacyId: string,
+  input: UpdatePharmacyInput,
+): Promise<PharmacyDetail> {
+  const payload = {
+    name: input.name,
+    email: input.email,
+    phone_number: input.phoneNumber,
+    devise: input.devise,
+  };
+  const data = await sendApiJson<unknown>(
+    "/api/pharmacies/" + pharmacyId + "/",
+    "PUT",
+    "Impossible de modifier la pharmacie.",
+    payload,
+  );
+
+  return normalizePharmacyDetail((data || {}) as UnknownRecord);
+}
+
 export async function getPharmacyMembers(pharmacyId: string): Promise<PharmacyMember[]> {
   const data = await fetchApiJson<unknown>(
     "/api/pharmacies/" + pharmacyId + "/members/",
@@ -720,9 +865,8 @@ export async function updatePharmacyMember(
     role: input.role,
     is_suspended: input.isSuspended,
   };
-  const data = await sendApiJson<unknown>(
+  const data = await postJson<unknown>(
     "/api/pharmacies/" + pharmacyId + "/members/" + memberId + "/",
-    "PATCH",
     "Impossible de modifier ce membre.",
     payload,
   );
@@ -734,9 +878,10 @@ export async function suspendPharmacyMember(
   pharmacyId: string,
   memberId: number,
 ): Promise<PharmacyMember> {
-  const data = await postApiJson<unknown>(
-    "/api/pharmacies/" + pharmacyId + "/members/" + memberId + "/suspend/",
+  const data = await postJson<unknown>(
+    "/api/pharmacies/" + pharmacyId + "/members/" + memberId + "/",
     "Impossible de suspendre ce membre.",
+    { is_suspended: true },
   );
 
   return normalizePharmacyMember((data || {}) as UnknownRecord);

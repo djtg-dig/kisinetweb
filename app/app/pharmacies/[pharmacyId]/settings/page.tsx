@@ -4,7 +4,7 @@ type PharmacySettingsPageProps = {
 
 const settingsCards = [
   {
-    title: "Détails pharmacie",
+    title: "Détails de la  Pharmacie",
     description:
       "Modifier les informations générales de la pharmacie : nom, adresse, contacts et informations administratives.",
     path: "/settings/details",

@@ -638,12 +638,12 @@ function PermissionsModal({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/40 px-3 py-3 sm:items-center sm:px-4 sm:py-6">
+    <div className="fixed inset-0 z-[1100] flex items-stretch justify-center bg-black/40 px-3 pb-3 pt-20 sm:items-center sm:px-4 sm:py-6 sm:pt-6">
       <section
         role="dialog"
         aria-modal="true"
         aria-labelledby="permissions-title"
-        className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-app-border bg-app-card shadow-xl sm:max-h-[88vh]"
+        className="flex max-h-[calc(100dvh-5.75rem)] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-app-border bg-app-card shadow-xl sm:max-h-[88vh]"
       >
         <div className="shrink-0 border-b border-app-border px-4 py-4 sm:px-5">
           <div className="flex items-start justify-between gap-4">
