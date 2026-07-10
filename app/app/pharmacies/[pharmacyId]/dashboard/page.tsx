@@ -5,6 +5,7 @@ import { PharmacyDashboard } from "@/components/dashboard/pharmacy-dashboard";
 import { LinkButton } from "@/components/ui/link-button";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
 import { setActivePharmacyId } from "@/lib/auth";
+import { getPharmacyPermissions, type PharmacyPermissions } from "@/lib/api";
 import { getPharmacyDashboard } from "@/lib/dashboard-api";
 import type { PharmacyDashboardData } from "@/lib/dashboard";
 
@@ -17,6 +18,7 @@ type PageState = "loading" | "error" | "empty" | "ready";
 export default function PharmacyDashboardPage({ params }: DashboardPageProps) {
   const [pharmacyId, setPharmacyId] = useState("");
   const [dashboardData, setDashboardData] = useState<PharmacyDashboardData | null>(null);
+  const [permissions, setPermissions] = useState<PharmacyPermissions>({});
   const [state, setState] = useState<PageState>("loading");
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -39,9 +41,13 @@ export default function PharmacyDashboardPage({ params }: DashboardPageProps) {
       setErrorMessage("");
 
       try {
-        const data = await getPharmacyDashboard(pharmacyId);
+        const [data, userPermissions] = await Promise.all([
+          getPharmacyDashboard(pharmacyId),
+          getPharmacyPermissions(pharmacyId),
+        ]);
         setActivePharmacyId(data.pharmacy.id);
         setDashboardData(data);
+        setPermissions(userPermissions);
         setState("ready");
       } catch (error) {
         const message = error instanceof Error ? error.message : "";
@@ -63,7 +69,9 @@ export default function PharmacyDashboardPage({ params }: DashboardPageProps) {
       {state === "loading" && <DashboardPlaceholder />}
       {state === "error" && <DashboardPlaceholder message={errorMessage} tone="error" />}
       {state === "empty" && <DashboardPlaceholder tone="empty" />}
-      {state === "ready" && dashboardData && <PharmacyDashboard data={dashboardData} />}
+      {state === "ready" && dashboardData && (
+        <PharmacyDashboard data={dashboardData} permissions={permissions} />
+      )}
     </div>
   );
 }

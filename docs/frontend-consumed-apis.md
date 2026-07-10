@@ -573,13 +573,18 @@ Content-Type: application/json
 - **Méthode HTTP** : `GET`
 - **URL** : `/api/pharmacies/{pharmacy_id}/permissions/`
 - **Vue backend** : `MyPharmacyPermissionListView`
-- **Pages frontend** : `/app/pharmacies/[pharmacyId]/products`,
+- **Pages frontend** : `/app/pharmacies/[pharmacyId]/dashboard`,
+  `/app/pharmacies/[pharmacyId]/products`,
   `/app/pharmacies/[pharmacyId]/products/create`,
   `/app/pharmacies/[pharmacyId]/settings/human-resources`
 - **Service frontend** : `getPharmacyPermissions(pharmacyId)` dans `lib/api`
 - **Réponse attendue (200)** : objet dont les clés sont les permissions (ex.
   `product_view`, `product_create`, `product_update`, `product_delete`) avec des
   valeurs booléennes.
+- **Comportement frontend dashboard** : la page dashboard charge ces permissions
+  en même temps que les données du dashboard. Les actions `Nouvelle vente` et
+  `Entrée de stock` restent visibles, mais elles ne sont cliquables que si
+  l'utilisateur possède respectivement `sale_create` et `stock_adjust`.
 - **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden`.
 
 ### GET /api/pharmacies/{pharmacy_id}/activity/

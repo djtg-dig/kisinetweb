@@ -1,4 +1,5 @@
 import { LinkButton } from "@/components/ui/link-button";
+import type { PharmacyPermissions } from "@/lib/api";
 import {
   formatCurrency,
   type DashboardAlert,
@@ -8,14 +9,85 @@ import {
 
 type PharmacyDashboardProps = {
   data: PharmacyDashboardData;
+  permissions: PharmacyPermissions;
 };
 
 const quickActions = [
-  { label: "Nouvelle vente", path: "/sales/create", tone: "primary" },
-  { label: "Entrée de stock", path: "/stock/entries/create", tone: "info" },
-];
+  { label: "Nouvelle vente", path: "/sales/create", permission: "sale_create", tone: "primary" },
+  { label: "Entrée de stock", path: "/stock/entries/create", permission: "stock_adjust", tone: "info" },
+] satisfies {
+  label: string;
+  path: string;
+  permission: keyof PharmacyPermissions;
+  tone: string;
+}[];
 
-export function PharmacyDashboard({ data }: PharmacyDashboardProps) {
+const shortcutPermissions: Record<string, keyof PharmacyPermissions> = {
+  "Nouvelle vente": "sale_create",
+  "Entrée de stock": "stock_adjust",
+};
+
+const disabledActionTitle =
+  "Vous n'avez pas la permission d'effectuer cette action dans cette pharmacie.";
+
+type QuickAction = (typeof quickActions)[number];
+
+type DashboardActionProps = {
+  href: string;
+  label: string;
+  tone?: string;
+  enabled: boolean;
+  compact?: boolean;
+};
+
+const shortcutActionClass =
+  "rounded-lg border border-app-border bg-app-surface px-4 py-3 text-sm font-semibold text-app-text transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700";
+
+const disabledShortcutActionClass =
+  "cursor-not-allowed rounded-lg border border-app-border bg-app-surface px-4 py-3 text-sm font-semibold text-app-muted opacity-60";
+
+function isActionAllowed(permissions: PharmacyPermissions, permission: keyof PharmacyPermissions) {
+  return Boolean(permissions[permission]);
+}
+
+function getQuickActionEnabled(action: QuickAction, permissions: PharmacyPermissions) {
+  return isActionAllowed(permissions, action.permission);
+}
+
+function getShortcutEnabled(label: string, permissions: PharmacyPermissions) {
+  const permission = shortcutPermissions[label];
+
+  return permission ? isActionAllowed(permissions, permission) : true;
+}
+
+function DashboardAction({
+  href,
+  label,
+  tone = "secondary",
+  enabled,
+  compact = false,
+}: DashboardActionProps) {
+  if (!enabled) {
+    return (
+      <span
+        aria-disabled="true"
+        className={compact ? disabledShortcutActionClass : getActionClass(tone, false)}
+        role="link"
+        title={disabledActionTitle}
+      >
+        {label}
+      </span>
+    );
+  }
+
+  return (
+    <a href={href} className={compact ? shortcutActionClass : getActionClass(tone, true)}>
+      {label}
+    </a>
+  );
+}
+
+export function PharmacyDashboard({ data, permissions }: PharmacyDashboardProps) {
   const pharmacyId = data.pharmacy.id;
   const currency = data.pharmacy.devise || "USD";
   const alerts = [
@@ -46,13 +118,13 @@ export function PharmacyDashboard({ data }: PharmacyDashboardProps) {
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
               {quickActions.map((action) => (
-                <a
+                <DashboardAction
                   key={action.label}
                   href={"/app/pharmacies/" + pharmacyId + action.path}
-                  className={getActionClass(action.tone)}
-                >
-                  {action.label}
-                </a>
+                  label={action.label}
+                  tone={action.tone}
+                  enabled={getQuickActionEnabled(action, permissions)}
+                />
               ))}
             </div>
           </div>
@@ -217,13 +289,13 @@ export function PharmacyDashboard({ data }: PharmacyDashboardProps) {
         <Panel title="Raccourcis">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {data.shortcuts.map((shortcut) => (
-              <a
+              <DashboardAction
                 key={shortcut.label}
                 href={shortcut.href}
-                className="rounded-lg border border-app-border bg-app-surface px-4 py-3 text-sm font-semibold text-app-text transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700"
-              >
-                {shortcut.label}
-              </a>
+                label={shortcut.label}
+                enabled={getShortcutEnabled(shortcut.label, permissions)}
+                compact
+              />
             ))}
           </div>
         </Panel>
@@ -320,9 +392,13 @@ function EmptyText({ message }: { message: string }) {
   return <p className="text-sm leading-6 text-app-muted">{message}</p>;
 }
 
-function getActionClass(tone: string) {
+function getActionClass(tone: string, enabled = true) {
   const base =
     "inline-flex min-h-11 items-center justify-center rounded-md px-4 py-2.5 text-sm font-semibold transition focus:outline-none focus:ring-4";
+
+  if (!enabled) {
+    return base + " cursor-not-allowed bg-app-border text-app-muted opacity-70";
+  }
 
   if (tone === "success") {
     return base + " bg-success-600 text-white hover:bg-success-700 focus:ring-success-100";
