@@ -13,7 +13,6 @@ type PharmacyDashboardProps = {
 const quickActions = [
   { label: "Nouvelle vente", path: "/sales/create", tone: "primary" },
   { label: "Entrée de stock", path: "/stock/entries/create", tone: "info" },
-  { label: "Inviter un employé", path: "/members/invite", tone: "secondary" },
 ];
 
 export function PharmacyDashboard({ data }: PharmacyDashboardProps) {
@@ -45,7 +44,7 @@ export function PharmacyDashboard({ data }: PharmacyDashboardProps) {
                 Bonjour, voici un aperçu des activité d'aujourd'hui.
               </p>
             </div>
-            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-2 sm:grid-cols-2">
               {quickActions.map((action) => (
                 <a
                   key={action.label}
