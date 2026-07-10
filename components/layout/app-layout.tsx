@@ -198,7 +198,7 @@ function MenuPanel({
           <div className="my-2 border-t border-app-border" />
         </>
       )}
-      <MenuLink href="/app/profile" onClose={onClose}>
+      <MenuLink href={basePath + "/profile"} onClose={onClose}>
         Mon profil
       </MenuLink>
       <MenuLink href="/app/select-pharmacy" onClose={onClose}>

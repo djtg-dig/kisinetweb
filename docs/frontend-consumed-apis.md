@@ -6,6 +6,24 @@ Ce fichier liste les endpoints backend déjà consommés par l'interface fronten
 
 - `GET /api/carri-account/login/`
 
+## Comptes
+
+- `GET /api/accounts/me/`
+
+### GET /api/accounts/me/
+
+- **Objectif** : consulter le profil de l'utilisateur connecté.
+- **Méthode HTTP** : `GET`
+- **URL** : `/api/accounts/me/`
+- **Pages frontend** : `/app/pharmacies/[pharmacyId]/profile`
+- **Service frontend** : `getAccountProfile()` dans `lib/api`
+- **Authentification** : requise avec `Authorization: Bearer <access_token>`.
+- **Réponse attendue (200)** : profil utilisateur avec `reference`, `email`,
+  `first_name`, `last_name`, `phone_number`, `date_joined` et `updated_at`.
+- **Comportement frontend** : le menu `Compte > Mon profil` mène vers la page
+  profil de la pharmacie active. La route `/app/profile` redirige vers cette page
+  si une pharmacie active est connue, sinon vers `/app/select-pharmacy`.
+
 ## Pharmacies
 
 - `GET /api/pharmacies/public/`

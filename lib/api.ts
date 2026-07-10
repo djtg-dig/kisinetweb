@@ -25,6 +25,16 @@ export type PharmacySummary = {
   trialEndsAt?: string;
 };
 
+export type AccountProfile = {
+  reference?: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  phoneNumber?: string;
+  dateJoined?: string;
+  updatedAt?: string;
+};
+
 export type PharmacyAddress = {
   country?: string | number;
   countryId?: string;
@@ -307,6 +317,18 @@ function normalizePharmacy(item: UnknownRecord): PharmacySummary {
     planName: getText(subscription?.plan_name) ?? getText(subscription?.plan_code),
     subscriptionStatus: getText(subscription?.status),
     trialEndsAt: getText(subscription?.trial_ends_at),
+  };
+}
+
+function normalizeAccountProfile(item: UnknownRecord): AccountProfile {
+  return {
+    reference: getText(item.reference),
+    email: getText(item.email),
+    firstName: getText(item.first_name),
+    lastName: getText(item.last_name),
+    phoneNumber: getText(item.phone_number),
+    dateJoined: getText(item.date_joined),
+    updatedAt: getText(item.updated_at),
   };
 }
 
@@ -731,6 +753,15 @@ export async function getPublicPharmacyFilterOptions(): Promise<PublicPharmacyFi
   );
 
   return normalizePublicPharmacyFilterOptions(data);
+}
+
+export async function getAccountProfile(): Promise<AccountProfile> {
+  const data = await fetchApiJson<unknown>(
+    "/api/accounts/me/",
+    "Impossible de charger votre profil.",
+  );
+
+  return normalizeAccountProfile((data || {}) as UnknownRecord);
 }
 
 export async function getCountries(): Promise<CountryOption[]> {
