@@ -169,6 +169,14 @@ export default function CreatePharmacyPage() {
       });
 
       setActivePharmacyId(pharmacy.id);
+      const params = new URLSearchParams(window.location.search);
+      const returnTo = params.get("return_to");
+
+      if (returnTo?.startsWith("/tarifs/")) {
+        window.location.href = returnTo;
+        return;
+      }
+
       window.location.href = "/app/pharmacies/" + pharmacy.id + "/dashboard";
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
@@ -327,7 +335,7 @@ export default function CreatePharmacyPage() {
             <p className="text-sm font-semibold text-primary-700">Après création</p>
             <p className="mt-2 text-sm leading-6 text-app-muted">
               La pharmacie sera associée à votre compte, puis Kisinet ouvrira son
-              tableau de bord automatiquement.
+              tableau de bord ou vous ramènera vers la souscription en cours.
             </p>
           </aside>
         </form>

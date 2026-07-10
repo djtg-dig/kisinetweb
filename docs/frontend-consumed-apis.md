@@ -76,6 +76,27 @@ Accept: application/json
 - **Réponse attendue (200)** : `countries`, `cities_or_provinces`,
   `neighborhoods`, `orderings`.
 
+### GET /api/pharmacies/
+
+- **Objectif** : lister les pharmacies associées au compte connecté.
+- **Méthode HTTP** : `GET`
+- **URL** : `/api/pharmacies/`
+- **Pages frontend** : `/app/select-pharmacy`, `/tarifs/[name]`
+- **Service frontend** : `getUserPharmacies()` dans `lib/api`
+- **Authentification** : requise avec `Authorization: Bearer <access_token>`.
+- **Moment d'appel sur la souscription** : la page `/tarifs/[name]` appelle cette
+  API uniquement après avoir confirmé qu'un token d'accès est présent. Si
+  l'utilisateur n'est pas connecté, les pharmacies ne sont pas chargées.
+- **Pourquoi elle est utilisée** : permettre à l'utilisateur de choisir la
+  pharmacie qui recevra l'abonnement du plan sélectionné.
+- **Informations récupérées** : pharmacies possédées ou accessibles comme membre
+  actif, avec notamment `id`, `reference`, `name`, `role`, `status`,
+  `planName`, `subscriptionStatus` et `trialEndsAt`.
+- **Comportement frontend** : la page de souscription filtre les pharmacies selon
+  le rôle disponible côté frontend afin de ne proposer que celles qui peuvent
+  gérer un abonnement, puis présélectionne la dernière pharmacie utilisée quand
+  elle est encore disponible.
+
 ### POST /api/pharmacies/join-requests/
 
 - **Objectif** : créer une demande d'adhésion/d'intégration à une pharmacie.
