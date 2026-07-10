@@ -76,6 +76,7 @@ const paymentOptions: { value: PaymentMethod; label: string }[] = [
 export default function CreateSalePage({ params }: CreateSalePageProps) {
   const [pharmacyId, setPharmacyId] = useState("");
   const [pharmacyName, setPharmacyName] = useState("");
+  const [currency, setCurrency] = useState("");
   const [cashierName, setCashierName] = useState("Non renseigné");
   const [pageState, setPageState] = useState<PageState>("loading");
   const [pageError, setPageError] = useState("");
@@ -116,6 +117,7 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
         ]);
         const savedDraft = getSavedSaleDraft(pharmacyId);
         setPharmacyName(dashboard.pharmacy.name);
+        setCurrency(dashboard.pharmacy.devise || "");
         setCashierName(cashier);
         if (savedDraft) {
           restoreDraft(savedDraft);
@@ -147,7 +149,7 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
   const dashboardHref = "/app/pharmacies/" + pharmacyId + "/dashboard";
   const salesHref = "/app/pharmacies/" + pharmacyId + "/sales";
-  const currency = "USD";
+  const activeCurrency = currency;
 
   function restoreDraft(draft: SaleDraftStorage) {
     setItems(draft.items || []);
@@ -402,13 +404,13 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
         <div className="grid gap-6">
           <SaleModeSelector mode={mode} onChange={setMode} />
           {mode === "manual" ? (
-            <ProductSearch pharmacyId={pharmacyId} onAdd={addProduct} currency={currency} />
+            <ProductSearch pharmacyId={pharmacyId} onAdd={addProduct} currency={activeCurrency} />
           ) : (
             <AiScannerPlaceholder />
           )}
           <SaleDraft
             items={items}
-            currency={currency}
+            currency={activeCurrency}
             onQuantityChange={updateQuantity}
             onRemove={removeItem}
           />
@@ -417,7 +419,7 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
           <DiscountSection
             discount={discount}
             subtotal={subtotal}
-            currency={currency}
+            currency={activeCurrency}
             onChange={updateDiscount}
           />
           <PaymentSection
@@ -437,7 +439,7 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
           total={total}
           received={received}
           changeDue={changeDue}
-          currency={currency}
+          currency={activeCurrency}
           cashierName={cashierName}
           submitting={submitting}
           onSaveDraft={saveDraft}

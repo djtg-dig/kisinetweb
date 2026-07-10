@@ -550,7 +550,8 @@ Content-Type: application/json
 - **Recherche produits utilisée** : `GET /api/products/?pharmacy_reference={pharmacy_id}&search={query}&ordering=name&page=1`
   via `searchSaleProducts(pharmacyId, query)`.
 - **Contexte pharmacie utilisé** : `GET /api/pharmacies/{pharmacy_id}/dashboard/`
-  via `getPharmacyDashboard(pharmacyId)` pour afficher le nom de la pharmacie.
+  via `getPharmacyDashboard(pharmacyId)` pour afficher le nom de la pharmacie et
+  utiliser sa devise (`pharmacy.devise`) dans les montants de la vente.
 - **Contexte caissier utilisé** : `GET /api/accounts/me/`
   via `getCurrentCashierName()` pour afficher le nom ou l'email du caissier.
 - **Validation vente** : aucun endpoint backend réel n'est encore consommé. Le helper
