@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { LinkButton } from "@/components/ui/link-button";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
 import {
@@ -561,60 +561,86 @@ function ProductSearch({
 }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SaleProduct[]>([]);
-  const [state, setState] = useState<"idle" | "loading" | "ready" | "empty" | "error">("idle");
+  const [state, setState] = useState<"idle" | "short" | "loading" | "ready" | "empty" | "error">("idle");
   const [error, setError] = useState("");
+  const latestSearchRef = useRef(0);
 
-  async function searchProducts() {
-    if (!query.trim()) {
+  useEffect(() => {
+    const searchTerm = query.trim();
+    latestSearchRef.current += 1;
+    const searchId = latestSearchRef.current;
+
+    if (!searchTerm) {
       setResults([]);
       setState("idle");
+      return;
+    }
+
+    if (searchTerm.length < 2) {
+      setResults([]);
+      setState("short");
       return;
     }
 
     setState("loading");
     setError("");
 
-    try {
-      const rows = await searchSaleProducts(pharmacyId, query);
-      setResults(rows);
-      setState(rows.length ? "ready" : "empty");
-    } catch (searchError) {
-      setError(searchError instanceof Error ? searchError.message : "Recherche indisponible.");
-      setState("error");
-    }
-  }
+    const timer = window.setTimeout(async () => {
+      try {
+        const rows = await searchSaleProducts(pharmacyId, searchTerm);
+        if (latestSearchRef.current !== searchId) {
+          return;
+        }
+
+        setResults(rows);
+        setState(rows.length ? "ready" : "empty");
+      } catch (searchError) {
+        if (latestSearchRef.current !== searchId) {
+          return;
+        }
+
+        setResults([]);
+        setError(searchError instanceof Error ? searchError.message : "Recherche indisponible.");
+        setState("error");
+      }
+    }, 400);
+
+    return () => window.clearTimeout(timer);
+  }, [pharmacyId, query]);
 
   return (
     <section className="rounded-lg border border-app-border bg-app-card p-5 shadow-sm">
-      <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
+      <div className="grid gap-3">
         <label className="grid gap-2">
           <span className="text-sm font-semibold text-app-text">Recherche produit</span>
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                searchProducts();
-              }
-            }}
-            placeholder="Nom, référence ou code-barres saisi"
-            className="min-h-11 rounded-md border border-app-border bg-white px-3 text-sm text-app-text outline-none transition focus:border-primary-300 focus:ring-4 focus:ring-primary-100"
-          />
+          <div className="relative">
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Nom, référence ou code-barres saisi"
+              className="min-h-11 w-full rounded-md border border-app-border bg-white px-3 pr-12 text-sm text-app-text outline-none transition focus:border-primary-300 focus:ring-4 focus:ring-primary-100"
+            />
+            {state === "loading" && (
+              <span
+                aria-label="Recherche en cours"
+                role="status"
+                className="absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 animate-spin rounded-full border-2 border-primary-100 border-t-primary-600"
+              />
+            )}
+          </div>
         </label>
-        <button
-          type="button"
-          onClick={searchProducts}
-          className="self-end rounded-md bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-700 focus:outline-none focus:ring-4 focus:ring-primary-200"
-        >
-          Rechercher
-        </button>
       </div>
 
       <div className="mt-5">
         {state === "idle" && (
           <p className="text-sm text-app-muted">Recherchez par nom, référence ou code-barres.</p>
         )}
-        {state === "loading" && <LoadingBubble label="Recherche des produits" className="min-h-[120px]" />}
+        {state === "short" && (
+          <p className="text-sm text-app-muted">Saisissez au moins 2 caractères.</p>
+        )}
+        {state === "loading" && (
+          <p className="text-sm font-semibold text-primary-700">Recherche en cours...</p>
+        )}
         {state === "error" && <p className="text-sm font-semibold text-red-600">{error}</p>}
         {state === "empty" && <p className="text-sm text-app-muted">Aucun produit trouvé.</p>}
         {state === "ready" && (
@@ -657,8 +683,8 @@ function ProductResultCard({
         <div className="mt-3 grid gap-2 text-sm text-app-muted sm:grid-cols-2 lg:grid-cols-4">
           <Info label="Forme" value={product.form || "Non renseignée"} />
           <Info label="Dosage" value={product.dosage || "Non renseigné"} />
-          <Info label="Expiration" value={formatDate(product.expirationDate)} />
           <Info label="Stock" value={String(product.availableStock)} />
+          <Info label="État" value={getStockStatus(product)} />
         </div>
       </div>
       <div className="flex flex-col gap-3 md:items-end">
@@ -1194,4 +1220,20 @@ function formatDate(value?: string) {
   }
 
   return date.toLocaleDateString("fr-FR");
+}
+
+function getStockStatus(product: SaleProduct) {
+  if (product.availableStock <= 0) {
+    return "Indisponible";
+  }
+
+  if (product.isExpired) {
+    return "Expiré";
+  }
+
+  if (product.isExpiringSoon) {
+    return "Expire bientôt";
+  }
+
+  return "Disponible";
 }

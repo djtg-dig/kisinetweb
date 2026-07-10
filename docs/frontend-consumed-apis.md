@@ -549,6 +549,10 @@ Content-Type: application/json
 - **Service frontend** : types et helpers dans `lib/api/sales.ts`
 - **Recherche produits utilisée** : `GET /api/products/?pharmacy_reference={pharmacy_id}&search={query}&ordering=name&page=1`
   via `searchSaleProducts(pharmacyId, query)`.
+- **Comportement de recherche** : la saisie manuelle déclenche cette recherche en
+  temps réel avec un debounce de 400 ms. Le frontend n'appelle pas l'API pour une
+  recherche vide ou inférieure à 2 caractères, et ignore les réponses obsolètes si
+  l'utilisateur a déjà saisi une nouvelle valeur.
 - **Contexte pharmacie utilisé** : `GET /api/pharmacies/{pharmacy_id}/dashboard/`
   via `getPharmacyDashboard(pharmacyId)` pour afficher le nom de la pharmacie et
   utiliser sa devise (`pharmacy.devise`) dans les montants de la vente.
