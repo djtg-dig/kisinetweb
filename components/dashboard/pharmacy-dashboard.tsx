@@ -25,6 +25,7 @@ const quickActions = [
 const shortcutPermissions: Record<string, keyof PharmacyPermissions> = {
   "Nouvelle vente": "sale_create",
   "Entrée de stock": "stock_adjust",
+  Produits: "product_view",
 };
 
 const disabledActionTitle =

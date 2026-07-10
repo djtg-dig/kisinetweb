@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { SiteFooter } from "@/components/layout/site-footer";
+import { getPharmacyPermissions, type PharmacyPermissions } from "@/lib/api";
 import { clearActivePharmacyId, logout, setActivePharmacyId } from "@/lib/auth";
 
 type AppLayoutProps = {
@@ -12,13 +13,21 @@ type AppLayoutProps = {
 
 const appNavItems = [
   { label: "Dashboard", path: "/dashboard" },
-  { label: "Produits", path: "/products" },
+  { label: "Produits", path: "/products", permission: "product_view" },
   { label: "Stock", path: "/stock" },
   { label: "Ventes", path: "/sales" },
   { label: "Rapports", path: "/reports" },
   { label: "Notification", path: "/notifications", icon: "bell" },
   { label: "Paramètres", path: "/settings" },
-];
+] satisfies {
+  label: string;
+  path: string;
+  icon?: string;
+  permission?: keyof PharmacyPermissions;
+}[];
+
+const disabledNavTitle =
+  "Vous n'avez pas la permission d'accéder à cette section dans cette pharmacie.";
 
 export function AppLayout({ children, pharmacyId }: AppLayoutProps) {
   useEffect(() => {
@@ -38,6 +47,30 @@ export function AppLayout({ children, pharmacyId }: AppLayoutProps) {
 
 function AppNavbar({ pharmacyId }: { pharmacyId: string }) {
   const basePath = "/app/pharmacies/" + pharmacyId;
+  const [permissions, setPermissions] = useState<PharmacyPermissions>({});
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadPermissions() {
+      try {
+        const currentPermissions = await getPharmacyPermissions(pharmacyId);
+        if (isMounted) {
+          setPermissions(currentPermissions);
+        }
+      } catch {
+        if (isMounted) {
+          setPermissions({});
+        }
+      }
+    }
+
+    loadPermissions();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [pharmacyId]);
 
   return (
     <header className="fixed left-0 right-0 top-0 z-[1000] h-16 w-full border-b border-app-border bg-app-surface shadow-sm lg:h-[72px]">
@@ -49,14 +82,20 @@ function AppNavbar({ pharmacyId }: { pharmacyId: string }) {
           <span className="truncate text-base font-bold text-app-text sm:text-lg">Kisinet</span>
         </a>
 
-        <DesktopNav basePath={basePath} />
-        <MobileNav basePath={basePath} />
+        <DesktopNav basePath={basePath} permissions={permissions} />
+        <MobileNav basePath={basePath} permissions={permissions} />
       </nav>
     </header>
   );
 }
 
-function DesktopNav({ basePath }: { basePath: string }) {
+function DesktopNav({
+  basePath,
+  permissions,
+}: {
+  basePath: string;
+  permissions: PharmacyPermissions;
+}) {
   const pathname = usePathname();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -85,6 +124,7 @@ function DesktopNav({ basePath }: { basePath: string }) {
             href={basePath + item.path}
             isActive={isActivePath(pathname, basePath + item.path, item.path)}
             icon={item.icon}
+            enabled={isNavItemEnabled(item, permissions)}
           >
             {item.label}
           </NavLink>
@@ -110,6 +150,7 @@ function DesktopNav({ basePath }: { basePath: string }) {
             basePath={basePath}
             includeAppLinks={false}
             mode="desktop"
+            permissions={permissions}
             onClose={() => setIsUserMenuOpen(false)}
           />
         )}
@@ -118,7 +159,13 @@ function DesktopNav({ basePath }: { basePath: string }) {
   );
 }
 
-function MobileNav({ basePath }: { basePath: string }) {
+function MobileNav({
+  basePath,
+  permissions,
+}: {
+  basePath: string;
+  permissions: PharmacyPermissions;
+}) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -157,6 +204,7 @@ function MobileNav({ basePath }: { basePath: string }) {
           basePath={basePath}
           includeAppLinks
           mode="mobile"
+          permissions={permissions}
           onClose={() => setIsMenuOpen(false)}
         />
       )}
@@ -168,11 +216,13 @@ function MenuPanel({
   basePath,
   includeAppLinks,
   mode,
+  permissions,
   onClose,
 }: {
   basePath: string;
   includeAppLinks: boolean;
   mode: "desktop" | "mobile";
+  permissions: PharmacyPermissions;
   onClose: () => void;
 }) {
   const panelClass =
@@ -188,7 +238,12 @@ function MenuPanel({
       {includeAppLinks && (
         <>
           {appNavItems.map((item) => (
-            <MenuLink key={item.path} href={basePath + item.path} onClose={onClose}>
+            <MenuLink
+              key={item.path}
+              href={basePath + item.path}
+              enabled={isNavItemEnabled(item, permissions)}
+              onClose={onClose}
+            >
               <span className="inline-flex items-center gap-2">
                 {item.icon === "bell" && <BellIcon className="h-4 w-4" />}
                 {item.label}
@@ -241,13 +296,29 @@ function NavLink({
   href,
   isActive,
   icon,
+  enabled = true,
   children,
 }: {
   href: string;
   isActive: boolean;
   icon?: string;
+  enabled?: boolean;
   children: React.ReactNode;
 }) {
+  if (!enabled) {
+    return (
+      <span
+        aria-disabled="true"
+        className="inline-flex shrink-0 cursor-not-allowed items-center gap-2 rounded-md px-3 py-2 text-app-muted opacity-60"
+        role="link"
+        title={disabledNavTitle}
+      >
+        {icon === "bell" && <BellIcon className="h-4 w-4" />}
+        {children}
+      </span>
+    );
+  }
+
   return (
     <a
       href={href}
@@ -264,12 +335,27 @@ function NavLink({
 function MenuLink({
   href,
   children,
+  enabled = true,
   onClose,
 }: {
   href: string;
   children: React.ReactNode;
+  enabled?: boolean;
   onClose: () => void;
 }) {
+  if (!enabled) {
+    return (
+      <span
+        aria-disabled="true"
+        className="block cursor-not-allowed px-4 py-2.5 font-medium text-app-muted opacity-60"
+        role="menuitem"
+        title={disabledNavTitle}
+      >
+        {children}
+      </span>
+    );
+  }
+
   return (
     <a
       role="menuitem"
@@ -280,6 +366,13 @@ function MenuLink({
       {children}
     </a>
   );
+}
+
+function isNavItemEnabled(
+  item: (typeof appNavItems)[number],
+  permissions: PharmacyPermissions,
+) {
+  return item.permission ? Boolean(permissions[item.permission]) : true;
 }
 
 function isActivePath(pathname: string, href: string, path: string) {

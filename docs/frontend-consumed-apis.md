@@ -584,7 +584,11 @@ Content-Type: application/json
 - **Comportement frontend dashboard** : la page dashboard charge ces permissions
   en même temps que les données du dashboard. Les actions `Nouvelle vente` et
   `Entrée de stock` restent visibles, mais elles ne sont cliquables que si
-  l'utilisateur possède respectivement `sale_create` et `stock_adjust`.
+  l'utilisateur possède respectivement `sale_create` et `stock_adjust`. Le
+  raccourci `Produits` n'est cliquable que si l'utilisateur possède `product_view`.
+- **Comportement frontend navbar pharmacie** : l'onglet `Produits` reste visible
+  dans la navigation de la pharmacie, mais il est désactivé quand `product_view`
+  n'est pas accordée.
 - **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden`.
 
 ### GET /api/pharmacies/{pharmacy_id}/activity/
