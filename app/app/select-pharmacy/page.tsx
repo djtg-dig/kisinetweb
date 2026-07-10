@@ -65,13 +65,15 @@ export default function SelectPharmacyPage() {
       </section>
 
       <section className="mx-auto min-h-[calc(100vh-235px)] max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-        {state === "loading" && <LoadingBubble label="Récupération des pharmacies" />}
-        {state === "redirecting" && <RedirectingState />}
-        {state === "error" && <ErrorState message={errorMessage} />}
-        {state === "empty" && <EmptyState />}
-        {state === "ready" && (
-          <PharmacyList pharmacies={pharmacies} onOpenPharmacy={openPharmacy} />
-        )}
+        <div className="min-h-[260px]">
+          {state === "loading" && <LoadingBubble label="Récupération des pharmacies" />}
+          {state === "redirecting" && <RedirectingState />}
+          {state === "error" && <ErrorState message={errorMessage} />}
+          {state === "empty" && <EmptyState />}
+          {state === "ready" && (
+            <PharmacyList pharmacies={pharmacies} onOpenPharmacy={openPharmacy} />
+          )}
+        </div>
       </section>
     </MainLayout>
   );

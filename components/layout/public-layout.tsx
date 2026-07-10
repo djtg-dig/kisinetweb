@@ -21,7 +21,7 @@ const navLinks = [
 ];
 
 type UserMenuState = {
-  isLoggedIn: boolean | null;
+  isLoggedIn: boolean;
   contextPharmacy: PharmacySummary | null;
 };
 
@@ -39,7 +39,7 @@ export function PublicLayout({ children, activePharmacy = null }: PublicLayoutPr
 
 function PublicNavbar({ activePharmacy = null }: { activePharmacy?: PharmacySummary | null }) {
   const [userMenu, setUserMenu] = useState<UserMenuState>({
-    isLoggedIn: null,
+    isLoggedIn: false,
     contextPharmacy: activePharmacy,
   });
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -115,10 +115,8 @@ function PublicNavbar({ activePharmacy = null }: { activePharmacy?: PharmacySumm
           ))}
         </div>
 
-        <div className="flex items-center gap-2">
-          {userMenu.isLoggedIn === null ? (
-            <span aria-hidden="true" className="min-h-11 w-32" />
-          ) : userMenu.isLoggedIn ? (
+        <div className="flex min-h-11 min-w-32 items-center justify-end gap-2">
+          {userMenu.isLoggedIn ? (
             <UserMenu
               contextPharmacy={userMenu.contextPharmacy}
               isOpen={isMenuOpen}

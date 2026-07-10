@@ -20,15 +20,11 @@ export function PublicAuthLink({
   loggedInLabel = "Ouvrir Kisinet",
   variant = "primary",
 }: PublicAuthLinkProps) {
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
     setIsLoggedIn(Boolean(getAccessToken()));
   }, []);
-
-  if (isLoggedIn === null) {
-    return <span aria-hidden="true" className={`inline-flex min-h-11 ${className}`} />;
-  }
 
   return (
     <LinkButton

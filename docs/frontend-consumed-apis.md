@@ -526,7 +526,8 @@ Content-Type: application/json
 - **Objectif** : lister les produits d'une pharmacie (avec pagination et filtres).
 - **Méthode HTTP** : `GET`
 - **URL** : `/api/products/?pharmacy_reference={pharmacy_id}`
-- **Page frontend** : `/app/pharmacies/[pharmacyId]/products`
+- **Pages frontend** : `/app/pharmacies/[pharmacyId]/products`,
+  `/app/pharmacies/[pharmacyId]/sales/create` (recherche manuelle de produits)
 - **Service frontend** : `getPharmacyProducts(pharmacyId, filters)` dans `lib/api`
 - **Paramètre query obligatoire** : `pharmacy_reference` (référence PHXXXXXXXX de la pharmacie).
 - **Autres query params** : `search`, `reference`, `name`, `form`, `target_gender`,
@@ -538,6 +539,38 @@ Content-Type: application/json
 - **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden`.
 - **Endpoint compagnon** : `GET /api/products/filter-options/?pharmacy_reference={pharmacy_id}`
   (`getProductFilterOptions`) renvoie les options des filtres (formes, catégories, etc.).
+
+## Ventes
+
+### Page `/app/pharmacies/{pharmacy_id}/sales/create`
+
+- **Objectif frontend** : préparer une nouvelle vente de pharmacie avant validation.
+- **Route frontend** : `/app/pharmacies/{pharmacy_id}/sales/create`
+- **Service frontend** : types et helpers dans `lib/api/sales.ts`
+- **Recherche produits utilisée** : `GET /api/products/?pharmacy_reference={pharmacy_id}&search={query}&ordering=name&page=1`
+  via `searchSaleProducts(pharmacyId, query)`.
+- **Contexte pharmacie utilisé** : `GET /api/pharmacies/{pharmacy_id}/dashboard/`
+  via `getPharmacyDashboard(pharmacyId)` pour afficher le nom de la pharmacie.
+- **Contexte caissier utilisé** : `GET /api/accounts/me/`
+  via `getCurrentCashierName()` pour afficher le nom ou l'email du caissier.
+- **Validation vente** : aucun endpoint backend réel n'est encore consommé. Le helper
+  `createSale(payload)` existe côté frontend, mais il renvoie le message :
+  `La validation backend de la vente sera ajoutée ultérieurement.`
+- **Brouillon temporaire** : `Enregistrer le brouillon` sauvegarde localement les
+  produits, client, ordonnance, réduction et paiement dans `localStorage`, avec une
+  clé par pharmacie.
+- **Scanner IA** : placeholder visuel uniquement. Aucun fichier n'est envoyé et
+  aucune analyse IA n'est simulée.
+- **Données temporaires** : aucune donnée produit temporaire n'est utilisée pour la
+  recherche manuelle ; les produits viennent de l'API existante. Les champs non
+  exposés par l'API actuelle (`dosage`, `barcode`, `expirationDate`) restent affichés
+  en repli `Non renseigné`.
+- **Endpoints backend manquants à créer plus tard** :
+  - `POST /api/sales/` ou équivalent pour créer/valider une vente.
+  - `POST /api/sales/drafts/` ou équivalent si les brouillons doivent être persistés côté serveur.
+  - `GET /api/sales/?pharmacy_reference={pharmacy_id}` pour l'historique des ventes.
+  - Endpoint de facture/reçu si `Voir la facture` ou `Imprimer le reçu` doivent être activés.
+  - Endpoint d'import/analyse d'ordonnance si le scanner IA devient réel.
 
 ### GET /api/products/{reference}/
 
