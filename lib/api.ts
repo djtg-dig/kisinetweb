@@ -35,6 +35,15 @@ export type AccountProfile = {
   updatedAt?: string;
 };
 
+export type PharmacyActivity = {
+  id: string;
+  type: string;
+  label: string;
+  message: string;
+  user?: string;
+  createdAt?: string;
+};
+
 export type PharmacyAddress = {
   country?: string | number;
   countryId?: string;
@@ -329,6 +338,19 @@ function normalizeAccountProfile(item: UnknownRecord): AccountProfile {
     phoneNumber: getText(item.phone_number),
     dateJoined: getText(item.date_joined),
     updatedAt: getText(item.updated_at),
+  };
+}
+
+function normalizePharmacyActivity(item: UnknownRecord): PharmacyActivity {
+  const type = getText(item.type) || "ACTIVITY";
+
+  return {
+    id: String(item.id || item.created_at || type),
+    type,
+    label: type.replaceAll("_", " "),
+    message: getText(item.message) || "Activité enregistrée.",
+    user: getText(item.user),
+    createdAt: getText(item.created_at),
   };
 }
 
@@ -762,6 +784,18 @@ export async function getAccountProfile(): Promise<AccountProfile> {
   );
 
   return normalizeAccountProfile((data || {}) as UnknownRecord);
+}
+
+export async function getPharmacyActivity(pharmacyId: string): Promise<PharmacyActivity[]> {
+  const data = await fetchApiJson<unknown>(
+    "/api/pharmacies/" + pharmacyId + "/activity/",
+    "Impossible de charger l'historique de la pharmacie.",
+  );
+  const rows = Array.isArray(data) ? data : [];
+
+  return rows
+    .filter((item: unknown): item is UnknownRecord => Boolean(item) && typeof item === "object")
+    .map(normalizePharmacyActivity);
 }
 
 export async function getCountries(): Promise<CountryOption[]> {

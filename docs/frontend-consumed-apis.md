@@ -15,14 +15,13 @@ Ce fichier liste les endpoints backend déjà consommés par l'interface fronten
 - **Objectif** : consulter le profil de l'utilisateur connecté.
 - **Méthode HTTP** : `GET`
 - **URL** : `/api/accounts/me/`
-- **Pages frontend** : `/app/pharmacies/[pharmacyId]/profile`
+- **Pages frontend** : `/app/profile`
 - **Service frontend** : `getAccountProfile()` dans `lib/api`
 - **Authentification** : requise avec `Authorization: Bearer <access_token>`.
 - **Réponse attendue (200)** : profil utilisateur avec `reference`, `email`,
   `first_name`, `last_name`, `phone_number`, `date_joined` et `updated_at`.
 - **Comportement frontend** : le menu `Compte > Mon profil` mène vers la page
-  profil de la pharmacie active. La route `/app/profile` redirige vers cette page
-  si une pharmacie active est connue, sinon vers `/app/select-pharmacy`.
+  profil global de l'utilisateur. Cette page ne dépend pas d'une pharmacie active.
 
 ## Pharmacies
 
@@ -40,6 +39,7 @@ Ce fichier liste les endpoints backend déjà consommés par l'interface fronten
 - `GET /api/pharmacies/countries/`
 - `GET /api/pharmacies/cities-or-provinces/` (paramètre `country` requis : indicatif, ISO2 ou id)
 - `GET /api/pharmacies/{pharmacy_id}/permissions/`
+- `GET /api/pharmacies/{pharmacy_id}/activity/`
 - `GET /api/pharmacies/{pharmacy_id}/members/`
 - `POST /api/pharmacies/{pharmacy_id}/members/{member_id}/`
 - `DELETE /api/pharmacies/{pharmacy_id}/members/{member_id}/`
@@ -581,6 +581,21 @@ Content-Type: application/json
   `product_view`, `product_create`, `product_update`, `product_delete`) avec des
   valeurs booléennes.
 - **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden`.
+
+### GET /api/pharmacies/{pharmacy_id}/activity/
+
+- **Objectif** : récupérer l'activité récente de la pharmacie active.
+- **Méthode HTTP** : `GET`
+- **URL** : `/api/pharmacies/{pharmacy_id}/activity/`
+- **Vue backend** : `PharmacyActivityView`
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/history`
+- **Service frontend** : `getPharmacyActivity(pharmacyId)` dans `lib/api`
+- **Authentification** : requise avec `Authorization: Bearer <access_token>`.
+- **Réponse attendue (200)** : liste d'événements avec `id`, `type`, `message`,
+  `user` et `created_at`.
+- **Comportement frontend** : le menu `Compte > Mon historique` ouvre
+  l'historique de la pharmacie active.
+- **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden`, `404 Not Found`.
 
 ### GET /api/pharmacies/{pharmacy_id}/dashboard/
 

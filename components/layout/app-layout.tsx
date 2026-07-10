@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { SiteFooter } from "@/components/layout/site-footer";
-import { logout, setActivePharmacyId } from "@/lib/auth";
+import { clearActivePharmacyId, logout, setActivePharmacyId } from "@/lib/auth";
 
 type AppLayoutProps = {
   children: React.ReactNode;
@@ -198,8 +198,11 @@ function MenuPanel({
           <div className="my-2 border-t border-app-border" />
         </>
       )}
-      <MenuLink href={basePath + "/profile"} onClose={onClose}>
+      <MenuLink href="/app/profile" onClose={onClose}>
         Mon profil
+      </MenuLink>
+      <MenuLink href={basePath + "/history"} onClose={onClose}>
+        Mon historique
       </MenuLink>
       <MenuLink href="/app/select-pharmacy" onClose={onClose}>
         Mes pharmacies
@@ -210,6 +213,18 @@ function MenuPanel({
       <MenuLink href="/help" onClose={onClose}>
         Aide
       </MenuLink>
+      <button
+        type="button"
+        role="menuitem"
+        onClick={() => {
+          clearActivePharmacyId();
+          onClose();
+          window.location.href = "/app/select-pharmacy";
+        }}
+        className="block w-full px-4 py-2.5 text-left font-semibold text-app-text transition hover:bg-primary-50"
+      >
+        Fermer la pharmacie
+      </button>
       <button
         type="button"
         role="menuitem"

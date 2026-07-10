@@ -49,6 +49,14 @@ export function setActivePharmacyId(pharmacyId: string) {
   localStorage.setItem(ACTIVE_PHARMACY_KEY, pharmacyId);
 }
 
+export function clearActivePharmacyId() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  localStorage.removeItem(ACTIVE_PHARMACY_KEY);
+}
+
 export function logout() {
   if (typeof window === "undefined") {
     return;
