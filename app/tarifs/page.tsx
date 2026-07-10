@@ -83,7 +83,7 @@ export default function TarifsPage() {
                   {plans.map((plan) => (
                     <article
                       key={plan.id || plan.name}
-                      className={`relative flex flex-col rounded-2xl border p-7 transition duration-200 hover:-translate-y-1 hover:shadow-soft ${
+                      className={`relative flex flex-col rounded-2xl border p-5 transition duration-200 hover:-translate-y-1 hover:shadow-soft sm:p-6 lg:p-7 ${
                         plan.highlighted
                           ? "border-primary-600 bg-app-card shadow-soft ring-1 ring-primary-200"
                           : "border-app-border bg-app-card shadow-sm"
@@ -113,11 +113,11 @@ export default function TarifsPage() {
                         </div>
                       </div>
 
-                      <p className="mt-4 min-h-[2.5rem] text-sm leading-6 text-app-muted">
+                      <p className="mt-3 text-sm leading-5 text-app-muted">
                         {plan.description}
                       </p>
 
-                      <div className="mt-5 border-t border-app-border pt-5">
+                      <div className="mt-4 border-t border-app-border pt-4">
                         <p className="flex items-baseline gap-1 text-3xl font-bold text-app-text">
                           {plan.priceMonthly ? (
                             <>
