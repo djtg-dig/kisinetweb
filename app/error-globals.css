@@ -1,0 +1,4 @@
+/* Styles de secours pour les pages d'erreur globales.
+   Réutilise les variables et les bases de globals.css afin que la page
+   d'erreur globale reste stylisée même quand elle remplace le layout racine. */
+@import "./globals.css";

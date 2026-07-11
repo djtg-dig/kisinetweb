@@ -1,5 +1,6 @@
 "use client";
 
+import "./error-globals.css";
 import { AppErrorScreen } from "@/components/app-error-screen";
 
 type GlobalErrorPageProps = {
