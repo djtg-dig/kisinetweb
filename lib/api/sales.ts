@@ -37,13 +37,6 @@ export type CreateSalePayload = {
   customer?: {
     name?: string;
     phone?: string;
-    address?: string;
-    reference?: string;
-  };
-  prescription?: {
-    prescriberName?: string;
-    reference?: string;
-    prescribedAt?: string;
   };
   discount?: {
     type: DiscountType;
@@ -59,12 +52,6 @@ export type CreateSalePayload = {
 export type SaleDraftStorage = {
   customerName: string;
   customerPhone: string;
-  customerAddress: string;
-  customerReference: string;
-  prescriptionMode: "none" | "image";
-  prescriberName: string;
-  prescriptionReference: string;
-  prescriptionDate: string;
   discountType: DiscountType;
   discountValue: string;
   discountReason: string;

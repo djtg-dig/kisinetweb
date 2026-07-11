@@ -29,15 +29,6 @@ type SaleMode = "manual" | "ai";
 type CustomerForm = {
   name: string;
   phone: string;
-  address: string;
-  reference: string;
-};
-
-type PrescriptionForm = {
-  mode: "none" | "image";
-  prescriberName: string;
-  reference: string;
-  prescribedAt: string;
 };
 
 type DiscountForm = {
@@ -49,15 +40,6 @@ type DiscountForm = {
 const defaultCustomer: CustomerForm = {
   name: "",
   phone: "",
-  address: "",
-  reference: "",
-};
-
-const defaultPrescription: PrescriptionForm = {
-  mode: "none",
-  prescriberName: "",
-  reference: "",
-  prescribedAt: "",
 };
 
 const defaultDiscount: DiscountForm = {
@@ -83,7 +65,6 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
   const [mode, setMode] = useState<SaleMode>("manual");
   const [items, setItems] = useState<SaleDraftItem[]>([]);
   const [customer, setCustomer] = useState<CustomerForm>(defaultCustomer);
-  const [prescription, setPrescription] = useState<PrescriptionForm>(defaultPrescription);
   const [discount, setDiscount] = useState<DiscountForm>(defaultDiscount);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
   const [receivedAmount, setReceivedAmount] = useState("");
@@ -156,14 +137,6 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
     setCustomer({
       name: draft.customerName || "",
       phone: draft.customerPhone || "",
-      address: draft.customerAddress || "",
-      reference: draft.customerReference || "",
-    });
-    setPrescription({
-      mode: draft.prescriptionMode || "none",
-      prescriberName: draft.prescriberName || "",
-      reference: draft.prescriptionReference || "",
-      prescribedAt: draft.prescriptionDate || "",
     });
     setDiscount({
       type: draft.discountType || "none",
@@ -178,12 +151,6 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
     return {
       customerName: customer.name,
       customerPhone: customer.phone,
-      customerAddress: customer.address,
-      customerReference: customer.reference,
-      prescriptionMode: prescription.mode,
-      prescriberName: prescription.prescriberName,
-      prescriptionReference: prescription.reference,
-      prescriptionDate: prescription.prescribedAt,
       discountType: discount.type,
       discountValue: discount.value,
       discountReason: discount.reason,
@@ -280,7 +247,6 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
 
     setItems([]);
     setCustomer(defaultCustomer);
-    setPrescription(defaultPrescription);
     setDiscount(defaultDiscount);
     setPaymentMethod("cash");
     setReceivedAmount("");
@@ -313,17 +279,7 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
       customer: cleanObject({
         name: customer.name,
         phone: customer.phone,
-        address: customer.address,
-        reference: customer.reference,
       }),
-      prescription:
-        prescription.mode === "none"
-          ? undefined
-          : cleanObject({
-              prescriberName: prescription.prescriberName,
-              reference: prescription.reference,
-              prescribedAt: prescription.prescribedAt,
-            }),
       discount: {
         type: discount.type,
         value: Number(discount.value || 0),
@@ -415,7 +371,6 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
             onRemove={removeItem}
           />
           <CustomerSection customer={customer} onChange={setCustomer} />
-          <PrescriptionSection prescription={prescription} onChange={setPrescription} />
           <DiscountSection
             discount={discount}
             subtotal={subtotal}
@@ -822,59 +777,7 @@ function CustomerSection({
       <div className="grid gap-3 sm:grid-cols-2">
         <TextInput label="Nom du client" value={customer.name} onChange={(name) => onChange({ ...customer, name })} />
         <TextInput label="Téléphone" value={customer.phone} onChange={(phone) => onChange({ ...customer, phone })} />
-        <TextInput label="Adresse" value={customer.address} onChange={(address) => onChange({ ...customer, address })} />
-        <TextInput
-          label="Référence client"
-          value={customer.reference}
-          onChange={(reference) => onChange({ ...customer, reference })}
-        />
       </div>
-    </FormSection>
-  );
-}
-
-function PrescriptionSection({
-  prescription,
-  onChange,
-}: {
-  prescription: PrescriptionForm;
-  onChange: (prescription: PrescriptionForm) => void;
-}) {
-  return (
-    <FormSection title="Ordonnance associée" description="Section facultative.">
-      <div className="grid gap-3 sm:grid-cols-2">
-        <SelectInput
-          label="Ordonnance"
-          value={prescription.mode}
-          options={[
-            { value: "none", label: "Aucune ordonnance" },
-            { value: "image", label: "Importer une image" },
-          ]}
-          onChange={(mode) => onChange({ ...prescription, mode: mode as "none" | "image" })}
-        />
-        <TextInput
-          label="Nom du prescripteur"
-          value={prescription.prescriberName}
-          onChange={(prescriberName) => onChange({ ...prescription, prescriberName })}
-        />
-        <TextInput
-          label="Référence de l'ordonnance"
-          value={prescription.reference}
-          onChange={(reference) => onChange({ ...prescription, reference })}
-        />
-        <TextInput
-          label="Date de prescription"
-          type="date"
-          value={prescription.prescribedAt}
-          onChange={(prescribedAt) => onChange({ ...prescription, prescribedAt })}
-        />
-      </div>
-      {prescription.mode === "image" && (
-        <label className="mt-4 flex min-h-[110px] cursor-not-allowed items-center justify-center rounded-lg border border-dashed border-app-border bg-app-surface px-4 text-center text-sm font-semibold text-app-muted">
-          Import visuel uniquement pour le moment
-          <input type="file" accept="image/*" className="hidden" disabled />
-        </label>
-      )}
     </FormSection>
   );
 }
