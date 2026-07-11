@@ -4,8 +4,8 @@ import {
   type AccountProfile,
   type ProductSummary,
 } from "@/lib/api";
-
-export type PaymentMethod = "cash" | "mobile_money" | "card" | "other";
+import { getAccessToken } from "@/lib/auth";
+import { apiBaseUrl } from "@/lib/carri-account";
 
 export type DiscountType = "none" | "percent" | "amount";
 
@@ -43,10 +43,6 @@ export type CreateSalePayload = {
     value: number;
     reason?: string;
   };
-  payment: {
-    method: PaymentMethod;
-    receivedAmount: number;
-  };
 };
 
 export type SaleDraftStorage = {
@@ -55,8 +51,6 @@ export type SaleDraftStorage = {
   discountType: DiscountType;
   discountValue: string;
   discountReason: string;
-  paymentMethod: PaymentMethod;
-  receivedAmount: string;
   items: SaleDraftItem[];
 };
 
@@ -85,8 +79,75 @@ export async function getCurrentCashierName(): Promise<string> {
   }
 }
 
-export async function createSale(_payload: CreateSalePayload): Promise<never> {
-  throw new Error("La validation backend de la vente sera ajoutée ultérieurement.");
+export type CreatedSale = {
+  reference: string;
+  pharmacy: string;
+  customer_name?: string;
+  customer_phone?: string;
+  subtotal_amount: string;
+  discount_amount: string;
+  total_amount: string;
+  paid_amount: string;
+  change_amount: string;
+  status: string;
+  items: {
+    pharmacy: string;
+    product: string;
+    product_name: string;
+    unit_price: string;
+    quantity: number;
+    total_price: string;
+  }[];
+  created_at?: string;
+};
+
+export async function createSale(payload: CreateSalePayload): Promise<CreatedSale> {
+  const accessToken = getAccessToken();
+  if (!accessToken) {
+    throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
+  }
+
+  const subtotal = payload.items.reduce(
+    (total, item) => total + item.unitPrice * item.quantity,
+    0,
+  );
+  const discountAmount = calculateDiscountAmount(
+    subtotal,
+    payload.discount?.type || "none",
+    payload.discount?.value || 0,
+  );
+
+  const body = {
+    pharmacy: payload.pharmacyReference,
+    customer_name: payload.customer?.name || "",
+    customer_phone: payload.customer?.phone || "",
+    discount_amount: String(discountAmount),
+    items: payload.items.map((item) => ({
+      pharmacy: payload.pharmacyReference,
+      product: item.productReference,
+      quantity: item.quantity,
+    })),
+  };
+
+  const response = await fetch(apiBaseUrl.replace(/\/$/, "") + "/api/sales/", {
+    method: "POST",
+    cache: "no-store",
+    headers: {
+      Authorization: "Bearer " + accessToken,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  const responseText = await response.text();
+  const data = parseJsonResponse(responseText);
+
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(data, "Impossible de créer la facture."));
+  }
+
+  return data as CreatedSale;
 }
 
 export function saveSaleDraft(pharmacyId: string, draft: SaleDraftStorage) {
@@ -130,4 +191,61 @@ function normalizeSaleProduct(product: ProductSummary): SaleProduct {
     salePrice: product.salePrice,
     availableStock: product.currentStock,
   };
+}
+
+function parseJsonResponse(responseText: string) {
+  if (!responseText) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(responseText);
+  } catch {
+    return responseText;
+  }
+}
+
+function getApiErrorMessage(data: unknown, fallbackMessage: string): string {
+  if (!data) {
+    return fallbackMessage;
+  }
+
+  if (typeof data === "string") {
+    return data;
+  }
+
+  if (typeof data !== "object") {
+    return fallbackMessage;
+  }
+
+  const record = data as Record<string, unknown>;
+  const detail = record.detail;
+  if (typeof detail === "string") {
+    return detail;
+  }
+
+  const messages: string[] = [];
+  for (const [field, value] of Object.entries(record)) {
+    if (typeof value === "string") {
+      messages.push(field + ": " + value);
+    } else if (Array.isArray(value)) {
+      messages.push(field + ": " + value.join(", "));
+    } else if (value && typeof value === "object") {
+      messages.push(field + ": " + JSON.stringify(value));
+    }
+  }
+
+  return messages.length ? messages.join(" | ") : fallbackMessage;
+}
+
+function calculateDiscountAmount(subtotal: number, type: DiscountType, value: number): number {
+  if (type === "none") {
+    return 0;
+  }
+
+  if (type === "percent") {
+    return Math.min(subtotal, Math.max(0, subtotal * (value / 100)));
+  }
+
+  return Math.min(subtotal, Math.max(0, value));
 }

@@ -12,7 +12,6 @@ import {
   searchSaleProducts,
   type CreateSalePayload,
   type DiscountType,
-  type PaymentMethod,
   type SaleDraftItem,
   type SaleDraftStorage,
   type SaleProduct,
@@ -48,13 +47,6 @@ const defaultDiscount: DiscountForm = {
   reason: "",
 };
 
-const paymentOptions: { value: PaymentMethod; label: string }[] = [
-  { value: "cash", label: "Espèces" },
-  { value: "mobile_money", label: "Mobile Money" },
-  { value: "card", label: "Carte" },
-  { value: "other", label: "Autre" },
-];
-
 export default function CreateSalePage({ params }: CreateSalePageProps) {
   const [pharmacyId, setPharmacyId] = useState("");
   const [pharmacyName, setPharmacyName] = useState("");
@@ -66,8 +58,6 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
   const [items, setItems] = useState<SaleDraftItem[]>([]);
   const [customer, setCustomer] = useState<CustomerForm>(defaultCustomer);
   const [discount, setDiscount] = useState<DiscountForm>(defaultDiscount);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
-  const [receivedAmount, setReceivedAmount] = useState("");
   const [feedback, setFeedback] = useState<{ tone: "success" | "error" | "info"; message: string } | null>(
     null,
   );
@@ -125,8 +115,6 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
   );
   const taxAmount = 0;
   const total = Math.max(subtotal - discountAmount + taxAmount, 0);
-  const received = Math.max(Number(receivedAmount || 0), 0);
-  const changeDue = Math.max(received - total, 0);
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
   const dashboardHref = "/app/pharmacies/" + pharmacyId + "/dashboard";
   const salesHref = "/app/pharmacies/" + pharmacyId + "/sales";
@@ -143,8 +131,6 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
       value: draft.discountValue || "",
       reason: draft.discountReason || "",
     });
-    setPaymentMethod(draft.paymentMethod || "cash");
-    setReceivedAmount(draft.receivedAmount || "");
   }
 
   function buildDraft(): SaleDraftStorage {
@@ -154,8 +140,6 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
       discountType: discount.type,
       discountValue: discount.value,
       discountReason: discount.reason,
-      paymentMethod,
-      receivedAmount,
       items,
     };
   }
@@ -237,7 +221,7 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
   }
 
   function cancelDraft() {
-    if (!items.length && !customer.name && !receivedAmount) {
+    if (!items.length && !customer.name) {
       return;
     }
 
@@ -248,8 +232,6 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
     setItems([]);
     setCustomer(defaultCustomer);
     setDiscount(defaultDiscount);
-    setPaymentMethod("cash");
-    setReceivedAmount("");
     clearSaleDraft(pharmacyId);
     setFeedback({ tone: "info", message: "Brouillon vidé." });
   }
@@ -257,14 +239,6 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
   async function submitSale() {
     if (!items.length) {
       setFeedback({ tone: "error", message: "Ajoutez au moins un produit à la vente." });
-      return;
-    }
-
-    if (received < total) {
-      setFeedback({
-        tone: "error",
-        message: "Le montant reçu est inférieur au total à encaisser.",
-      });
       return;
     }
 
@@ -285,23 +259,19 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
         value: Number(discount.value || 0),
         reason: discount.reason || undefined,
       },
-      payment: {
-        method: paymentMethod,
-        receivedAmount: received,
-      },
     };
 
     try {
       await createSale(payload);
       clearSaleDraft(pharmacyId);
-      setFeedback({ tone: "success", message: "Vente validée avec succès." });
+      setFeedback({ tone: "success", message: "Facture créée avec succès. Le paiement sera enregistré par le caissier." });
     } catch (error) {
       setFeedback({
         tone: "info",
         message:
           error instanceof Error
             ? error.message
-            : "La validation backend de la vente sera ajoutée ultérieurement.",
+            : "Impossible de créer la facture.",
       });
     } finally {
       setSubmitting(false);
@@ -377,12 +347,6 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
             currency={activeCurrency}
             onChange={updateDiscount}
           />
-          <PaymentSection
-            method={paymentMethod}
-            receivedAmount={receivedAmount}
-            onMethodChange={setPaymentMethod}
-            onReceivedAmountChange={setReceivedAmount}
-          />
         </div>
 
         <SaleSummary
@@ -392,8 +356,6 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
           discountAmount={discountAmount}
           taxAmount={taxAmount}
           total={total}
-          received={received}
-          changeDue={changeDue}
           currency={activeCurrency}
           cashierName={cashierName}
           submitting={submitting}
@@ -424,7 +386,7 @@ function PageHeader({
         </p>
         <h1 className="mt-2 text-3xl font-bold text-app-text">Nouvelle vente</h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-app-muted">
-          Ajoutez les produits, vérifiez le stock et finalisez la vente.
+          Ajoutez les produits, vérifiez le stock et créez la facture. Le paiement sera enregistré séparément par le caissier.
         </p>
       </div>
       <div className="flex flex-col gap-3 sm:flex-row">
@@ -826,40 +788,6 @@ function DiscountSection({
   );
 }
 
-function PaymentSection({
-  method,
-  receivedAmount,
-  onMethodChange,
-  onReceivedAmountChange,
-}: {
-  method: PaymentMethod;
-  receivedAmount: string;
-  onMethodChange: (method: PaymentMethod) => void;
-  onReceivedAmountChange: (amount: string) => void;
-}) {
-  return (
-    <FormSection title="Moyen de paiement" description="Aucune logique de paiement externe n'est encore déclenchée.">
-      <div className="grid gap-3 sm:grid-cols-2">
-        <SelectInput
-          label="Paiement"
-          value={method}
-          options={paymentOptions}
-          onChange={(value) => onMethodChange(value as PaymentMethod)}
-        />
-        <TextInput
-          label="Montant reçu"
-          type="number"
-          value={receivedAmount}
-          onChange={onReceivedAmountChange}
-        />
-      </div>
-      <p className="mt-3 text-xs text-app-muted">
-        M-Pesa, Airtel Money, Orange Money et Afrimoney pourront être ajoutés plus tard.
-      </p>
-    </FormSection>
-  );
-}
-
 function SaleSummary({
   itemCount,
   totalItems,
@@ -867,8 +795,6 @@ function SaleSummary({
   discountAmount,
   taxAmount,
   total,
-  received,
-  changeDue,
   currency,
   cashierName,
   submitting,
@@ -882,8 +808,6 @@ function SaleSummary({
   discountAmount: number;
   taxAmount: number;
   total: number;
-  received: number;
-  changeDue: number;
   currency: string;
   cashierName: string;
   submitting: boolean;
@@ -903,16 +827,9 @@ function SaleSummary({
         <div className="border-t border-app-border pt-3">
           <SummaryRow label="Total" value={formatCurrency(total, currency)} strong />
         </div>
-        <SummaryRow label="Montant reçu" value={formatCurrency(received, currency)} />
-        <SummaryRow label="Monnaie à rendre" value={formatCurrency(changeDue, currency)} />
         <SummaryRow label="Devise" value={currency} />
         <SummaryRow label="Caissier" value={cashierName} />
       </div>
-      {received > 0 && received < total && (
-        <p className="mt-4 rounded-md border border-orange-200 bg-orange-50 p-3 text-sm font-semibold text-orange-700">
-          Le montant reçu est inférieur au total.
-        </p>
-      )}
       <div className="mt-5 grid gap-3">
         <button
           type="button"
@@ -920,7 +837,7 @@ function SaleSummary({
           disabled={submitting}
           className="inline-flex min-h-11 items-center justify-center rounded-md bg-success-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-success-700 disabled:cursor-not-allowed disabled:opacity-70"
         >
-          {submitting ? "Validation..." : "Valider et encaisser"}
+          {submitting ? "Création..." : "Créer la facture"}
         </button>
         <button
           type="button"
