@@ -592,3 +592,56 @@ Si les changements sont réellement indépendants et nécessitent plusieurs comm
 
 
 8. un message de commit(en francais) proposé, sans aucune commande Git.
+
+
+
+## 22. Mise à jour de la documentation des API consommées
+
+Le fichier :
+
+```text
+docs/frontend-consumed-apis.md
+```
+
+est la référence des API consommées par le frontend.
+
+À chaque tâche, vérifie si les modifications impactent les échanges entre le frontend et le backend.
+
+Cela inclut notamment :
+
+* l'ajout d'un nouvel endpoint ;
+* la suppression d'un endpoint ;
+* la modification d'une URL ;
+* la modification d'une méthode HTTP (`GET`, `POST`, `PUT`, `PATCH`, `DELETE`, etc.) ;
+* la modification des paramètres de requête ;
+* la modification des paramètres de chemin (`path parameters`) ;
+* la modification des en-têtes requis ;
+* la modification du format du corps de la requête ;
+* la modification du format de la réponse ;
+* l'ajout, la suppression ou la modification de champs dans les objets JSON ;
+* la modification des codes de réponse HTTP ;
+* l'ajout de nouvelles règles métier ayant un impact sur les échanges avec l'API.
+
+Si une de ces modifications est effectuée, mets obligatoirement à jour :
+
+```text
+docs/frontend-consumed-apis.md
+```
+
+La documentation doit toujours refléter exactement l'état actuel du frontend.
+
+Ne laisse jamais ce fichier en retard par rapport au code.
+
+Si la tâche ne modifie aucune consommation d'API, indique explicitement dans le compte rendu final :
+
+```text
+Documentation des API : aucune mise à jour nécessaire.
+```
+
+Sinon, indique :
+
+* les sections de la documentation mises à jour ;
+* les endpoints ajoutés, modifiés ou supprimés ;
+* les principales modifications apportées à la documentation.
+
+Ne termine pas une tâche impactant les API sans avoir vérifié la cohérence entre le code et `docs/frontend-consumed-apis.md`.

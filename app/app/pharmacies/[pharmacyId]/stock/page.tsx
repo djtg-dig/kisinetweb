@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/ui/link-button";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
@@ -48,7 +48,6 @@ export default function PharmacyStockPage({ params }: StockPageProps) {
   const [pharmacyId, setPharmacyId] = useState("");
   const [permissions, setPermissions] = useState<PharmacyPermissions>({});
   const [movements, setMovements] = useState<StockMovement[]>([]);
-  const [products, setProducts] = useState<ProductSummary[]>([]);
   const [state, setState] = useState<PageState>("loading");
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -90,18 +89,14 @@ export default function PharmacyStockPage({ params }: StockPageProps) {
           return;
         }
 
-        const [movementsPage, productsPage] = await Promise.all([
-          getStockMovements({
+        const movementsPage = await getStockMovements({
             pharmacyReference: pharmacyId,
             ordering: "-created_at",
             page: String(currentPage),
-          }),
-          getPharmacyProducts(pharmacyId, { ordering: "name", page: "1" }),
-        ]);
+          });
 
-        setMovements(movementsPage.results);
-        setProducts(productsPage.results);
-        setTotalMovements(movementsPage.count);
+          setMovements(movementsPage.results);
+          setTotalMovements(movementsPage.count);
         setHasNextPage(Boolean(movementsPage.next));
         setHasPreviousPage(Boolean(movementsPage.previous));
         setState(movementsPage.results.length ? "ready" : "empty");
@@ -222,8 +217,8 @@ export default function PharmacyStockPage({ params }: StockPageProps) {
         <section className="mt-6 grid gap-6 xl:grid-cols-[380px_1fr] xl:items-start">
           <StockMovementForm
             canCreate={Boolean(permissions.stock_adjust)}
+            pharmacyId={pharmacyId}
             form={form}
-            products={products}
             submitting={submitting}
             onChange={updateForm}
             onSubmit={submitMovement}
@@ -262,15 +257,15 @@ export default function PharmacyStockPage({ params }: StockPageProps) {
 
 function StockMovementForm({
   canCreate,
+  pharmacyId,
   form,
-  products,
   submitting,
   onChange,
   onSubmit,
 }: {
   canCreate: boolean;
+  pharmacyId: string;
   form: MovementForm;
-  products: ProductSummary[];
   submitting: boolean;
   onChange: (name: keyof MovementForm, value: string) => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
@@ -289,33 +284,12 @@ function StockMovementForm({
       )}
 
       <form className="mt-5 grid gap-4" onSubmit={onSubmit}>
-        <label className="grid gap-1 text-sm">
-          <span className="font-semibold text-app-text">Produit</span>
-          <select
-            value={form.productReference}
-            disabled={!canCreate || submitting}
-            onChange={(event) => onChange("productReference", event.target.value)}
-            className="min-h-11 rounded-md border border-app-border bg-app-surface px-3 py-2 text-sm text-app-text outline-none transition focus:border-primary-300 focus:ring-4 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <option value="">Sélectionner un produit</option>
-            {products.map((product) => (
-              <option key={product.reference} value={product.reference}>
-                {product.name} · {product.reference}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="grid gap-1 text-sm">
-          <span className="font-semibold text-app-text">Référence produit</span>
-          <input
-            value={form.productReference}
-            disabled={!canCreate || submitting}
-            placeholder="Ex. PR..."
-            onChange={(event) => onChange("productReference", event.target.value)}
-            className="min-h-11 rounded-md border border-app-border bg-app-surface px-3 py-2 text-sm text-app-text outline-none transition focus:border-primary-300 focus:ring-4 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-60"
-          />
-        </label>
+        <ProductSearchField
+          pharmacyId={pharmacyId}
+          value={form.productReference}
+          disabled={!canCreate || submitting}
+          onSelect={(reference) => onChange("productReference", reference)}
+        />
 
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="grid gap-1 text-sm">
@@ -363,6 +337,178 @@ function StockMovementForm({
         </Button>
       </form>
     </section>
+  );
+}
+
+type ProductSearchState = "idle" | "short" | "loading" | "ready" | "empty" | "error";
+
+function ProductSearchField({
+  pharmacyId,
+  value,
+  disabled,
+  onSelect,
+}: {
+  pharmacyId: string;
+  value: string;
+  disabled: boolean;
+  onSelect: (reference: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<ProductSummary[]>([]);
+  const [selectedName, setSelectedName] = useState("");
+  const [state, setState] = useState<ProductSearchState>("idle");
+  const [error, setError] = useState("");
+  const latestSearchRef = useRef(0);
+
+  // Si la référence est vidée ailleurs (réinitialisation du formulaire),
+  // on oublie le nom du produit sélectionné.
+  useEffect(() => {
+    if (!value) {
+      setSelectedName("");
+    }
+  }, [value]);
+
+  useEffect(() => {
+    const searchTerm = query.trim();
+    latestSearchRef.current += 1;
+    const searchId = latestSearchRef.current;
+
+    if (!searchTerm) {
+      setResults([]);
+      setState("idle");
+      return;
+    }
+
+    if (searchTerm.length < 2) {
+      setResults([]);
+      setState("short");
+      return;
+    }
+
+    setState("loading");
+    setError("");
+
+    const timer = window.setTimeout(async () => {
+      try {
+        const page = await getPharmacyProducts(pharmacyId, {
+          search: searchTerm,
+          ordering: "name",
+          page: "1",
+        });
+
+        if (latestSearchRef.current !== searchId) {
+          return;
+        }
+
+        setResults(page.results);
+        setState(page.results.length ? "ready" : "empty");
+      } catch (searchError) {
+        if (latestSearchRef.current !== searchId) {
+          return;
+        }
+
+        setResults([]);
+        setError(
+          searchError instanceof Error ? searchError.message : "Recherche indisponible.",
+        );
+        setState("error");
+      }
+    }, 400);
+
+    return () => window.clearTimeout(timer);
+  }, [pharmacyId, query]);
+
+  function resetSelection() {
+    onSelect("");
+    setSelectedName("");
+    setQuery("");
+    setResults([]);
+    setState("idle");
+  }
+
+  if (value) {
+    return (
+      <div className="grid gap-1 text-sm">
+        <span className="font-semibold text-app-text">Produit sélectionné</span>
+        <div className="flex items-center justify-between gap-3 rounded-md border border-app-border bg-app-surface px-3 py-2">
+          <span className="min-w-0 truncate text-sm font-semibold text-app-text">
+            {selectedName || value}
+          </span>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={resetSelection}
+            className="shrink-0 rounded-md border border-app-border bg-white px-3 py-1.5 text-xs font-semibold text-app-text transition hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Changer
+          </button>
+        </div>
+        <p className="text-xs font-semibold text-app-muted">Référence {value}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-1 text-sm">
+      <span className="font-semibold text-app-text">Produit</span>
+      <div className="relative">
+        <input
+          value={query}
+          disabled={disabled}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Nom, référence ou code-barres"
+          className="min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 pr-12 text-sm text-app-text outline-none transition focus:border-primary-300 focus:ring-4 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-60"
+        />
+        {state === "loading" && (
+          <span
+            aria-label="Recherche en cours"
+            role="status"
+            className="absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 animate-spin rounded-full border-2 border-primary-100 border-t-primary-600"
+          />
+        )}
+      </div>
+
+      <div className="mt-2">
+        {state === "idle" && (
+          <p className="text-sm text-app-muted">Recherchez par nom, référence ou code-barres.</p>
+        )}
+        {state === "short" && (
+          <p className="text-sm text-app-muted">Saisissez au moins 2 caractères.</p>
+        )}
+        {state === "loading" && (
+          <p className="text-sm font-semibold text-primary-700">Recherche en cours...</p>
+        )}
+        {state === "error" && <p className="text-sm font-semibold text-red-600">{error}</p>}
+        {state === "empty" && <p className="text-sm text-app-muted">Aucun produit trouvé.</p>}
+        {state === "ready" && (
+          <ul className="grid max-h-64 gap-2 overflow-y-auto pr-1">
+            {results.map((product) => (
+              <li key={product.reference}>
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => {
+                    onSelect(product.reference);
+                    setSelectedName(product.name);
+                    setQuery("");
+                    setResults([]);
+                    setState("idle");
+                  }}
+                  className="w-full rounded-md border border-app-border bg-app-surface px-3 py-2 text-left transition hover:border-primary-200 hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <span className="block truncate text-sm font-semibold text-app-text">
+                    {product.name}
+                  </span>
+                  <span className="mt-0.5 block text-xs font-semibold text-app-muted">
+                    Référence {product.reference} · Stock {product.currentStock}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
   );
 }
 

@@ -89,7 +89,7 @@ export async function createStockMovement(
 ): Promise<StockMovement> {
   const payload = {
     pharmacy_reference: input.pharmacyReference,
-    product_reference: input.productReference,
+    product: input.productReference,
     movement_type: input.movementType,
     quantity: input.quantity,
     reason: input.reason || undefined,

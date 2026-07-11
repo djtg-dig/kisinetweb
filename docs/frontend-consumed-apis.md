@@ -527,7 +527,8 @@ Content-Type: application/json
 - **Méthode HTTP** : `GET`
 - **URL** : `/api/products/?pharmacy_reference={pharmacy_id}`
 - **Pages frontend** : `/app/pharmacies/[pharmacyId]/products`,
-  `/app/pharmacies/[pharmacyId]/sales/create` (recherche manuelle de produits)
+  `/app/pharmacies/[pharmacyId]/sales/create` (recherche manuelle de produits),
+  `/app/pharmacies/[pharmacyId]/stock` (champ de recherche du produit du mouvement)
 - **Service frontend** : `getPharmacyProducts(pharmacyId, filters)` dans `lib/api`
 - **Paramètre query obligatoire** : `pharmacy_reference` (référence PHXXXXXXXX de la pharmacie).
 - **Autres query params** : `search`, `reference`, `name`, `form`, `target_gender`,
@@ -539,6 +540,53 @@ Content-Type: application/json
 - **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden`.
 - **Endpoint compagnon** : `GET /api/products/filter-options/?pharmacy_reference={pharmacy_id}`
   (`getProductFilterOptions`) renvoie les options des filtres (formes, catégories, etc.).
+
+## Stock (mouvements)
+
+- `GET /api/stock-movements/`
+- `POST /api/stock-movements/`
+- `GET /api/stock-movements/{id}/`
+
+### GET /api/stock-movements/
+
+- **Objectif** : lister les mouvements de stock (entrées, sorties, ajustements) d'une pharmacie.
+- **Méthode HTTP** : `GET`
+- **URL** : `/api/stock-movements/?pharmacy_reference={pharmacy_id}`
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/stock`
+- **Service frontend** : `getStockMovements(filters)` dans `lib/api/stock-movements.ts`
+- **Paramètre query obligatoire** : `pharmacy_reference` (référence PHXXXXXXXX de la pharmacie).
+- **Autres query params** : `product_reference`, `movement_type`, `ordering`, `page`.
+- **Permission requise** : `stock_view` dans la pharmacie.
+- **Réponse attendue (200)** : objet paginé `{ count, next, previous, results }`.
+
+### POST /api/stock-movements/
+
+- **Objectif** : créer un mouvement de stock manuel (entrée, sortie ou ajustement).
+- **Méthode HTTP** : `POST`
+- **URL** : `/api/stock-movements/`
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/stock` (bloc « Créer un mouvement manuel »)
+- **Service frontend** : `createStockMovement(input)` dans `lib/api/stock-movements.ts`
+- **Permission requise** : `stock_adjust` dans la pharmacie.
+- **Payload envoyé (JSON)** :
+
+  | Champ              | Type    | Obligatoire | Description                                           |
+  |-------------------|---------|-------------|-------------------------------------------------------|
+  | `pharmacy_reference` | string | oui         | Référence PHXXXXXXXX de la pharmacie.              |
+  | `product`          | string  | oui         | Référence du produit concerné par le mouvement. |
+  | `movement_type`   | string  | oui         | `IN`, `OUT` ou `ADJUSTMENT`.                    |
+  | `quantity`        | integer | oui         | Quantité, strictement positive.                    |
+  | `reason`          | string  | non         | Motif du mouvement (envoyé si renseigné).       |
+
+- **Note de champ `product`** : contrairement à la lecture (qui renvoie
+  `product_reference`), la création attend la clé `product` contenant
+  directement la référence du produit (même convention que la création
+  de vente dans `lib/api/sales.ts`). Envoyer `product_reference` est
+  ignoré et provoque l'erreur `product : La référence du produit est obligatoire.`
+- **Réponse attendue (201)** : mouvement créé (serializer de lecture avec
+  `product_reference`, `product_name`, `previous_stock`, `new_stock`, etc.).
+- **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden` (permission
+  `stock_adjust` manquante), `400 Bad Request` si `product` ou `quantity`
+  est manquant/invalide.
 
 ## Ventes
 
