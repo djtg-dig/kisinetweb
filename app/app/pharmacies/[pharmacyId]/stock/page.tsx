@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/ui/link-button";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
@@ -62,6 +62,7 @@ export default function PharmacyStockPage({ params }: StockPageProps) {
   const [selectedMovement, setSelectedMovement] = useState<StockMovement | null>(null);
   const [loadingDetailId, setLoadingDetailId] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
+  const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     async function readParams() {
@@ -78,9 +79,15 @@ export default function PharmacyStockPage({ params }: StockPageProps) {
     }
 
     async function loadStockPage() {
-      setState("loading");
+      // Au premier chargement uniquement, on affiche l'etat de chargement.
+      // Lors d'un rafraichissement (creation, pagination), on conserve la
+      // liste deja affichee afin d'eviter un saut d'affichage.
+      const isFirstLoad = state === "loading";
+      if (isFirstLoad) {
+        setState("loading");
+        setSuccessMessage("");
+      }
       setErrorMessage("");
-      setSuccessMessage("");
 
       try {
         const pharmacyPermissions = await getPharmacyPermissions(pharmacyId);
@@ -103,10 +110,16 @@ export default function PharmacyStockPage({ params }: StockPageProps) {
         setHasPreviousPage(Boolean(movementsPage.previous));
         setState(movementsPage.results.length ? "ready" : "empty");
       } catch (error) {
-        setErrorMessage(
-          error instanceof Error ? error.message : "Impossible de charger le stock.",
-        );
-        setState("error");
+        if (isFirstLoad) {
+          setErrorMessage(
+            error instanceof Error ? error.message : "Impossible de charger le stock.",
+          );
+          setState("error");
+        } else {
+          setErrorMessage(
+            error instanceof Error ? error.message : "Impossible de recharger le stock.",
+          );
+        }
       }
     }
 
@@ -168,9 +181,11 @@ export default function PharmacyStockPage({ params }: StockPageProps) {
         reason: form.reason.trim(),
       });
       setForm(initialForm);
-      setCurrentPage(1);
-      setReloadKey((key) => key + 1);
       setSuccessMessage("Mouvement de stock créé avec succès.");
+      startTransition(() => {
+        setCurrentPage(1);
+        setReloadKey((key) => key + 1);
+      });
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Impossible de créer le mouvement de stock.",
@@ -235,6 +250,7 @@ export default function PharmacyStockPage({ params }: StockPageProps) {
             pharmacyId={pharmacyId}
             form={form}
             submitting={submitting}
+            pending={isPending}
             onChange={updateForm}
             onSubmit={submitMovement}
           />
@@ -275,6 +291,7 @@ function StockMovementForm({
   pharmacyId,
   form,
   submitting,
+  pending,
   onChange,
   onSubmit,
 }: {
@@ -282,6 +299,7 @@ function StockMovementForm({
   pharmacyId: string;
   form: MovementForm;
   submitting: boolean;
+  pending: boolean;
   onChange: (name: keyof MovementForm, value: string) => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
 }) {
@@ -362,7 +380,7 @@ function StockMovementForm({
           />
         </label>
 
-        <Button type="submit" disabled={!canCreate || submitting}>
+        <Button type="submit" disabled={!canCreate || submitting || pending}>
           {submitting ? "Création..." : "Créer le mouvement"}
         </Button>
       </form>
