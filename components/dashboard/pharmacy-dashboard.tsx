@@ -26,6 +26,8 @@ const shortcutPermissions: Record<string, keyof PharmacyPermissions> = {
   "Nouvelle vente": "sale_create",
   "Entrée de stock": "stock_adjust",
   Produits: "product_view",
+  Stock: "stock_view",
+  Ventes: "sale_view",
 };
 
 const disabledActionTitle =
@@ -45,7 +47,7 @@ const shortcutActionClass =
   "rounded-lg border border-app-border bg-app-surface px-4 py-3 text-sm font-semibold text-app-text transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700";
 
 const disabledShortcutActionClass =
-  "cursor-not-allowed rounded-lg border border-app-border bg-app-surface px-4 py-3 text-sm font-semibold text-app-muted opacity-60";
+  "cursor-not-allowed rounded-lg border border-slate-200 bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-400";
 
 function isActionAllowed(permissions: PharmacyPermissions, permission: keyof PharmacyPermissions) {
   return Boolean(permissions[permission]);
@@ -398,7 +400,7 @@ function getActionClass(tone: string, enabled = true) {
     "inline-flex min-h-11 items-center justify-center rounded-md px-4 py-2.5 text-sm font-semibold transition focus:outline-none focus:ring-4";
 
   if (!enabled) {
-    return base + " cursor-not-allowed bg-app-border text-app-muted opacity-70";
+    return base + " cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400";
   }
 
   if (tone === "success") {

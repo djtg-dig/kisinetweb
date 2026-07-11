@@ -14,10 +14,10 @@ type AppLayoutProps = {
 const appNavItems = [
   { label: "Dashboard", path: "/dashboard" },
   { label: "Produits", path: "/products", permission: "product_view" },
-  { label: "Stock", path: "/stock" },
-  { label: "Ventes", path: "/sales" },
+  { label: "Stock", path: "/stock", permission: "stock_view" },
+  { label: "Ventes", path: "/sales", permission: "sale_view" },
   { label: "Rapports", path: "/reports" },
-  { label: "Notification", path: "/notifications", icon: "bell" },
+  { label: "Notification", path: "/notifications", icon: "bell", permission: "join_request_view" },
   { label: "Paramètres", path: "/settings" },
 ] satisfies {
   label: string;
@@ -309,7 +309,7 @@ function NavLink({
     return (
       <span
         aria-disabled="true"
-        className="inline-flex shrink-0 cursor-not-allowed items-center gap-2 rounded-md px-3 py-2 text-app-muted opacity-60"
+        className="inline-flex shrink-0 cursor-not-allowed items-center gap-2 rounded-md border border-slate-200 bg-slate-100 px-3 py-2 text-slate-400"
         role="link"
         title={disabledNavTitle}
       >
@@ -347,7 +347,7 @@ function MenuLink({
     return (
       <span
         aria-disabled="true"
-        className="block cursor-not-allowed px-4 py-2.5 font-medium text-app-muted opacity-60"
+        className="block cursor-not-allowed border-l-2 border-slate-300 bg-slate-50 px-4 py-2.5 font-medium text-slate-400"
         role="menuitem"
         title={disabledNavTitle}
       >
