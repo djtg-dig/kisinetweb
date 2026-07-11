@@ -28,6 +28,7 @@ type MovementForm = {
   productReference: string;
   movementType: StockMovementType;
   quantity: string;
+  newStock: string;
   reason: string;
 };
 
@@ -35,6 +36,7 @@ const initialForm: MovementForm = {
   productReference: "",
   movementType: "IN",
   quantity: "1",
+  newStock: "",
   reason: "",
 };
 
@@ -134,10 +136,22 @@ export default function PharmacyStockPage({ params }: StockPageProps) {
       return;
     }
 
-    const quantity = Number(form.quantity);
-    if (!Number.isFinite(quantity) || quantity <= 0) {
-      setErrorMessage("La quantité doit être supérieure à zéro.");
-      return;
+    const isAdjustment = form.movementType === "ADJUSTMENT";
+    let quantity: number | undefined;
+    let newStock: number | undefined;
+
+    if (isAdjustment) {
+      newStock = Number(form.newStock);
+      if (!Number.isInteger(newStock) || newStock < 0) {
+        setErrorMessage("Le stock final doit être un entier positif ou nul.");
+        return;
+      }
+    } else {
+      quantity = Number(form.quantity);
+      if (!Number.isFinite(quantity) || quantity <= 0) {
+        setErrorMessage("La quantité doit être supérieure à zéro.");
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -150,6 +164,7 @@ export default function PharmacyStockPage({ params }: StockPageProps) {
         productReference: form.productReference.trim(),
         movementType: form.movementType,
         quantity,
+        newStock,
         reason: form.reason.trim(),
       });
       setForm(initialForm);
@@ -308,17 +323,32 @@ function StockMovementForm({
             </select>
           </label>
 
-          <label className="grid gap-1 text-sm">
-            <span className="font-semibold text-app-text">Quantité</span>
-            <input
-              type="number"
-              min="1"
-              value={form.quantity}
-              disabled={!canCreate || submitting}
-              onChange={(event) => onChange("quantity", event.target.value)}
-              className="min-h-11 rounded-md border border-app-border bg-app-surface px-3 py-2 text-sm text-app-text outline-none transition focus:border-primary-300 focus:ring-4 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-60"
-            />
-          </label>
+          {form.movementType === "ADJUSTMENT" ? (
+            <label className="grid gap-1 text-sm">
+              <span className="font-semibold text-app-text">Stock final</span>
+              <input
+                type="number"
+                min="0"
+                value={form.newStock}
+                disabled={!canCreate || submitting}
+                placeholder="Ex. 23"
+                onChange={(event) => onChange("newStock", event.target.value)}
+                className="min-h-11 rounded-md border border-app-border bg-app-surface px-3 py-2 text-sm text-app-text outline-none transition focus:border-primary-300 focus:ring-4 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-60"
+              />
+            </label>
+          ) : (
+            <label className="grid gap-1 text-sm">
+              <span className="font-semibold text-app-text">Quantité</span>
+              <input
+                type="number"
+                min="1"
+                value={form.quantity}
+                disabled={!canCreate || submitting}
+                onChange={(event) => onChange("quantity", event.target.value)}
+                className="min-h-11 rounded-md border border-app-border bg-app-surface px-3 py-2 text-sm text-app-text outline-none transition focus:border-primary-300 focus:ring-4 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-60"
+              />
+            </label>
+          )}
         </div>
 
         <label className="grid gap-1 text-sm">

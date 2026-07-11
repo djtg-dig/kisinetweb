@@ -39,7 +39,8 @@ export type CreateStockMovementInput = {
   pharmacyReference: string;
   productReference: string;
   movementType: StockMovementType;
-  quantity: number;
+  quantity?: number;
+  newStock?: number;
   reason?: string;
 };
 
@@ -91,7 +92,8 @@ export async function createStockMovement(
     pharmacy_reference: input.pharmacyReference,
     product: input.productReference,
     movement_type: input.movementType,
-    quantity: input.quantity,
+    quantity: input.movementType === "ADJUSTMENT" ? undefined : input.quantity,
+    new_stock: input.movementType === "ADJUSTMENT" ? input.newStock : undefined,
     reason: input.reason || undefined,
   };
 

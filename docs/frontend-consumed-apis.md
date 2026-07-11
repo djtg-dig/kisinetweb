@@ -574,7 +574,8 @@ Content-Type: application/json
   | `pharmacy_reference` | string | oui         | Référence PHXXXXXXXX de la pharmacie.              |
   | `product`          | string  | oui         | Référence du produit concerné par le mouvement. |
   | `movement_type`   | string  | oui         | `IN`, `OUT` ou `ADJUSTMENT`.                    |
-  | `quantity`        | integer | oui         | Quantité, strictement positive.                    |
+  | `quantity`        | integer | conditionnel| Quantité strictement positive. Obligatoire pour `IN` et `OUT` ; ignoré pour `ADJUSTMENT`. |
+  | `new_stock`       | integer | conditionnel| Stock final (>= 0). Obligatoire pour `ADJUSTMENT` ; ignoré pour `IN`/`OUT`. |
   | `reason`          | string  | non         | Motif du mouvement (envoyé si renseigné).       |
 
 - **Note de champ `product`** : contrairement à la lecture (qui renvoie
@@ -582,11 +583,15 @@ Content-Type: application/json
   directement la référence du produit (même convention que la création
   de vente dans `lib/api/sales.ts`). Envoyer `product_reference` est
   ignoré et provoque l'erreur `product : La référence du produit est obligatoire.`
+- **Note de champ `new_stock`** : pour un ajustement (`ADJUSTMENT`),
+  le backend attend la **valeur finale du stock** (`new_stock`), et non une
+  quantité. Sinon il renvoie `Le stock final est obligatoire pour un ajustement.`
+  Pour `IN`/`OUT`, c'est `quantity` qui est requis.
 - **Réponse attendue (201)** : mouvement créé (serializer de lecture avec
   `product_reference`, `product_name`, `previous_stock`, `new_stock`, etc.).
 - **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden` (permission
-  `stock_adjust` manquante), `400 Bad Request` si `product` ou `quantity`
-  est manquant/invalide.
+  `stock_adjust` manquante), `400 Bad Request` si `product`, `quantity`
+  (pour IN/OUT) ou `new_stock` (pour ADJUSTMENT) est manquant/invalide.
 
 ## Ventes
 
