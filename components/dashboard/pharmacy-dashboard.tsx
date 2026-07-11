@@ -14,7 +14,7 @@ type PharmacyDashboardProps = {
 
 const quickActions = [
   { label: "Nouvelle vente", path: "/sales/create", permission: "sale_create", tone: "primary" },
-  { label: "Entrée de stock", path: "/stock/entries/create", permission: "stock_adjust", tone: "info" },
+  { label: "Entrée de stock", path: "/stock", permission: "stock_adjust", tone: "info" },
 ] satisfies {
   label: string;
   path: string;

@@ -83,7 +83,7 @@ export function getDashboardShortcuts(pharmacyId: string): DashboardShortcut[] {
   return [
     { label: "Nouvelle vente", href: route(pharmacyId, "/sales/create") },
     { label: "Ajouter un produit", href: route(pharmacyId, "/products/create") },
-    { label: "Entrée de stock", href: route(pharmacyId, "/stock/entries/create") },
+    { label: "Entrée de stock", href: route(pharmacyId, "/stock") },
     { label: "Produits", href: route(pharmacyId, "/products") },
     { label: "Stock", href: route(pharmacyId, "/stock") },
     { label: "Ventes", href: route(pharmacyId, "/sales") },
