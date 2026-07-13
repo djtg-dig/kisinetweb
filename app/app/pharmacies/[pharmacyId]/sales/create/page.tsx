@@ -834,7 +834,7 @@ function SaleSummary({
           <SummaryRow label="Total" value={formatCurrency(total, currency)} strong />
         </div>
         <SummaryRow label="Devise" value={currency} />
-        <SummaryRow label="Caissier" value={cashierName} />
+        <SummaryRow label="Préparée par" value={cashierName} />
       </div>
       <div className="mt-5 grid gap-3">
         <button
