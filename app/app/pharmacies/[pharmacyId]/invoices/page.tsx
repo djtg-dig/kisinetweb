@@ -187,11 +187,7 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
               Consultez, recherchez et suivez les factures de cette pharmacie.
             </p>
           </div>
-          {permissions.sale_create && pharmacyId && (
-            <LinkButton href={"/app/pharmacies/" + pharmacyId + "/sales/create"}>
-              Nouvelle vente
-            </LinkButton>
-          )}
+     
         </div>
       </header>
 
