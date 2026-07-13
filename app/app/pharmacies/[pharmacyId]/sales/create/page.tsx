@@ -274,6 +274,10 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
 
     try {
       await createSale(payload);
+      setItems([]);
+      setCustomer(defaultCustomer);
+      setDiscount(defaultDiscount);
+      setMode("manual");
       clearSaleDraft(pharmacyId);
       setFeedback({ tone: "success", message: "Facture créée avec succès. Le paiement sera enregistré par le caissier." });
     } catch (error) {
@@ -979,6 +983,12 @@ function ToastMessage({
   children: React.ReactNode;
   onClose: () => void;
 }) {
+  useEffect(() => {
+    const timer = window.setTimeout(onClose, 5000);
+
+    return () => window.clearTimeout(timer);
+  }, [children, onClose]);
+
   const toneClass =
     tone === "success"
       ? "border-success-200 bg-success-50 text-success-700"
@@ -987,7 +997,10 @@ function ToastMessage({
         : "border-cyan-200 bg-cyan-50 text-cyan-700";
 
   return (
-    <div className={`mt-6 flex items-start justify-between gap-4 rounded-lg border p-4 ${toneClass}`}>
+    <div
+      role="status"
+      className={`fixed right-4 top-20 z-[1200] flex w-[min(calc(100vw-2rem),28rem)] items-start justify-between gap-4 rounded-lg border p-4 shadow-soft lg:top-24 ${toneClass}`}
+    >
       <p className="text-sm font-semibold">{children}</p>
       <button type="button" onClick={onClose} className="text-sm font-bold">
         Fermer
