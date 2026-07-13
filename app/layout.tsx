@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SalesChoicesBootstrap } from "@/components/sales/sales-choices-bootstrap";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -13,7 +14,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fr">
-      <body>{children}</body>
+      <body>
+        <SalesChoicesBootstrap />
+        {children}
+      </body>
     </html>
   );
 }

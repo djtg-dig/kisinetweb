@@ -705,6 +705,49 @@ Content-Type: application/json
   page conserve ses options locales de secours.
 - **Erreurs possibles** : `400 Bad Request`, `401 Unauthorized`, `403 Forbidden`.
 
+### GET /api/sales/payment-methods/
+
+- **Objectif** : récupérer les modes de paiement globaux utilisés par le domaine
+  ventes.
+- **Méthode HTTP** : `GET`
+- **URL** : `/api/sales/payment-methods/`
+- **Service frontend** : `refreshSalesChoices()` dans `lib/api/sales-choices.ts`
+- **Chargement frontend** : `SalesChoicesBootstrap` est monté dans `app/layout.tsx`
+  et rafraîchit `localStorage` à chaque ouverture de l'application.
+- **Authentification** : aucune.
+- **Permission** : aucune.
+- **Réponse attendue (200)** : liste d'objets `{ value, label }`.
+- **Stockage frontend** : la réponse est regroupée avec les autres choix dans
+  `localStorage`, clé `kisinet_sales_choices`.
+- **Erreurs possibles** : le frontend ignore l'erreur pour ne pas bloquer
+  l'application.
+
+### GET /api/sales/payment-statuses/
+
+- **Objectif** : récupérer les statuts possibles d'un paiement de facture.
+- **Méthode HTTP** : `GET`
+- **URL** : `/api/sales/payment-statuses/`
+- **Service frontend** : `refreshSalesChoices()` dans `lib/api/sales-choices.ts`
+- **Chargement frontend** : à chaque ouverture de l'application via
+  `SalesChoicesBootstrap`.
+- **Authentification** : aucune.
+- **Permission** : aucune.
+- **Réponse attendue (200)** : liste d'objets `{ value, label }`.
+- **Stockage frontend** : `localStorage`, clé `kisinet_sales_choices`.
+
+### GET /api/sales/statuses/
+
+- **Objectif** : récupérer les statuts possibles d'une facture.
+- **Méthode HTTP** : `GET`
+- **URL** : `/api/sales/statuses/`
+- **Service frontend** : `refreshSalesChoices()` dans `lib/api/sales-choices.ts`
+- **Chargement frontend** : à chaque ouverture de l'application via
+  `SalesChoicesBootstrap`.
+- **Authentification** : aucune.
+- **Permission** : aucune.
+- **Réponse attendue (200)** : liste d'objets `{ value, label }`.
+- **Stockage frontend** : `localStorage`, clé `kisinet_sales_choices`.
+
 ### GET /api/products/{reference}/
 
 - **Objectif** : consulter le détail complet d'un produit.
