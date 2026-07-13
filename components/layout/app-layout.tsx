@@ -16,6 +16,7 @@ const appNavItems = [
   { label: "Produits", path: "/products", permission: "product_view" },
   { label: "Stock", path: "/stock", permission: "stock_view" },
   { label: "Ventes", path: "/sales", permission: "sale_view" },
+  { label: "Facture", path: "/invoices", permission: "sale_view" },
   { label: "Rapports", path: "/reports" },
   { label: "Notification", path: "/notifications", icon: "bell", permission: "join_request_view" },
   { label: "Paramètres", path: "/settings" },

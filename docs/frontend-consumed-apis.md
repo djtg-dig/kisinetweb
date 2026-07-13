@@ -342,7 +342,8 @@ Content-Type: application/json
 - **Objectif** : consulter le détail complet d'une pharmacie (page « Détails pharmacie »).
 - **Méthode HTTP** : `GET`
 - **URL** : `/api/pharmacies/{pharmacy_id}/`
-- **Page frontend** : `/app/pharmacies/[pharmacyId]/settings/details`
+- **Pages frontend** : `/app/pharmacies/[pharmacyId]/settings/details`,
+  `/app/pharmacies/[pharmacyId]/invoices`
 - **Service frontend** : `getPharmacyDetail(pharmacyId)` dans `lib/api`
 - **Authentification** : requise avec `Authorization: Bearer <access_token>`.
 - **Identifiant** : `{pharmacy_id}` accepte la **référence** publique (`PHXXXXXXXX`) ou
@@ -683,6 +684,7 @@ Content-Type: application/json
 - **Pages frontend** : `/app/pharmacies/[pharmacyId]/dashboard`,
   `/app/pharmacies/[pharmacyId]/products`,
   `/app/pharmacies/[pharmacyId]/products/create`,
+  `/app/pharmacies/[pharmacyId]/invoices`,
   `/app/pharmacies/[pharmacyId]/settings/human-resources`
 - **Service frontend** : `getPharmacyPermissions(pharmacyId)` dans `lib/api`
 - **Réponse attendue (200)** : objet dont les clés sont les permissions (ex.
@@ -693,9 +695,11 @@ Content-Type: application/json
   `Entrée de stock` restent visibles, mais elles ne sont cliquables que si
   l'utilisateur possède respectivement `sale_create` et `stock_adjust`. Le
   raccourci `Produits` n'est cliquable que si l'utilisateur possède `product_view`.
-- **Comportement frontend navbar pharmacie** : l'onglet `Produits` reste visible
-  dans la navigation de la pharmacie, mais il est désactivé quand `product_view`
-  n'est pas accordée.
+- **Comportement frontend navbar pharmacie** : les onglets contrôlés par permissions
+  restent visibles dans la navigation de la pharmacie, mais ils sont désactivés si
+  la permission correspondante n'est pas accordée. `Produits` dépend de
+  `product_view`, `Stock` de `stock_view`, `Ventes` de `sale_view`, `Facture` de
+  `sale_view`, et `Notification` de `join_request_view`.
 - **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden`.
 
 ### GET /api/pharmacies/{pharmacy_id}/activity/
@@ -723,6 +727,23 @@ Content-Type: application/json
 - **Réponse attendue (200)** : payload contenant `pharmacy` (avec `id` = référence de la
   pharmacie), `stats`, `alerts`, `sales_last_7_days`, `top_products`, `latest_sales`,
   `restock_products`, `recent_activity`.
+- **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden`, `404 Not Found`.
+
+### GET /api/pharmacies/{pharmacy_id}/invoices/pending/
+
+- **Objectif** : récupérer les factures en attente de traitement pour une pharmacie.
+- **Méthode HTTP** : `GET`
+- **URL** : `/api/pharmacies/{pharmacy_id}/invoices/pending/`
+- **Pages frontend** : `/app/pharmacies/[pharmacyId]/dashboard`,
+  `/app/pharmacies/[pharmacyId]/invoices`
+- **Services frontend** : `getPharmacyDashboard(pharmacyId)` dans `lib/dashboard-api`
+  pour les alertes du dashboard, et `getPendingPharmacyInvoices(pharmacyId)` dans
+  `lib/api/invoices.ts` pour la page `Facture`.
+- **Permission frontend** : la page `Facture` est accessible depuis un onglet activé
+  uniquement avec `sale_view`; sans cette permission, la page affiche un état
+  d'accès limité.
+- **Réponse attendue (200)** : liste de factures en attente avec `id`, `reference`,
+  `customer`, `amount` et `created_at`.
 - **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden`, `404 Not Found`.
 
 > Note : `{pharmacy_id}` dans les URLs pharmacies correspond à la **référence** publique
