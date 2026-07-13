@@ -339,12 +339,21 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_360px] xl:items-start">
         <div className="grid gap-6">
-          <SaleModeSelector mode={mode} onChange={setMode} />
-          {mode === "manual" ? (
+          <section className="grid gap-4 md:grid-cols-2">
             <ProductSearch pharmacyId={pharmacyId} onAdd={addProduct} currency={activeCurrency} />
-          ) : (
-            <AiScannerPlaceholder />
-          )}
+            <ModeCard
+              active={mode === "ai"}
+              title="Scanner avec l'IA"
+              description="Importez ou prenez une photo d'une ordonnance pour détecter les produits."
+              buttonLabel="Préparer un scan"
+              onClick={() => setMode("ai")}
+            >
+              <p className="mt-3 rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-700">
+                Les résultats proposés par l'IA doivent être vérifiés avant validation.
+              </p>
+            </ModeCard>
+          </section>
+          {mode === "ai" && <AiScannerPlaceholder />}
           <SaleDraft
             items={items}
             currency={activeCurrency}
@@ -418,37 +427,6 @@ function PageHeader({
         </LinkButton>
       </div>
     </header>
-  );
-}
-
-function SaleModeSelector({
-  mode,
-  onChange,
-}: {
-  mode: SaleMode;
-  onChange: (mode: SaleMode) => void;
-}) {
-  return (
-    <section className="grid gap-4 md:grid-cols-2">
-      <ModeCard
-        active={mode === "manual"}
-        title="Entrée manuelle"
-        description="Recherchez et ajoutez les produits disponibles dans la pharmacie."
-        buttonLabel="Saisie manuelle"
-        onClick={() => onChange("manual")}
-      />
-      <ModeCard
-        active={mode === "ai"}
-        title="Scanner avec l'IA"
-        description="Importez ou prenez une photo d'une ordonnance pour détecter les produits."
-        buttonLabel="Préparer un scan"
-        onClick={() => onChange("ai")}
-      >
-        <p className="mt-3 rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-700">
-          Les résultats proposés par l'IA doivent être vérifiés avant validation.
-        </p>
-      </ModeCard>
-    </section>
   );
 }
 
@@ -547,6 +525,12 @@ function ProductSearch({
 
   return (
     <section className="rounded-lg border border-app-border bg-app-card p-5 shadow-sm">
+      <div className="mb-4">
+        <h2 className="text-lg font-bold text-app-text">Entrée manuelle</h2>
+        <p className="mt-1 text-sm leading-6 text-app-muted">
+          Recherchez et ajoutez les produits disponibles dans la pharmacie.
+        </p>
+      </div>
       <div className="grid gap-3">
         <label className="grid gap-2">
           <span className="text-sm font-semibold text-app-text">Recherche produit</span>
