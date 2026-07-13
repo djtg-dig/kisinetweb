@@ -610,6 +610,9 @@ Content-Type: application/json
 
 ## Ventes
 
+- `POST /api/sales/`
+- `GET /api/sales/?pharmacy_reference={pharmacy_id}`
+
 ### Page `/app/pharmacies/{pharmacy_id}/sales/create`
 
 - **Objectif frontend** : préparer une nouvelle vente de pharmacie avant validation.
@@ -641,11 +644,46 @@ Content-Type: application/json
   exposés par l'API actuelle (`dosage`, `barcode`, `expirationDate`) restent affichés
   en repli `Non renseigné`.
 - **Endpoints backend manquants à créer plus tard** :
-  - `POST /api/sales/` ou équivalent pour créer/valider une vente.
   - `POST /api/sales/drafts/` ou équivalent si les brouillons doivent être persistés côté serveur.
-  - `GET /api/sales/?pharmacy_reference={pharmacy_id}` pour l'historique des ventes.
-  - Endpoint de facture/reçu si `Voir la facture` ou `Imprimer le reçu` doivent être activés.
+  - Endpoint de caisse si l'action `Encaisser` doit ouvrir directement une facture.
+  - Endpoint d'annulation de facture si l'action `Annuler` doit être activée.
+  - Endpoint de facture/reçu si `Imprimer le reçu` doit être activé.
   - Endpoint d'import/analyse d'ordonnance si le scanner IA devient réel.
+
+### GET /api/sales/
+
+- **Objectif** : lister les ventes/factures d'une pharmacie pour la page `Factures`.
+- **Méthode HTTP** : `GET`
+- **URL** : `/api/sales/?pharmacy_reference={pharmacy_id}`
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/invoices`
+- **Service frontend** : `getPharmacyInvoices(pharmacyId, filters)` dans `lib/api/invoices.ts`
+- **Authentification** : requise avec `Authorization: Bearer <access_token>`.
+- **Permission frontend** : la page est visible avec `sale_view`. Le backend reste
+  responsable de l'autorisation réelle.
+- **Paramètres envoyés par le frontend** :
+  - `pharmacy_reference` : référence de la pharmacie active, obligatoire.
+  - `search` : recherche par référence, client ou téléphone.
+  - `payment_status` : `UNPAID`, `PARTIALLY_PAID` ou `PAID`.
+  - `status` : `CANCELED` ou `DRAFT` lorsque ces statuts existent côté backend.
+  - `created_from` : date de début au format `YYYY-MM-DD`.
+  - `created_to` : date de fin au format `YYYY-MM-DD`.
+  - `page` : page demandée pour la pagination.
+- **Réponse attendue (200)** : réponse paginée `{ count, next, previous, results }`.
+  Chaque élément de `results` peut contenir `id`, `reference`, `customer_name`,
+  `customer_phone`, `subtotal_amount`, `discount_amount`, `total_amount`,
+  `paid_amount`, `remaining_amount`, `status`, `payment_status`, `created_by`,
+  `created_by_name` et `created_at`.
+- **Résumé optionnel** : si l'API fournit `summary` ou `stats`, le frontend utilise
+  `total_invoices`, `unpaid_invoices`, `partially_paid_invoices`, `paid_invoices`
+  et `remaining_amount` pour les cartes. Sinon, les cartes par statut et le reste à
+  encaisser sont calculés sur la page courante uniquement.
+- **Pagination** : le frontend utilise `count`, `next` et `previous`, et conserve
+  les filtres/recherche actifs lors des changements de page.
+- **Fonctionnalités non connectées faute d'endpoint dédié** : ouverture caisse avec
+  une facture sélectionnée, annulation de facture, impression/téléchargement de reçu.
+- **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden`, `404 Not Found`,
+  `500 Internal Server Error` côté API. Le frontend affiche un message convivial
+  sans exposer la réponse technique brute.
 
 ### GET /api/products/{reference}/
 
@@ -734,14 +772,12 @@ Content-Type: application/json
 - **Objectif** : récupérer les factures en attente de traitement pour une pharmacie.
 - **Méthode HTTP** : `GET`
 - **URL** : `/api/pharmacies/{pharmacy_id}/invoices/pending/`
-- **Pages frontend** : `/app/pharmacies/[pharmacyId]/dashboard`,
-  `/app/pharmacies/[pharmacyId]/invoices`
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/dashboard`
 - **Services frontend** : `getPharmacyDashboard(pharmacyId)` dans `lib/dashboard-api`
-  pour les alertes du dashboard, et `getPendingPharmacyInvoices(pharmacyId)` dans
-  `lib/api/invoices.ts` pour la page `Facture`.
-- **Permission frontend** : la page `Facture` est accessible depuis un onglet activé
-  uniquement avec `sale_view`; sans cette permission, la page affiche un état
-  d'accès limité.
+  pour les alertes du dashboard. Le helper `getPendingPharmacyInvoices(pharmacyId)`
+  reste disponible dans `lib/api/invoices.ts` pour un usage ciblé.
+- **Usage frontend** : cet endpoint alimente les alertes du dashboard. La page
+  `Facture` utilise désormais `GET /api/sales/` pour la liste complète.
 - **Réponse attendue (200)** : liste de factures en attente avec `id`, `reference`,
   `customer`, `amount` et `created_at`.
 - **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden`, `404 Not Found`.
