@@ -212,6 +212,7 @@ export type PharmacyPermissions = {
   stock_transfer?: boolean;
   sale_view?: boolean;
   sale_create?: boolean;
+  sale_payment_create?: boolean;
   sale_cancel?: boolean;
 };
 

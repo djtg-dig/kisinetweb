@@ -9,9 +9,11 @@ import {
   type PharmacyPermissions,
 } from "@/lib/api";
 import {
+  getInvoiceMetadata,
   getPharmacyInvoices,
   type Invoice,
   type InvoiceFilters,
+  type InvoiceStatusOption,
   type InvoicePaymentStatus,
   type InvoiceSummary,
 } from "@/lib/api/invoices";
@@ -31,11 +33,13 @@ const defaultFilters: InvoiceFilters = {
   page: "1",
 };
 
-const statusOptions: { value: InvoicePaymentStatus | ""; label: string }[] = [
+const defaultStatusOptions: { value: string; label: string }[] = [
   { value: "", label: "Tous les statuts" },
   { value: "UNPAID", label: "Non payée" },
   { value: "PARTIALLY_PAID", label: "Partiellement payée" },
   { value: "PAID", label: "Payée" },
+  { value: "OVERPAID", label: "Payée avec excédent" },
+  { value: "CONFIRMED", label: "Confirmée" },
   { value: "CANCELED", label: "Annulée" },
   { value: "DRAFT", label: "Brouillon" },
 ];
@@ -50,6 +54,7 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
   const [summary, setSummary] = useState<InvoiceSummary | null>(null);
   const [filters, setFilters] = useState<InvoiceFilters>(defaultFilters);
   const [draftFilters, setDraftFilters] = useState<InvoiceFilters>(defaultFilters);
+  const [statusOptions, setStatusOptions] = useState(defaultStatusOptions);
   const [state, setState] = useState<PageState>("loading");
   const [errorMessage, setErrorMessage] = useState("");
   const [totalInvoices, setTotalInvoices] = useState(0);
@@ -93,7 +98,15 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
           return;
         }
 
-        const page = await getPharmacyInvoices(pharmacyId, filters);
+        const [page, metadata] = await Promise.all([
+          getPharmacyInvoices(pharmacyId, filters),
+          getInvoiceMetadata(pharmacyId).catch(() => null),
+        ]);
+
+        if (metadata) {
+          setStatusOptions(buildStatusOptions(metadata.statuses, metadata.paymentStatuses));
+        }
+
         setInvoices(page.results);
         setSummary(page.summary);
         setTotalInvoices(page.count);
@@ -118,7 +131,7 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
   );
   const activeSummary = summary || buildEmptySummary(totalInvoices);
   const cashRegisterUnavailable =
-    "La page Caisse et la permission d'encaissement ne sont pas encore disponibles dans ce frontend.";
+    "La permission d'encaissement est disponible, mais la route Caisse n'est pas encore connectée dans ce frontend.";
 
   function applyFilters(nextFilters: InvoiceFilters) {
     const cleanedFilters = cleanFilters({ ...nextFilters, page: "1" });
@@ -167,6 +180,7 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
 
         <InvoiceFiltersPanel
           filters={draftFilters}
+          statusOptions={statusOptions}
           loading={state === "loading"}
           onChange={setDraftFilters}
           onApply={() => applyFilters(draftFilters)}
@@ -196,6 +210,7 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
               currency={currency}
               pharmacyId={pharmacyId}
               canCancel={Boolean(permissions.sale_cancel)}
+              canOpenCashRegister={Boolean(permissions.sale_payment_create)}
               cashRegisterUnavailable={cashRegisterUnavailable}
               onSelect={setSelectedInvoice}
             />
@@ -256,12 +271,14 @@ function SummaryCards({
 
 function InvoiceFiltersPanel({
   filters,
+  statusOptions,
   loading,
   onChange,
   onApply,
   onReset,
 }: {
   filters: InvoiceFilters;
+  statusOptions: { value: string; label: string }[];
   loading: boolean;
   onChange: (filters: InvoiceFilters) => void;
   onApply: () => void;
@@ -319,6 +336,7 @@ function InvoicesList({
   currency,
   pharmacyId,
   canCancel,
+  canOpenCashRegister,
   cashRegisterUnavailable,
   onSelect,
 }: {
@@ -326,6 +344,7 @@ function InvoicesList({
   currency: string;
   pharmacyId: string;
   canCancel: boolean;
+  canOpenCashRegister: boolean;
   cashRegisterUnavailable: string;
   onSelect: (invoice: Invoice) => void;
 }) {
@@ -343,6 +362,7 @@ function InvoicesList({
         currency={currency}
         pharmacyId={pharmacyId}
         canCancel={canCancel}
+        canOpenCashRegister={canOpenCashRegister}
         cashRegisterUnavailable={cashRegisterUnavailable}
         onSelect={onSelect}
       />
@@ -350,6 +370,7 @@ function InvoicesList({
         invoices={invoices}
         currency={currency}
         canCancel={canCancel}
+        canOpenCashRegister={canOpenCashRegister}
         cashRegisterUnavailable={cashRegisterUnavailable}
         onSelect={onSelect}
       />
@@ -361,6 +382,7 @@ function DesktopInvoicesTable({
   invoices,
   currency,
   canCancel,
+  canOpenCashRegister,
   cashRegisterUnavailable,
   onSelect,
 }: {
@@ -368,6 +390,7 @@ function DesktopInvoicesTable({
   currency: string;
   pharmacyId: string;
   canCancel: boolean;
+  canOpenCashRegister: boolean;
   cashRegisterUnavailable: string;
   onSelect: (invoice: Invoice) => void;
 }) {
@@ -413,6 +436,7 @@ function DesktopInvoicesTable({
                 <InvoiceActions
                   invoice={invoice}
                   canCancel={canCancel}
+                  canOpenCashRegister={canOpenCashRegister}
                   cashRegisterUnavailable={cashRegisterUnavailable}
                   onSelect={onSelect}
                 />
@@ -429,12 +453,14 @@ function MobileInvoicesList({
   invoices,
   currency,
   canCancel,
+  canOpenCashRegister,
   cashRegisterUnavailable,
   onSelect,
 }: {
   invoices: Invoice[];
   currency: string;
   canCancel: boolean;
+  canOpenCashRegister: boolean;
   cashRegisterUnavailable: string;
   onSelect: (invoice: Invoice) => void;
 }) {
@@ -459,6 +485,7 @@ function MobileInvoicesList({
             <InvoiceActions
               invoice={invoice}
               canCancel={canCancel}
+              canOpenCashRegister={canOpenCashRegister}
               cashRegisterUnavailable={cashRegisterUnavailable}
               onSelect={onSelect}
               compact
@@ -473,17 +500,25 @@ function MobileInvoicesList({
 function InvoiceActions({
   invoice,
   canCancel,
+  canOpenCashRegister,
   cashRegisterUnavailable,
   compact = false,
   onSelect,
 }: {
   invoice: Invoice;
   canCancel: boolean;
+  canOpenCashRegister: boolean;
   cashRegisterUnavailable: string;
   compact?: boolean;
   onSelect: (invoice: Invoice) => void;
 }) {
-  const canOpenCashRegister = false;
+  const canCollectPayment =
+    canOpenCashRegister &&
+    invoice.remainingAmount > 0 &&
+    invoice.paymentStatus !== "PAID" &&
+    invoice.paymentStatus !== "OVERPAID" &&
+    invoice.paymentStatus !== "CANCELED" &&
+    invoice.paymentStatus !== "DRAFT";
 
   return (
     <div className={compact ? "flex flex-col gap-2 sm:flex-row" : "flex justify-end gap-2"}>
@@ -494,15 +529,7 @@ function InvoiceActions({
       >
         Voir
       </button>
-      {canOpenCashRegister && (
-        <a
-          href="#"
-          className="inline-flex min-h-10 items-center justify-center rounded-md bg-primary-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary-700"
-        >
-          Encaisser
-        </a>
-      )}
-      {!canOpenCashRegister && invoice.remainingAmount > 0 && (
+      {canCollectPayment && (
         <span
           className="inline-flex min-h-10 items-center justify-center rounded-md border border-app-border bg-app-surface px-4 py-2 text-sm font-semibold text-app-muted"
           title={cashRegisterUnavailable}
@@ -782,6 +809,29 @@ function buildEmptySummary(totalInvoices: number): InvoiceSummary {
   };
 }
 
+function buildStatusOptions(
+  statuses: InvoiceStatusOption[],
+  paymentStatuses: InvoiceStatusOption[],
+) {
+  const options = [
+    { value: "", label: "Tous les statuts" },
+    ...paymentStatuses,
+    ...statuses,
+  ];
+  const seen = new Set<string>();
+
+  // Les métadonnées backend peuvent contenir des libellés différents, mais on
+  // garde une option unique par valeur pour éviter les doublons dans le select.
+  return options.filter((option) => {
+    if (seen.has(option.value)) {
+      return false;
+    }
+
+    seen.add(option.value);
+    return true;
+  });
+}
+
 function cleanFilters(filters: InvoiceFilters): InvoiceFilters {
   return Object.fromEntries(
     Object.entries(filters).filter(([, value]) => value && String(value).trim()),
@@ -805,7 +855,7 @@ function getSummaryValueClass(tone?: string) {
 
 function getStatusClass(status: InvoicePaymentStatus) {
   const base = "inline-flex rounded-full px-3 py-1 text-xs font-semibold ring-1";
-  if (status === "PAID") {
+  if (status === "PAID" || status === "OVERPAID") {
     return base + " bg-success-50 text-success-700 ring-success-100";
   }
   if (status === "PARTIALLY_PAID") {
@@ -826,6 +876,7 @@ function getStatusLabel(status: InvoicePaymentStatus) {
     UNPAID: "Non payée",
     PARTIALLY_PAID: "Partiellement payée",
     PAID: "Payée",
+    OVERPAID: "Payée avec excédent",
     CANCELED: "Annulée",
     DRAFT: "Brouillon",
     UNKNOWN: "Inconnu",

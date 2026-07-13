@@ -60,6 +60,7 @@ const permissionGroups = [
       ["stock_transfer", "Transférer le stock"],
       ["sale_view", "Voir les ventes"],
       ["sale_create", "Ajouter des ventes"],
+      ["sale_payment_create", "Encaisser les factures"],
       ["sale_cancel", "Annuler les ventes"],
     ],
   },

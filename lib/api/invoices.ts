@@ -5,9 +5,15 @@ export type InvoicePaymentStatus =
   | "UNPAID"
   | "PARTIALLY_PAID"
   | "PAID"
+  | "OVERPAID"
   | "CANCELED"
   | "DRAFT"
   | "UNKNOWN";
+
+export type InvoiceStatusOption = {
+  value: string;
+  label: string;
+};
 
 export type InvoiceSummary = {
   totalInvoices: number;
@@ -36,7 +42,7 @@ export type Invoice = {
 
 export type InvoiceFilters = {
   search?: string;
-  status?: InvoicePaymentStatus | "";
+  status?: string;
   createdFrom?: string;
   createdTo?: string;
   page?: string;
@@ -56,6 +62,12 @@ export type PendingInvoice = {
   customer: string;
   amount: number;
   createdAt: string;
+};
+
+export type InvoiceMetadata = {
+  statuses: InvoiceStatusOption[];
+  paymentStatuses: InvoiceStatusOption[];
+  orderings: InvoiceStatusOption[];
 };
 
 // Type proche de la réponse brute du backend : les champs restent optionnels car
@@ -104,6 +116,12 @@ type InvoiceListApiResponse = {
   stats?: InvoiceSummaryApi;
 };
 
+type InvoiceMetadataApiResponse = {
+  statuses?: InvoiceStatusOption[];
+  payment_statuses?: InvoiceStatusOption[];
+  orderings?: InvoiceStatusOption[];
+};
+
 export async function getPharmacyInvoices(
   pharmacyId: string,
   filters: InvoiceFilters = {},
@@ -112,14 +130,14 @@ export async function getPharmacyInvoices(
   params.set("pharmacy_reference", pharmacyId);
   appendFilter(params, "search", filters.search);
   appendFilter(params, "page", filters.page);
-  appendFilter(params, "created_from", filters.createdFrom);
-  appendFilter(params, "created_to", filters.createdTo);
+  appendFilter(params, "date_from", filters.createdFrom);
+  appendFilter(params, "date_to", filters.createdTo);
 
   if (filters.status) {
-    if (filters.status === "CANCELED" || filters.status === "DRAFT") {
-      params.set("status", filters.status);
-    } else {
+    if (["UNPAID", "PARTIALLY_PAID", "PAID", "OVERPAID"].includes(filters.status)) {
       params.set("payment_status", filters.status);
+    } else {
+      params.set("status", filters.status);
     }
   }
 
@@ -129,6 +147,21 @@ export async function getPharmacyInvoices(
   return {
     ...page,
     summary: page.summary || buildCurrentPageSummary(page.count, page.results),
+  };
+}
+
+export async function getInvoiceMetadata(pharmacyId: string): Promise<InvoiceMetadata> {
+  const params = new URLSearchParams();
+  params.set("pharmacy_reference", pharmacyId);
+
+  const data = await fetchInvoicesJson<InvoiceMetadataApiResponse>(
+    "/api/sales/metadata/?" + params.toString(),
+  );
+
+  return {
+    statuses: data.statuses || [],
+    paymentStatuses: data.payment_statuses || [],
+    orderings: data.orderings || [],
   };
 }
 
@@ -272,7 +305,7 @@ function normalizePaymentStatus(
   paidAmount: number,
 ): InvoicePaymentStatus {
   const normalized = (value || "").toUpperCase();
-  if (["UNPAID", "PARTIALLY_PAID", "PAID", "CANCELED", "DRAFT"].includes(normalized)) {
+  if (["UNPAID", "PARTIALLY_PAID", "PAID", "OVERPAID", "CANCELED", "DRAFT"].includes(normalized)) {
     return normalized as InvoicePaymentStatus;
   }
 

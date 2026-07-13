@@ -658,21 +658,23 @@ Content-Type: application/json
 - **Page frontend** : `/app/pharmacies/[pharmacyId]/invoices`
 - **Service frontend** : `getPharmacyInvoices(pharmacyId, filters)` dans `lib/api/invoices.ts`
 - **Authentification** : requise avec `Authorization: Bearer <access_token>`.
-- **Permission frontend** : la page est visible avec `sale_view`. Le backend reste
-  responsable de l'autorisation réelle.
+- **Permission frontend** : la page est visible avec `sale_view`. L'action liée à
+  la caisse dépend de `sale_payment_create`. Le backend reste responsable de
+  l'autorisation réelle.
 - **Paramètres envoyés par le frontend** :
   - `pharmacy_reference` : référence de la pharmacie active, obligatoire.
   - `search` : recherche par référence, client ou téléphone.
-  - `payment_status` : `UNPAID`, `PARTIALLY_PAID` ou `PAID`.
-  - `status` : `CANCELED` ou `DRAFT` lorsque ces statuts existent côté backend.
-  - `created_from` : date de début au format `YYYY-MM-DD`.
-  - `created_to` : date de fin au format `YYYY-MM-DD`.
+  - `payment_status` : `UNPAID`, `PARTIALLY_PAID`, `PAID` ou `OVERPAID`.
+  - `status` : `DRAFT`, `CONFIRMED` ou `CANCELED`.
+  - `date_from` : date de début au format `YYYY-MM-DD`.
+  - `date_to` : date de fin au format `YYYY-MM-DD`.
   - `page` : page demandée pour la pagination.
 - **Réponse attendue (200)** : réponse paginée `{ count, next, previous, results }`.
-  Chaque élément de `results` peut contenir `id`, `reference`, `customer_name`,
-  `customer_phone`, `subtotal_amount`, `discount_amount`, `total_amount`,
-  `paid_amount`, `remaining_amount`, `status`, `payment_status`, `created_by`,
-  `created_by_name` et `created_at`.
+  Chaque élément de `results` contient les champs utilisés par la page :
+  `reference`, `pharmacy`, `customer_name`, `customer_phone`, `subtotal_amount`,
+  `discount_amount`, `total_amount`, `paid_amount`, `remaining_amount`,
+  `change_amount`, `items_count`, `total_product_quantity`, `status`,
+  `payment_status`, `created_by`, `created_at` et `detail_url`.
 - **Résumé optionnel** : si l'API fournit `summary` ou `stats`, le frontend utilise
   `total_invoices`, `unpaid_invoices`, `partially_paid_invoices`, `paid_invoices`
   et `remaining_amount` pour les cartes. Sinon, les cartes par statut et le reste à
@@ -684,6 +686,24 @@ Content-Type: application/json
 - **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden`, `404 Not Found`,
   `500 Internal Server Error` côté API. Le frontend affiche un message convivial
   sans exposer la réponse technique brute.
+
+### GET /api/sales/metadata/
+
+- **Objectif** : récupérer les métadonnées de filtres de la page `Factures`.
+- **Méthode HTTP** : `GET`
+- **URL** : `/api/sales/metadata/?pharmacy_reference={pharmacy_id}`
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/invoices`
+- **Service frontend** : `getInvoiceMetadata(pharmacyId)` dans `lib/api/invoices.ts`
+- **Authentification** : requise avec `Authorization: Bearer <access_token>`.
+- **Permission frontend/backend** : `sale_view`.
+- **Paramètre query obligatoire** : `pharmacy_reference`.
+- **Réponse attendue (200)** :
+  `{ statuses, payment_statuses, orderings }`, chaque liste contenant des objets
+  `{ value, label }`.
+- **Utilisation** : le frontend construit le filtre de statut avec
+  `payment_statuses` puis `statuses`. Si cet endpoint échoue en développement, la
+  page conserve ses options locales de secours.
+- **Erreurs possibles** : `400 Bad Request`, `401 Unauthorized`, `403 Forbidden`.
 
 ### GET /api/products/{reference}/
 
@@ -726,13 +746,17 @@ Content-Type: application/json
   `/app/pharmacies/[pharmacyId]/settings/human-resources`
 - **Service frontend** : `getPharmacyPermissions(pharmacyId)` dans `lib/api`
 - **Réponse attendue (200)** : objet dont les clés sont les permissions (ex.
-  `product_view`, `product_create`, `product_update`, `product_delete`) avec des
+  `product_view`, `product_create`, `product_update`, `product_delete`,
+  `sale_view`, `sale_create`, `sale_payment_create`, `sale_cancel`) avec des
   valeurs booléennes.
 - **Comportement frontend dashboard** : la page dashboard charge ces permissions
   en même temps que les données du dashboard. Les actions `Nouvelle vente` et
   `Entrée de stock` restent visibles, mais elles ne sont cliquables que si
   l'utilisateur possède respectivement `sale_create` et `stock_adjust`. Le
   raccourci `Produits` n'est cliquable que si l'utilisateur possède `product_view`.
+- **Comportement frontend factures** : la page `Factures` utilise `sale_view` pour
+  l'accès, `sale_create` pour le bouton `Nouvelle vente`, `sale_payment_create`
+  pour l'action liée à la caisse, et `sale_cancel` pour l'action d'annulation.
 - **Comportement frontend navbar pharmacie** : les onglets contrôlés par permissions
   restent visibles dans la navigation de la pharmacie, mais ils sont désactivés si
   la permission correspondante n'est pas accordée. `Produits` dépend de
