@@ -47,6 +47,7 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
       setErrorMessage("");
 
       try {
+        // On charge d'abord le contexte et les droits pour éviter d'appeler les factures sans accès vente.
         const [userPermissions, pharmacy] = await Promise.all([
           getPharmacyPermissions(pharmacyId),
           getPharmacyDetail(pharmacyId),

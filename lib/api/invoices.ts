@@ -45,6 +45,7 @@ export async function getPendingPharmacyInvoices(pharmacyId: string): Promise<Pe
     return [];
   }
 
+  // La page consomme un modèle stable même si l'API renvoie des nombres sous forme de chaînes.
   return data.map((item) => normalizePendingInvoice((item || {}) as PendingInvoiceApiItem));
 }
 
