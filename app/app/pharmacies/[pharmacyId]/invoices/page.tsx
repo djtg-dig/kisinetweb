@@ -274,7 +274,7 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
             setPaymentInvoice(null);
             setFeedback({
               tone: "success",
-              text: "Paiement enregistré avec succès. Code HTTP " + statusCode + ".",
+              text: "Paiement enregistré avec succès.",
             });
             setReloadKey((key) => key + 1);
           }}
@@ -672,9 +672,8 @@ function InvoicePaymentDialog({
   onClose: () => void;
   onSuccess: (statusCode: number) => void;
 }) {
-  const remainingAmount = formatPaymentInput(invoice.remainingAmount);
-  const [amount, setAmount] = useState(remainingAmount);
-  const [amountReceived, setAmountReceived] = useState(remainingAmount);
+  const remainingAmount = Math.max(invoice.remainingAmount, 0);
+  const [amountReceived, setAmountReceived] = useState(formatPaymentInput(remainingAmount));
   const [paymentMethod, setPaymentMethod] = useState("CASH");
   const [transactionReference, setTransactionReference] = useState("");
   const [paymentMethods, setPaymentMethods] = useState<SalesChoiceOption[]>(defaultPaymentMethodOptions);
@@ -689,21 +688,20 @@ function InvoicePaymentDialog({
     event.preventDefault();
     setErrorMessage("");
 
-    const amountValue = parsePaymentNumber(amount);
-    const receivedValue = parsePaymentNumber(amountReceived);
+    const receivedValue = amountReceived.trim()
+      ? parsePaymentNumber(amountReceived)
+      : remainingAmount;
+    const remainingCents = toPaymentCents(remainingAmount);
+    const receivedCents = toPaymentCents(receivedValue);
+    const collectedCents = Math.min(receivedCents, remainingCents);
 
-    if (amountValue <= 0) {
+    if (remainingCents <= 0) {
       setErrorMessage("Le montant à encaisser doit être supérieur à zéro.");
       return;
     }
 
-    if (amountValue > invoice.remainingAmount) {
-      setErrorMessage("Le montant à encaisser ne peut pas dépasser le reste à payer.");
-      return;
-    }
-
-    if (receivedValue < amountValue) {
-      setErrorMessage("Le montant reçu doit couvrir le montant à encaisser.");
+    if (receivedCents <= 0) {
+      setErrorMessage("Renseignez le montant reçu avant d'enregistrer le paiement.");
       return;
     }
 
@@ -712,8 +710,8 @@ function InvoicePaymentDialog({
       const result = await createInvoicePayment({
         pharmacy: pharmacyId,
         sale: invoice.reference,
-        amount: formatPaymentPayloadValue(amountValue),
-        amount_received: formatPaymentPayloadValue(receivedValue),
+        amount: formatPaymentPayloadValue(fromPaymentCents(collectedCents)),
+        amount_received: formatPaymentPayloadValue(fromPaymentCents(receivedCents)),
         payment_method: paymentMethod,
         transaction_reference: transactionReference,
       });
@@ -762,15 +760,14 @@ function InvoicePaymentDialog({
         </div>
 
         <div className="mt-5 grid gap-4">
-          <FilterInput
+          <ReadOnlyPaymentValue
             label="Montant à encaisser"
-            type="number"
-            value={amount}
-            onChange={setAmount}
+            value={formatCurrency(remainingAmount, currency)}
           />
           <FilterInput
             label="Montant reçu"
             type="number"
+            step="0.01"
             value={amountReceived}
             onChange={setAmountReceived}
           />
@@ -933,12 +930,14 @@ function FilterInput({
   value,
   placeholder,
   type = "text",
+  step,
   onChange,
 }: {
   label: string;
   value: string;
   placeholder?: string;
   type?: string;
+  step?: string;
   onChange: (value: string) => void;
 }) {
   return (
@@ -946,12 +945,24 @@ function FilterInput({
       <span className="text-sm font-semibold text-app-text">{label}</span>
       <input
         type={type}
+        step={step}
         value={value}
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
         className="min-h-11 rounded-md border border-app-border bg-white px-3 text-sm text-app-text outline-none transition focus:border-primary-300 focus:ring-4 focus:ring-primary-100 dark:bg-app-surface"
       />
     </label>
+  );
+}
+
+function ReadOnlyPaymentValue({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="grid gap-2">
+      <span className="text-sm font-semibold text-app-text">{label}</span>
+      <div className="flex min-h-11 items-center rounded-md border border-app-border bg-app-surface px-3 text-sm font-bold text-app-text">
+        {value}
+      </div>
+    </div>
   );
 }
 
@@ -1143,6 +1154,14 @@ function readPaymentMethodOptions(): SalesChoiceOption[] {
 function parsePaymentNumber(value: string) {
   const numberValue = Number(value.replace(",", "."));
   return Number.isFinite(numberValue) ? numberValue : 0;
+}
+
+function toPaymentCents(value: number) {
+  return Math.round(value * 100);
+}
+
+function fromPaymentCents(value: number) {
+  return value / 100;
 }
 
 function formatPaymentInput(value: number) {

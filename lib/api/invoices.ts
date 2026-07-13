@@ -436,5 +436,31 @@ function getApiErrorMessage(data: unknown, fallbackMessage: string): string {
   }
 
   const detail = (data as { detail?: unknown }).detail;
-  return typeof detail === "string" ? detail : fallbackMessage;
+  if (typeof detail === "string") {
+    return detail;
+  }
+
+  const firstFieldMessage = getFirstFieldErrorMessage(data);
+  return firstFieldMessage || fallbackMessage;
+}
+
+function getFirstFieldErrorMessage(data: unknown): string {
+  if (!data || typeof data !== "object") {
+    return "";
+  }
+
+  for (const value of Object.values(data as Record<string, unknown>)) {
+    if (typeof value === "string") {
+      return value;
+    }
+
+    if (Array.isArray(value)) {
+      const firstText = value.find((item) => typeof item === "string");
+      if (typeof firstText === "string") {
+        return firstText;
+      }
+    }
+  }
+
+  return "";
 }

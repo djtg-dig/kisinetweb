@@ -701,7 +701,9 @@ Content-Type: application/json
 - **Corps JSON envoyé** :
   - `pharmacy` : référence de la pharmacie active.
   - `sale` : référence de la facture à encaisser.
-  - `amount` : montant affecté à la facture, au format décimal.
+  - `amount` : montant affecté à la facture. Le modal envoie le reste à payer si
+    `amount_received` couvre la facture ; sinon il envoie `amount_received` pour
+    enregistrer un paiement partiel.
   - `amount_received` : montant réellement reçu, au format décimal.
   - `payment_method` : mode de paiement, par exemple `CASH`.
   - `transaction_reference` : référence externe optionnelle.
