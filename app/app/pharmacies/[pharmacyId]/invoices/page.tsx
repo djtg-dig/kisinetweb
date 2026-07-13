@@ -17,9 +17,11 @@ type InvoicesPageProps = {
   params: Promise<{ pharmacyId: string }>;
 };
 
+// Union de chaînes : elle limite les états possibles de la page à ces valeurs précises.
 type PageState = "loading" | "ready" | "empty" | "forbidden" | "error";
 
 export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
+  // `useState<Type>()` indique à TypeScript la forme exacte de la donnée stockée.
   const [pharmacyId, setPharmacyId] = useState("");
   const [pharmacyName, setPharmacyName] = useState("");
   const [currency, setCurrency] = useState("USD");
@@ -29,6 +31,7 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
+    // Dans l'App Router, `params` est reçu comme Promise dans ce composant client.
     async function readParams() {
       const resolvedParams = await params;
       setPharmacyId(resolvedParams.pharmacyId);
@@ -76,6 +79,7 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
   }, [pharmacyId]);
 
   const totalAmount = useMemo(
+    // `reduce` additionne les montants pour produire le total affiché dans le résumé.
     () => invoices.reduce((total, invoice) => total + invoice.amount, 0),
     [invoices],
   );
@@ -103,6 +107,7 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
           </section>
         )}
 
+        {/* Rendu conditionnel : chaque état affiche uniquement le bloc correspondant. */}
         {state === "forbidden" && <ForbiddenState pharmacyId={pharmacyId} />}
         {state === "error" && <ErrorState message={errorMessage} pharmacyId={pharmacyId} />}
         {state === "empty" && <EmptyState pharmacyId={pharmacyId} />}
@@ -163,6 +168,7 @@ function InvoicesList({
           </thead>
           <tbody>
             {invoices.map((invoice) => (
+              // `key` aide React à identifier chaque ligne quand la liste change.
               <tr key={invoice.id || invoice.reference} className="border-b border-app-border last:border-0">
                 <td className="py-3 pr-4 font-semibold text-app-text">{invoice.reference}</td>
                 <td className="py-3 pr-4 text-app-muted">{invoice.customer}</td>

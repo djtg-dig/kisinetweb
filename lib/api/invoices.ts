@@ -9,6 +9,8 @@ export type PendingInvoice = {
   createdAt: string;
 };
 
+// Type proche de la réponse brute du backend : les champs restent optionnels car
+// l'API peut évoluer ou renvoyer une valeur vide selon le contexte.
 type PendingInvoiceApiItem = {
   id?: string | number;
   reference?: string;
@@ -34,6 +36,7 @@ export async function getPendingPharmacyInvoices(pharmacyId: string): Promise<Pe
     },
   );
 
+  // On lit d'abord en texte pour pouvoir gérer proprement une réponse vide ou non JSON.
   const responseText = await response.text();
   const data = parseJsonResponse(responseText);
 
@@ -50,6 +53,7 @@ export async function getPendingPharmacyInvoices(pharmacyId: string): Promise<Pe
 }
 
 function normalizePendingInvoice(item: PendingInvoiceApiItem): PendingInvoice {
+  // Cette fonction convertit la réponse backend vers le type utilisé par les composants React.
   return {
     id: String(item.id || item.reference || ""),
     reference: item.reference || "Facture sans référence",
@@ -72,6 +76,7 @@ function parseJsonResponse(responseText: string) {
 }
 
 function getApiErrorMessage(data: unknown, fallbackMessage: string): string {
+  // `unknown` oblige TypeScript à vérifier le type avant d'accéder aux propriétés.
   if (!data) {
     return fallbackMessage;
   }

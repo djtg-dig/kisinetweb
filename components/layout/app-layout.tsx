@@ -11,6 +11,8 @@ type AppLayoutProps = {
   pharmacyId: string;
 };
 
+// Chaque objet décrit un onglet de la navbar. `permission` est optionnel :
+// sans permission, l'onglet reste toujours cliquable.
 const appNavItems = [
   { label: "Dashboard", path: "/dashboard" },
   { label: "Produits", path: "/products", permission: "product_view" },
