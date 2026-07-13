@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/ui/link-button";
 import {
@@ -138,6 +138,26 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
     setDraftFilters(cleanedFilters);
     setFilters(cleanedFilters);
   }
+
+  useEffect(() => {
+    const searchValue = draftFilters.search?.trim() || "";
+    const currentSearch = filters.search?.trim() || "";
+
+    if (searchValue.length > 0 && searchValue.length < 3) {
+      return;
+    }
+
+    if (searchValue === currentSearch) {
+      return;
+    }
+
+    // La recherche se lance seule après une courte pause, mais seulement à partir de 3 caractères.
+    const debounceTimer = window.setTimeout(() => {
+      applyFilters(draftFilters);
+    }, 450);
+
+    return () => window.clearTimeout(debounceTimer);
+  }, [draftFilters, filters.search]);
 
   function goToPage(page: number) {
     setFilters((current) => cleanFilters({ ...current, page: String(page) }));
@@ -325,7 +345,7 @@ function InvoiceFiltersPanel({
         </div>
       </div>
       <p className="mt-3 text-xs font-semibold text-app-muted">
-        Le filtre par créateur nécessite un paramètre backend dédié et n'est pas encore affiché.
+        La recherche se lance automatiquement à partir de 3 caractères. Le filtre par créateur nécessite un paramètre backend dédié et n'est pas encore affiché.
       </p>
     </section>
   );
@@ -525,9 +545,11 @@ function InvoiceActions({
       <button
         type="button"
         onClick={() => onSelect(invoice)}
-        className="inline-flex min-h-10 items-center justify-center rounded-md border border-app-border bg-app-card px-4 py-2 text-sm font-semibold text-app-text transition hover:bg-primary-50 focus:outline-none focus:ring-4 focus:ring-primary-100"
+        className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-app-border bg-app-card text-app-text transition hover:bg-primary-50 focus:outline-none focus:ring-4 focus:ring-primary-100"
+        title="Voir le détail"
+        aria-label={"Voir le détail de la facture " + invoice.reference}
       >
-        Voir
+        <EyeIcon className="h-4 w-4" />
       </button>
       {canCollectPayment && (
         <span
@@ -538,8 +560,13 @@ function InvoiceActions({
         </span>
       )}
       {canCancel && invoice.paymentStatus !== "PAID" && invoice.paymentStatus !== "CANCELED" && (
-        <span className="inline-flex min-h-10 items-center justify-center rounded-md border border-app-border bg-app-surface px-4 py-2 text-sm font-semibold text-app-muted">
-          Annulation à connecter
+        <span
+          className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-app-border bg-app-surface text-app-muted"
+          title="Annulation à connecter"
+          aria-label={"Annulation à connecter pour la facture " + invoice.reference}
+          role="img"
+        >
+          <CancelIcon className="h-4 w-4" />
         </span>
       )}
     </div>
@@ -740,6 +767,43 @@ function FilterInput({
         className="min-h-11 rounded-md border border-app-border bg-white px-3 text-sm text-app-text outline-none transition focus:border-primary-300 focus:ring-4 focus:ring-primary-100 dark:bg-app-surface"
       />
     </label>
+  );
+}
+
+function EyeIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+function CancelIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="m15 9-6 6" />
+      <path d="m9 9 6 6" />
+    </svg>
   );
 }
 
