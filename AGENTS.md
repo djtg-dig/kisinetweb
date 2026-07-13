@@ -53,6 +53,7 @@ Le style doit rester chargé et fonctionnel sur toute l’application, notamment
 * les pages de produits ;
 * les pages de stock ;
 * les pages de ventes ;
+* les pages de factures
 * les pages d’erreur ;
 * les pages 404 ;
 * les écrans de chargement ;
