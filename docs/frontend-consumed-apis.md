@@ -645,7 +645,6 @@ Content-Type: application/json
   en repli `Non renseigné`.
 - **Endpoints backend manquants à créer plus tard** :
   - `POST /api/sales/drafts/` ou équivalent si les brouillons doivent être persistés côté serveur.
-  - Endpoint de caisse si l'action `Encaisser` doit ouvrir directement une facture.
   - Endpoint d'annulation de facture si l'action `Annuler` doit être activée.
   - Endpoint de facture/reçu si `Imprimer le reçu` doit être activé.
   - Endpoint d'import/analyse d'ordonnance si le scanner IA devient réel.
@@ -681,11 +680,37 @@ Content-Type: application/json
   encaisser sont calculés sur la page courante uniquement.
 - **Pagination** : le frontend utilise `count`, `next` et `previous`, et conserve
   les filtres/recherche actifs lors des changements de page.
-- **Fonctionnalités non connectées faute d'endpoint dédié** : ouverture caisse avec
-  une facture sélectionnée, annulation de facture, impression/téléchargement de reçu.
+- **Fonctionnalités non connectées faute d'endpoint dédié** : annulation de facture
+  et impression/téléchargement de reçu.
 - **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden`, `404 Not Found`,
   `500 Internal Server Error` côté API. Le frontend affiche un message convivial
   sans exposer la réponse technique brute.
+
+### POST /api/sale-payments/
+
+- **Objectif** : enregistrer un paiement sur une facture depuis la page
+  `Factures`, sans intégrer un formulaire complet de caisse.
+- **Méthode HTTP** : `POST`
+- **URL** : `/api/sale-payments/`
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/invoices`
+- **Service frontend** : `createInvoicePayment(payload)` dans
+  `lib/api/invoices.ts`
+- **Authentification** : requise avec `Authorization: Bearer <access_token>`.
+- **Permission frontend** : le bouton `Encaisser` est affiché seulement avec
+  `sale_payment_create`. Le backend applique aussi cette permission.
+- **Corps JSON envoyé** :
+  - `pharmacy` : référence de la pharmacie active.
+  - `sale` : référence de la facture à encaisser.
+  - `amount` : montant affecté à la facture, au format décimal.
+  - `amount_received` : montant réellement reçu, au format décimal.
+  - `payment_method` : mode de paiement, par exemple `CASH`.
+  - `transaction_reference` : référence externe optionnelle.
+- **Réponse attendue** : `201 Created` avec le paiement créé. Le frontend conserve
+  le code HTTP retourné (`statusCode`) et recharge la liste des factures après un
+  encaissement réussi.
+- **Erreurs possibles** : `400 Bad Request`, `401 Unauthorized`, `403 Forbidden`.
+  Le frontend affiche un message lisible sans exposer une stack trace ou une
+  réponse technique brute.
 
 ### GET /api/sales/metadata/
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/ui/link-button";
 import {
@@ -9,6 +9,7 @@ import {
   type PharmacyPermissions,
 } from "@/lib/api";
 import {
+  createInvoicePayment,
   getInvoiceMetadata,
   getPharmacyInvoices,
   type Invoice,
@@ -17,6 +18,7 @@ import {
   type InvoicePaymentStatus,
   type InvoiceSummary,
 } from "@/lib/api/invoices";
+import { SALES_CHOICES_STORAGE_KEY, type SalesChoiceOption } from "@/lib/api/sales-choices";
 
 type InvoicesPageProps = {
   params: Promise<{ pharmacyId: string }>;
@@ -24,6 +26,7 @@ type InvoicesPageProps = {
 
 // Union de chaînes : elle limite les états possibles de la page à ces valeurs précises.
 type PageState = "loading" | "ready" | "empty" | "forbidden" | "error";
+type FeedbackMessage = { tone: "success" | "error"; text: string };
 
 const defaultFilters: InvoiceFilters = {
   search: "",
@@ -44,6 +47,14 @@ const defaultStatusOptions: { value: string; label: string }[] = [
   { value: "DRAFT", label: "Brouillon" },
 ];
 
+const defaultPaymentMethodOptions: SalesChoiceOption[] = [
+  { value: "CASH", label: "Espèces" },
+  { value: "MOBILE_MONEY", label: "Mobile Money" },
+  { value: "CARD", label: "Carte bancaire" },
+  { value: "BANK_TRANSFER", label: "Virement bancaire" },
+  { value: "OTHER", label: "Autre" },
+];
+
 export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
   // `useState<Type>()` indique à TypeScript la forme exacte de la donnée stockée.
   const [pharmacyId, setPharmacyId] = useState("");
@@ -61,6 +72,8 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
   const [hasNextPage, setHasNextPage] = useState(false);
   const [hasPreviousPage, setHasPreviousPage] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
+  const [feedback, setFeedback] = useState<FeedbackMessage | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
@@ -130,8 +143,6 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
     filters.search || filters.status || filters.createdFrom || filters.createdTo,
   );
   const activeSummary = summary || buildEmptySummary(totalInvoices);
-  const cashRegisterUnavailable =
-    "La permission d'encaissement est disponible, mais la route Caisse n'est pas encore connectée dans ce frontend.";
 
   function applyFilters(nextFilters: InvoiceFilters) {
     const cleanedFilters = cleanFilters({ ...nextFilters, page: "1" });
@@ -231,8 +242,8 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
               pharmacyId={pharmacyId}
               canCancel={Boolean(permissions.sale_cancel)}
               canOpenCashRegister={Boolean(permissions.sale_payment_create)}
-              cashRegisterUnavailable={cashRegisterUnavailable}
               onSelect={setSelectedInvoice}
+              onCollect={setPaymentInvoice}
             />
             <PaginationControls
               currentPage={currentPage}
@@ -251,6 +262,29 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
           currency={currency}
           onClose={() => setSelectedInvoice(null)}
         />
+      )}
+
+      {paymentInvoice && (
+        <InvoicePaymentDialog
+          invoice={paymentInvoice}
+          pharmacyId={pharmacyId}
+          currency={currency}
+          onClose={() => setPaymentInvoice(null)}
+          onSuccess={(statusCode) => {
+            setPaymentInvoice(null);
+            setFeedback({
+              tone: "success",
+              text: "Paiement enregistré avec succès. Code HTTP " + statusCode + ".",
+            });
+            setReloadKey((key) => key + 1);
+          }}
+        />
+      )}
+
+      {feedback && (
+        <ToastMessage tone={feedback.tone} onClose={() => setFeedback(null)}>
+          {feedback.text}
+        </ToastMessage>
       )}
     </div>
   );
@@ -357,16 +391,16 @@ function InvoicesList({
   pharmacyId,
   canCancel,
   canOpenCashRegister,
-  cashRegisterUnavailable,
   onSelect,
+  onCollect,
 }: {
   invoices: Invoice[];
   currency: string;
   pharmacyId: string;
   canCancel: boolean;
   canOpenCashRegister: boolean;
-  cashRegisterUnavailable: string;
   onSelect: (invoice: Invoice) => void;
+  onCollect: (invoice: Invoice) => void;
 }) {
   return (
     <section className="rounded-lg border border-app-border bg-app-card shadow-sm">
@@ -383,16 +417,16 @@ function InvoicesList({
         pharmacyId={pharmacyId}
         canCancel={canCancel}
         canOpenCashRegister={canOpenCashRegister}
-        cashRegisterUnavailable={cashRegisterUnavailable}
         onSelect={onSelect}
+        onCollect={onCollect}
       />
       <MobileInvoicesList
         invoices={invoices}
         currency={currency}
         canCancel={canCancel}
         canOpenCashRegister={canOpenCashRegister}
-        cashRegisterUnavailable={cashRegisterUnavailable}
         onSelect={onSelect}
+        onCollect={onCollect}
       />
     </section>
   );
@@ -403,16 +437,16 @@ function DesktopInvoicesTable({
   currency,
   canCancel,
   canOpenCashRegister,
-  cashRegisterUnavailable,
   onSelect,
+  onCollect,
 }: {
   invoices: Invoice[];
   currency: string;
   pharmacyId: string;
   canCancel: boolean;
   canOpenCashRegister: boolean;
-  cashRegisterUnavailable: string;
   onSelect: (invoice: Invoice) => void;
+  onCollect: (invoice: Invoice) => void;
 }) {
   return (
     <div className="hidden overflow-x-auto lg:block">
@@ -457,8 +491,8 @@ function DesktopInvoicesTable({
                   invoice={invoice}
                   canCancel={canCancel}
                   canOpenCashRegister={canOpenCashRegister}
-                  cashRegisterUnavailable={cashRegisterUnavailable}
                   onSelect={onSelect}
+                  onCollect={onCollect}
                 />
               </td>
             </tr>
@@ -474,15 +508,15 @@ function MobileInvoicesList({
   currency,
   canCancel,
   canOpenCashRegister,
-  cashRegisterUnavailable,
   onSelect,
+  onCollect,
 }: {
   invoices: Invoice[];
   currency: string;
   canCancel: boolean;
   canOpenCashRegister: boolean;
-  cashRegisterUnavailable: string;
   onSelect: (invoice: Invoice) => void;
+  onCollect: (invoice: Invoice) => void;
 }) {
   return (
     <div className="grid gap-4 p-4 lg:hidden">
@@ -506,8 +540,8 @@ function MobileInvoicesList({
               invoice={invoice}
               canCancel={canCancel}
               canOpenCashRegister={canOpenCashRegister}
-              cashRegisterUnavailable={cashRegisterUnavailable}
               onSelect={onSelect}
+              onCollect={onCollect}
               compact
             />
           </div>
@@ -521,16 +555,16 @@ function InvoiceActions({
   invoice,
   canCancel,
   canOpenCashRegister,
-  cashRegisterUnavailable,
   compact = false,
   onSelect,
+  onCollect,
 }: {
   invoice: Invoice;
   canCancel: boolean;
   canOpenCashRegister: boolean;
-  cashRegisterUnavailable: string;
   compact?: boolean;
   onSelect: (invoice: Invoice) => void;
+  onCollect: (invoice: Invoice) => void;
 }) {
   const canCollectPayment =
     canOpenCashRegister &&
@@ -552,12 +586,15 @@ function InvoiceActions({
         <EyeIcon className="h-4 w-4" />
       </button>
       {canCollectPayment && (
-        <span
-          className="inline-flex min-h-10 items-center justify-center rounded-md border border-app-border bg-app-surface px-4 py-2 text-sm font-semibold text-app-muted"
-          title={cashRegisterUnavailable}
+        <button
+          type="button"
+          onClick={() => onCollect(invoice)}
+          className="inline-flex min-h-10 items-center justify-center rounded-md bg-primary-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary-700 focus:outline-none focus:ring-4 focus:ring-primary-200"
+          title="Encaisser cette facture"
+          aria-label={"Encaisser la facture " + invoice.reference}
         >
-          Caisse à venir
-        </span>
+          Encaisser
+        </button>
       )}
       {canCancel && invoice.paymentStatus !== "PAID" && invoice.paymentStatus !== "CANCELED" && (
         <span
@@ -618,6 +655,154 @@ function InvoiceDetailDialog({
           <Detail label="Statut" value={getStatusLabel(invoice.paymentStatus)} />
         </div>
       </section>
+    </div>
+  );
+}
+
+function InvoicePaymentDialog({
+  invoice,
+  pharmacyId,
+  currency,
+  onClose,
+  onSuccess,
+}: {
+  invoice: Invoice;
+  pharmacyId: string;
+  currency: string;
+  onClose: () => void;
+  onSuccess: (statusCode: number) => void;
+}) {
+  const remainingAmount = formatPaymentInput(invoice.remainingAmount);
+  const [amount, setAmount] = useState(remainingAmount);
+  const [amountReceived, setAmountReceived] = useState(remainingAmount);
+  const [paymentMethod, setPaymentMethod] = useState("CASH");
+  const [transactionReference, setTransactionReference] = useState("");
+  const [paymentMethods, setPaymentMethods] = useState<SalesChoiceOption[]>(defaultPaymentMethodOptions);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    setPaymentMethods(readPaymentMethodOptions());
+  }, []);
+
+  async function submitPayment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setErrorMessage("");
+
+    const amountValue = parsePaymentNumber(amount);
+    const receivedValue = parsePaymentNumber(amountReceived);
+
+    if (amountValue <= 0) {
+      setErrorMessage("Le montant à encaisser doit être supérieur à zéro.");
+      return;
+    }
+
+    if (amountValue > invoice.remainingAmount) {
+      setErrorMessage("Le montant à encaisser ne peut pas dépasser le reste à payer.");
+      return;
+    }
+
+    if (receivedValue < amountValue) {
+      setErrorMessage("Le montant reçu doit couvrir le montant à encaisser.");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const result = await createInvoicePayment({
+        pharmacy: pharmacyId,
+        sale: invoice.reference,
+        amount: formatPaymentPayloadValue(amountValue),
+        amount_received: formatPaymentPayloadValue(receivedValue),
+        payment_method: paymentMethod,
+        transaction_reference: transactionReference,
+      });
+
+      onSuccess(result.statusCode);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? cleanUserErrorMessage(error.message)
+          : "Impossible d'enregistrer le paiement. Veuillez réessayer.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4">
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/40"
+        aria-label="Fermer l'encaissement"
+        disabled={submitting}
+        onClick={onClose}
+      />
+      <form
+        onSubmit={submitPayment}
+        className="relative w-full max-w-lg rounded-lg border border-app-border bg-app-card p-6 shadow-soft"
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-primary-700">{invoice.reference}</p>
+            <h2 className="mt-2 text-xl font-bold text-app-text">Encaisser la facture</h2>
+            <p className="mt-2 text-sm leading-6 text-app-muted">
+              Reste à payer : {formatCurrency(invoice.remainingAmount, currency)}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={submitting}
+            className="rounded-md border border-app-border bg-app-surface px-3 py-1.5 text-sm font-semibold text-app-text hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Fermer
+          </button>
+        </div>
+
+        <div className="mt-5 grid gap-4">
+          <FilterInput
+            label="Montant à encaisser"
+            type="number"
+            value={amount}
+            onChange={setAmount}
+          />
+          <FilterInput
+            label="Montant reçu"
+            type="number"
+            value={amountReceived}
+            onChange={setAmountReceived}
+          />
+          <FilterSelect
+            label="Mode de paiement"
+            value={paymentMethod}
+            options={paymentMethods}
+            onChange={setPaymentMethod}
+          />
+          <FilterInput
+            label="Référence transactionnelle"
+            value={transactionReference}
+            placeholder="Optionnel"
+            onChange={setTransactionReference}
+          />
+        </div>
+
+        {errorMessage && (
+          <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+            {errorMessage}
+          </p>
+        )}
+
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+          <Button type="button" variant="secondary" onClick={onClose} disabled={submitting}>
+            Annuler
+          </Button>
+          <Button type="submit" disabled={submitting}>
+            {submitting ? "Encaissement..." : "Enregistrer le paiement"}
+          </Button>
+        </div>
+      </form>
     </div>
   );
 }
@@ -862,6 +1047,39 @@ function Detail({ label, value }: { label: string; value: string }) {
   );
 }
 
+function ToastMessage({
+  tone,
+  children,
+  onClose,
+}: {
+  tone: "success" | "error";
+  children: ReactNode;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const timer = window.setTimeout(onClose, 5000);
+
+    return () => window.clearTimeout(timer);
+  }, [children, onClose]);
+
+  const toneClass =
+    tone === "success"
+      ? "border-success-200 bg-success-50 text-success-700"
+      : "border-red-200 bg-red-50 text-red-700";
+
+  return (
+    <div
+      role="status"
+      className={`fixed right-4 top-20 z-[1200] flex w-[min(calc(100vw-2rem),28rem)] items-start justify-between gap-4 rounded-lg border p-4 shadow-soft lg:top-24 ${toneClass}`}
+    >
+      <p className="text-sm font-semibold">{children}</p>
+      <button type="button" onClick={onClose} className="text-sm font-bold">
+        Fermer
+      </button>
+    </div>
+  );
+}
+
 function buildEmptySummary(totalInvoices: number): InvoiceSummary {
   return {
     totalInvoices,
@@ -900,6 +1118,52 @@ function cleanFilters(filters: InvoiceFilters): InvoiceFilters {
   return Object.fromEntries(
     Object.entries(filters).filter(([, value]) => value && String(value).trim()),
   ) as InvoiceFilters;
+}
+
+function readPaymentMethodOptions(): SalesChoiceOption[] {
+  if (typeof window === "undefined") {
+    return defaultPaymentMethodOptions;
+  }
+
+  try {
+    const storedChoices = JSON.parse(
+      localStorage.getItem(SALES_CHOICES_STORAGE_KEY) || "{}",
+    ) as { paymentMethods?: SalesChoiceOption[] };
+
+    if (Array.isArray(storedChoices.paymentMethods) && storedChoices.paymentMethods.length) {
+      return storedChoices.paymentMethods;
+    }
+  } catch {
+    return defaultPaymentMethodOptions;
+  }
+
+  return defaultPaymentMethodOptions;
+}
+
+function parsePaymentNumber(value: string) {
+  const numberValue = Number(value.replace(",", "."));
+  return Number.isFinite(numberValue) ? numberValue : 0;
+}
+
+function formatPaymentInput(value: number) {
+  return value.toFixed(2);
+}
+
+function formatPaymentPayloadValue(value: number) {
+  return value.toFixed(2);
+}
+
+function cleanUserErrorMessage(message: string) {
+  const normalizedMessage = message.trim();
+  if (
+    !normalizedMessage ||
+    normalizedMessage === "Internal Server Error" ||
+    normalizedMessage.startsWith("<")
+  ) {
+    return "Impossible d'enregistrer le paiement. Veuillez réessayer.";
+  }
+
+  return normalizedMessage;
 }
 
 function getSummaryValueClass(tone?: string) {

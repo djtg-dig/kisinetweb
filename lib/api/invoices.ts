@@ -70,6 +70,30 @@ export type InvoiceMetadata = {
   orderings: InvoiceStatusOption[];
 };
 
+export type InvoicePaymentPayload = {
+  pharmacy: string;
+  sale: string;
+  amount?: string;
+  amount_received: string;
+  payment_method: string;
+  transaction_reference?: string;
+  notes?: string;
+};
+
+export type InvoicePaymentResult = {
+  statusCode: number;
+  payment: {
+    reference?: string;
+    sale?: string;
+    pharmacy?: string;
+    amount?: string;
+    amount_received?: string;
+    change_amount?: string;
+    payment_method?: string;
+    status?: string;
+  };
+};
+
 // Type proche de la réponse brute du backend : les champs restent optionnels car
 // l'API peut évoluer ou renvoyer une valeur vide selon le contexte.
 type InvoiceApiItem = {
@@ -178,19 +202,29 @@ export async function getPendingPharmacyInvoices(pharmacyId: string): Promise<Pe
   return data.map((item) => normalizePendingInvoice((item || {}) as PendingInvoiceApiItem));
 }
 
-async function fetchInvoicesJson<T>(path: string): Promise<T> {
-  const accessToken = getAccessToken();
-  if (!accessToken) {
-    throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
+export async function createInvoicePayment(
+  payload: InvoicePaymentPayload,
+): Promise<InvoicePaymentResult> {
+  const response = await fetchInvoicesResponse("/api/sale-payments/", {
+    method: "POST",
+    body: JSON.stringify(cleanPaymentPayload(payload)),
+  });
+
+  const responseText = await response.text();
+  const data = parseJsonResponse(responseText);
+
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(data, "Impossible d'enregistrer le paiement."));
   }
 
-  const response = await fetch(apiBaseUrl.replace(/\/$/, "") + path, {
-    cache: "no-store",
-    headers: {
-      Authorization: "Bearer " + accessToken,
-      Accept: "application/json",
-    },
-  });
+  return {
+    statusCode: response.status,
+    payment: data && typeof data === "object" ? data as InvoicePaymentResult["payment"] : {},
+  };
+}
+
+async function fetchInvoicesJson<T>(path: string): Promise<T> {
+  const response = await fetchInvoicesResponse(path);
 
   // On lit d'abord en texte pour pouvoir gérer proprement une réponse vide ou non JSON.
   const responseText = await response.text();
@@ -201,6 +235,24 @@ async function fetchInvoicesJson<T>(path: string): Promise<T> {
   }
 
   return data as T;
+}
+
+async function fetchInvoicesResponse(path: string, init: RequestInit = {}) {
+  const accessToken = getAccessToken();
+  if (!accessToken) {
+    throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
+  }
+
+  return fetch(apiBaseUrl.replace(/\/$/, "") + path, {
+    cache: "no-store",
+    ...init,
+    headers: {
+      Authorization: "Bearer " + accessToken,
+      Accept: "application/json",
+      ...(init.body ? { "Content-Type": "application/json" } : {}),
+      ...init.headers,
+    },
+  });
 }
 
 function normalizeInvoicePage(data: unknown): PaginatedInvoices {
@@ -343,6 +395,13 @@ function appendFilter(params: URLSearchParams, key: string, value?: string) {
   if (value && value.trim()) {
     params.set(key, value.trim());
   }
+}
+
+function cleanPaymentPayload(payload: InvoicePaymentPayload) {
+  // On évite d'envoyer les champs optionnels vides pour laisser le backend appliquer ses valeurs par défaut.
+  return Object.fromEntries(
+    Object.entries(payload).filter(([, value]) => value !== undefined && String(value).trim()),
+  );
 }
 
 function toNumber(value: string | number | undefined) {
