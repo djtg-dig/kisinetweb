@@ -8,6 +8,7 @@ export type StockMovementType = "IN" | "OUT" | "ADJUSTMENT";
 
 export type StockMovement = {
   id: string;
+  reference?: string;
   pharmacyReference?: string;
   productReference?: string;
   productName: string;
@@ -146,6 +147,7 @@ function normalizeStockMovement(item: UnknownRecord): StockMovement {
 
   return {
     id: String(item.id ?? item.reference ?? ""),
+    reference: getText(item.reference) ?? getText(item.id) ?? "",
     pharmacyReference: getText(item.pharmacy_reference) ?? getText(item.pharmacy),
     productReference:
       getText(item.product_reference) ??

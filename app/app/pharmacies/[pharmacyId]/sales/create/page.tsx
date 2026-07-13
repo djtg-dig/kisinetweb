@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { LinkButton } from "@/components/ui/link-button";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
 import {
@@ -62,6 +63,7 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
     null,
   );
   const [submitting, setSubmitting] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
 
   useEffect(() => {
     async function readParams() {
@@ -119,6 +121,33 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
   const dashboardHref = "/app/pharmacies/" + pharmacyId + "/dashboard";
   const salesHref = "/app/pharmacies/" + pharmacyId + "/sales";
   const activeCurrency = currency;
+  const hasDraftContent =
+    items.length > 0 ||
+    customer.name.trim() !== "" ||
+    customer.phone.trim() !== "" ||
+    discount.type !== defaultDiscount.type ||
+    discount.value.trim() !== "" ||
+    discount.reason.trim() !== "";
+
+  useEffect(() => {
+    if (!pharmacyId || pageState !== "ready") {
+      return;
+    }
+
+    if (items.length > 0) {
+      saveSaleDraft(pharmacyId, {
+        customerName: customer.name,
+        customerPhone: customer.phone,
+        discountType: discount.type,
+        discountValue: discount.value,
+        discountReason: discount.reason,
+        items,
+      });
+      return;
+    }
+
+    clearSaleDraft(pharmacyId);
+  }, [customer, discount, items, pageState, pharmacyId]);
 
   function restoreDraft(draft: SaleDraftStorage) {
     setItems(draft.items || []);
@@ -131,17 +160,6 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
       value: draft.discountValue || "",
       reason: draft.discountReason || "",
     });
-  }
-
-  function buildDraft(): SaleDraftStorage {
-    return {
-      customerName: customer.name,
-      customerPhone: customer.phone,
-      discountType: discount.type,
-      discountValue: discount.value,
-      discountReason: discount.reason,
-      items,
-    };
   }
 
   function addProduct(product: SaleProduct) {
@@ -211,28 +229,21 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
     });
   }
 
-  function saveDraft() {
-    if (!pharmacyId) {
+  function cancelDraft() {
+    if (!hasDraftContent) {
+      setFeedback({ tone: "info", message: "Aucun brouillon à vider." });
       return;
     }
 
-    saveSaleDraft(pharmacyId, buildDraft());
-    setFeedback({ tone: "success", message: "Brouillon enregistré localement." });
+    setCancelDialogOpen(true);
   }
 
-  function cancelDraft() {
-    if (!items.length && !customer.name) {
-      return;
-    }
-
-    if (!window.confirm("Vider le brouillon de vente ?")) {
-      return;
-    }
-
+  function confirmCancelDraft() {
     setItems([]);
     setCustomer(defaultCustomer);
     setDiscount(defaultDiscount);
     clearSaleDraft(pharmacyId);
+    setCancelDialogOpen(false);
     setFeedback({ tone: "info", message: "Brouillon vidé." });
   }
 
@@ -359,11 +370,20 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
           currency={activeCurrency}
           cashierName={cashierName}
           submitting={submitting}
-          onSaveDraft={saveDraft}
           onCancel={cancelDraft}
           onSubmit={submitSale}
         />
       </div>
+
+      <ConfirmDialog
+        open={cancelDialogOpen}
+        title="Vider le brouillon"
+        message="Voulez-vous vraiment annuler cette vente ? Les produits et les informations saisies dans ce brouillon seront supprimés."
+        confirmLabel="Vider le brouillon"
+        cancelLabel="Continuer la vente"
+        onConfirm={confirmCancelDraft}
+        onCancel={() => setCancelDialogOpen(false)}
+      />
     </main>
   );
 }
@@ -414,7 +434,7 @@ function SaleModeSelector({
         active={mode === "manual"}
         title="Entrée manuelle"
         description="Recherchez et ajoutez les produits disponibles dans la pharmacie."
-        buttonLabel="Commencer la saisie manuelle"
+        buttonLabel="Saisie manuelle"
         onClick={() => onChange("manual")}
       />
       <ModeCard
@@ -798,7 +818,6 @@ function SaleSummary({
   currency,
   cashierName,
   submitting,
-  onSaveDraft,
   onCancel,
   onSubmit,
 }: {
@@ -811,7 +830,6 @@ function SaleSummary({
   currency: string;
   cashierName: string;
   submitting: boolean;
-  onSaveDraft: () => void;
   onCancel: () => void;
   onSubmit: () => void;
 }) {
@@ -838,13 +856,6 @@ function SaleSummary({
           className="inline-flex min-h-11 items-center justify-center rounded-md bg-success-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-success-700 disabled:cursor-not-allowed disabled:opacity-70"
         >
           {submitting ? "Création..." : "Créer la facture"}
-        </button>
-        <button
-          type="button"
-          onClick={onSaveDraft}
-          className="inline-flex min-h-11 items-center justify-center rounded-md border border-app-border bg-app-surface px-5 py-2.5 text-sm font-semibold text-app-text transition hover:bg-primary-50"
-        >
-          Enregistrer le brouillon
         </button>
         <button
           type="button"

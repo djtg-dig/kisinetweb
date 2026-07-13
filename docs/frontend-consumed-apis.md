@@ -589,9 +589,23 @@ Content-Type: application/json
   Pour `IN`/`OUT`, c'est `quantity` qui est requis.
 - **Réponse attendue (201)** : mouvement créé (serializer de lecture avec
   `product_reference`, `product_name`, `previous_stock`, `new_stock`, etc.).
-- **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden` (permission
-  `stock_adjust` manquante), `400 Bad Request` si `product`, `quantity`
-  (pour IN/OUT) ou `new_stock` (pour ADJUSTMENT) est manquant/invalide.
+
+### GET /api/stock-movements/{reference}/
+
+- **Objectif** : consulter un mouvement de stock précis.
+- **Méthode HTTP** : `GET`
+- **URL** : `/api/stock-movements/{reference}/`
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/stock` (bouton « Consulter » d'un mouvement)
+- **Service frontend** : `getStockMovementDetail(reference)` dans `lib/api/stock-movements.ts`
+- **Identifiant** : la route utilise la **référence alphanumérique du mouvement**
+  (`MVXXXXXXXX`, champ `reference` du modèle `StockMovement`), et **non** son `id`
+  interne. Cela aligne le endpoint avec les autres ressources
+  (produit `PR...`, pharmacie `PH...`, vente `SEL...`).
+- **Permission requise** : `stock_view` dans la pharmacie du mouvement.
+- **Réponse attendue (200)** : détail du mouvement (mêmes champs que la liste,
+  `reference` inclus).
+- **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden`, `404 Not Found`
+  si la référence n'appartient pas à la pharmacie.
 
 ## Ventes
 
@@ -614,9 +628,11 @@ Content-Type: application/json
 - **Validation vente** : aucun endpoint backend réel n'est encore consommé. Le helper
   `createSale(payload)` existe côté frontend, mais il renvoie le message :
   `La validation backend de la vente sera ajoutée ultérieurement.`
-- **Brouillon temporaire** : `Enregistrer le brouillon` sauvegarde localement les
-  produits, client, ordonnance, réduction et paiement dans `localStorage`, avec une
-  clé par pharmacie.
+- **Brouillon temporaire** : dès qu'au moins un produit est présent dans le
+  brouillon, les produits, les informations client et la réduction sont sauvegardés
+  automatiquement dans `localStorage`, avec une clé par pharmacie. Le brouillon est
+  restauré après actualisation de la page et supprimé lorsqu'il ne contient plus de
+  produit ou lorsque l'utilisateur confirme l'action `Annuler`.
 - **Scanner IA** : placeholder visuel uniquement. Aucun fichier n'est envoyé et
   aucune analyse IA n'est simulée.
 - **Données temporaires** : aucune donnée produit temporaire n'est utilisée pour la

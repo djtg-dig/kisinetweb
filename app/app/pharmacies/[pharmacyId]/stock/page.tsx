@@ -196,11 +196,11 @@ export default function PharmacyStockPage({ params }: StockPageProps) {
   }
 
   async function openMovementDetail(movement: StockMovement) {
-    setLoadingDetailId(movement.id);
+    setLoadingDetailId(movement.reference ?? movement.id);
     setErrorMessage("");
 
     try {
-      const detail = await getStockMovementDetail(movement.id);
+      const detail = await getStockMovementDetail(movement.reference ?? movement.id);
       setSelectedMovement(detail);
     } catch (error) {
       setErrorMessage(
