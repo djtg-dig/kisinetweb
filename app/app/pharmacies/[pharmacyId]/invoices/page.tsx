@@ -198,13 +198,6 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
           loading={state === "loading"}
         />
 
-        {activeSummary.source === "current_page" && state !== "loading" && (
-          <p className="rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-semibold text-orange-700">
-            Les statistiques détaillées sont calculées sur les factures chargées dans la page courante.
-            Un résumé global backend sera nécessaire pour des totaux par statut sur toute la pharmacie.
-          </p>
-        )}
-
         <InvoiceFiltersPanel
           filters={draftFilters}
           statusOptions={statusOptions}

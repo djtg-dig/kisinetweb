@@ -668,16 +668,17 @@ Content-Type: application/json
   - `date_from` : date de début au format `YYYY-MM-DD`.
   - `date_to` : date de fin au format `YYYY-MM-DD`.
   - `page` : page demandée pour la pagination.
-- **Réponse attendue (200)** : réponse paginée `{ count, next, previous, results }`.
+- **Réponse attendue (200)** : réponse paginée
+  `{ count, next, previous, summary, results }`.
   Chaque élément de `results` contient les champs utilisés par la page :
   `reference`, `pharmacy`, `customer_name`, `customer_phone`, `subtotal_amount`,
   `discount_amount`, `total_amount`, `paid_amount`, `remaining_amount`,
   `change_amount`, `items_count`, `total_product_quantity`, `status`,
   `payment_status`, `created_by`, `created_at` et `detail_url`.
-- **Résumé optionnel** : si l'API fournit `summary` ou `stats`, le frontend utilise
+- **Résumé global** : `summary` est calculé par le backend sur toutes les factures
+  correspondant aux filtres actifs, avant pagination. Le frontend utilise
   `total_invoices`, `unpaid_invoices`, `partially_paid_invoices`, `paid_invoices`
-  et `remaining_amount` pour les cartes. Sinon, les cartes par statut et le reste à
-  encaisser sont calculés sur la page courante uniquement.
+  et `remaining_amount` pour les cartes.
 - **Pagination** : le frontend utilise `count`, `next` et `previous`, et conserve
   les filtres/recherche actifs lors des changements de page.
 - **Fonctionnalités non connectées faute d'endpoint dédié** : annulation de facture
