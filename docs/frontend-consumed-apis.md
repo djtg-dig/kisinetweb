@@ -99,9 +99,12 @@ Accept: application/json
 - **Objectif** : lister les pharmacies associées au compte connecté.
 - **Méthode HTTP** : `GET`
 - **URL** : `/api/pharmacies/`
-- **Pages frontend** : `/app/select-pharmacy`, `/tarifs/[name]`
+- **Pages frontend** : `/app/select-pharmacy`, `/app/settings`, `/tarifs/[name]`
 - **Service frontend** : `getUserPharmacies()` dans `lib/api`
 - **Authentification** : requise avec `Authorization: Bearer <access_token>`.
+- **Moment d'appel sur les paramètres généraux** : la page `/app/settings`
+  appelle cette API pour retrouver la pharmacie active stockée côté navigateur
+  et proposer un lien direct vers ses paramètres métier.
 - **Moment d'appel sur la souscription** : la page `/tarifs/[name]` appelle cette
   API uniquement après avoir confirmé qu'un token d'accès est présent. Si
   l'utilisateur n'est pas connecté, les pharmacies ne sont pas chargées.
