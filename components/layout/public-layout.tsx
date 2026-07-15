@@ -207,9 +207,9 @@ function UserMenu({
           <MenuLink href="/app/profile" onClose={onClose}>
             Mon profil
           </MenuLink>
-          <MenuLink href="/app/subscription" onClose={onClose}>
+          {/* <MenuLink href="/app/subscription" onClose={onClose}>
             Mon abonnement
-          </MenuLink>
+          </MenuLink> */}
           <MenuLink href="/app/settings" onClose={onClose}>
             Paramètres
           </MenuLink>
