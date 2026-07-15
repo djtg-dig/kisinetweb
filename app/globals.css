@@ -4,22 +4,22 @@
 
 :root {
   /* Variables du thème clair utilisées par les classes Tailwind app-*. */
-  --color-background: 248 250 252;
-  --color-surface: 255 255 255;
-  --color-card: 255 255 255;
-  --color-border: 226 232 240;
-  --color-text: 15 23 42;
-  --color-muted: 100 116 139;
+  --color-background: 248 250 252; /* Couleur de fond principale : gris clair */
+  --color-surface: 255 255 255; /* Couleur de surface : blanc */
+  --color-card: 255 255 255; /* Couleur des cartes : blanc */
+  --color-border: 226 232 240; /* Couleur de bordure : gris */
+  --color-text: 15 23 42; /* Couleur du texte : bleu foncé */
+  --color-muted: 100 116 139; /* Couleur de texte secondaire : bleu-gris */
 }
 
 .dark {
   /* La classe .dark permettra d'activer plus tard le thème sombre. */
-  --color-background: 2 6 23;
-  --color-surface: 15 23 42;
-  --color-card: 30 41 59;
-  --color-border: 51 65 85;
-  --color-text: 248 250 252;
-  --color-muted: 148 163 184;
+  --color-background: 2 6 23; /* Couleur de fond principale : bleu très foncé */
+  --color-surface: 15 23 42; /* Couleur de surface : bleu foncé */
+  --color-card: 30 41 59; /* Couleur des cartes : bleu-gris */
+  --color-border: 51 65 85; /* Couleur de bordure : bleu-gris */
+  --color-text: 248 250 252; /* Couleur du texte : blanc */
+  --color-muted: 148 163 184; /* Couleur de texte secondaire : gris */
 }
 
 * {

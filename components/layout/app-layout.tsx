@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { SiteFooter } from "@/components/layout/site-footer";
@@ -80,8 +81,15 @@ function AppNavbar({ pharmacyId }: { pharmacyId: string }) {
     <header className="fixed left-0 right-0 top-0 z-[1000] h-16 w-full border-b border-app-border bg-app-surface shadow-sm lg:h-[72px]">
       <nav className="mx-auto flex h-full max-w-7xl items-center justify-between gap-3 px-3 pr-24 sm:px-6 sm:pr-28 lg:px-8">
         <a href="/" className="flex min-w-0 shrink items-center gap-2 sm:gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary-600 text-base font-bold text-white sm:h-10 sm:w-10 sm:text-lg">
-            K
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white sm:h-10 sm:w-10">
+            <Image
+              src="/kisinet-logo.png"
+              alt=""
+              width={40}
+              height={40}
+              className="h-full w-full object-contain"
+              priority
+            />
           </span>
           <span className="truncate text-base font-bold text-app-text sm:text-lg">Kisinet</span>
         </a>

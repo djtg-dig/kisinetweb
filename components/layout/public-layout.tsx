@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { LinkButton } from "@/components/ui/link-button";
 import { SiteFooter } from "@/components/layout/site-footer";
@@ -101,8 +102,15 @@ function PublicNavbar({ activePharmacy = null }: { activePharmacy?: PharmacySumm
     <header className="fixed inset-x-0 top-0 z-20 border-b border-app-border bg-app-surface/95 backdrop-blur">
       <nav className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
         <a href="/" className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-md bg-primary-600 text-lg font-bold text-white">
-            K
+          <span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-md bg-white">
+            <Image
+              src="/kisinet-logo.png"
+              alt=""
+              width={40}
+              height={40}
+              className="h-full w-full object-contain"
+              priority
+            />
           </span>
           <span className="text-lg font-bold text-app-text">Kisinet</span>
         </a>
