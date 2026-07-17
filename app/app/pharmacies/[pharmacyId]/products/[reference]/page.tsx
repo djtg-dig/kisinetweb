@@ -120,6 +120,8 @@ function DetailCard({ product, pharmacyId }: { product: Product; pharmacyId: str
       )}
 
       <dl className="mt-6 grid gap-4 border-t border-app-border pt-6 sm:grid-cols-2">
+        <DetailRow label="Dosage / concentration" value={formatValue(product.strength)} />
+        <DetailRow label="Conditionnement" value={formatValue(product.package)} />
         <DetailRow label="Forme" value={labelFor(PRODUCT_FORMS, product.form)} />
         <DetailRow label="Catégorie thérapeutique" value={labelFor(THERAPEUTIC_CATEGORIES, product.therapeutic_category)} />
         <DetailRow label="Public visé" value={labelFor(TARGET_GENDERS, product.target_gender)} />
@@ -158,6 +160,10 @@ function DetailRow({ label, value }: { label: string; value: string }) {
       <dd className="mt-1 text-sm font-semibold text-app-text">{value}</dd>
     </div>
   );
+}
+
+function formatValue(value?: string) {
+  return value || "Non renseigné";
 }
 
 function labelFor(

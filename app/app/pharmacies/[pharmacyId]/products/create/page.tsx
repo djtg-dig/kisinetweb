@@ -170,6 +170,21 @@ export default function CreateProductPage({ params }: CreatePageProps) {
           />
 
           <div className="grid gap-5 md:grid-cols-2">
+            <TextField
+              label="Dosage / concentration"
+              value={values.strength}
+              placeholder="Ex : 500 mg, 250 mg/5 ml"
+              onChange={(value) => updateField("strength", value)}
+            />
+            <TextField
+              label="Conditionnement"
+              value={values.package}
+              placeholder="Ex : Boîte de 10 comprimés"
+              onChange={(value) => updateField("package", value)}
+            />
+          </div>
+
+          <div className="grid gap-5 md:grid-cols-2">
             <SelectField
               label="Forme"
               value={values.form}

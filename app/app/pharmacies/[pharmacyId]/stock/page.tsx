@@ -504,7 +504,7 @@ function ProductSearchField({
           value={query}
           disabled={disabled}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Nom, référence ou code-barres"
+          placeholder="Nom, référence, dosage..."
           className="min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 pr-12 text-sm text-app-text outline-none transition focus:border-primary-300 focus:ring-4 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-60"
         />
         {state === "loading" && (
@@ -518,7 +518,9 @@ function ProductSearchField({
 
       <div className="mt-2">
         {state === "idle" && (
-          <p className="text-sm text-app-muted">Recherchez par nom, référence ou code-barres.</p>
+          <p className="text-sm text-app-muted">
+            Recherchez par nom, référence, dosage ou conditionnement.
+          </p>
         )}
         {state === "short" && (
           <p className="text-sm text-app-muted">Saisissez au moins 2 caractères.</p>
@@ -550,6 +552,11 @@ function ProductSearchField({
                   <span className="mt-0.5 block text-xs font-semibold text-app-muted">
                     Référence {product.reference} · Stock {product.currentStock}
                   </span>
+                  {(product.strength || product.package) && (
+                    <span className="mt-0.5 block truncate text-xs font-semibold text-app-muted">
+                      {[product.strength, product.package].filter(Boolean).join(" · ")}
+                    </span>
+                  )}
                 </button>
               </li>
             ))}

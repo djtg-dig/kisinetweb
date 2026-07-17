@@ -458,6 +458,8 @@ Content-Type: application/json
 | `target_gender`    | string  | non         | Public visé (`MALE`, `FEMALE`, `MIXED`, `UNDEFINED`). Défaut : `UNDEFINED`. |
 | `target_age_group` | string  | non         | Tranche d'âge (`NEWBORN`, `CHILD`, ..., `ALL`). Défaut : `ALL`. |
 | `therapeutic_category` | string | non      | Catégorie (`ANALGESIC`, `ANTIBIOTIC`, ..., `OTHER`). Défaut : `OTHER`. |
+| `strength`         | string  | non         | Dosage ou concentration, max 50 caractères. Envoyé seulement si renseigné. |
+| `package`          | string  | non         | Conditionnement commercial, max 50 caractères. Envoyé seulement si renseigné. |
 | `purchase_price`   | number  | non         | Prix d'achat, >= 0. Envoyé seulement si renseigné.              |
 | `current_stock`    | integer | non         | Stock initial, >= 0. Défaut : 0. Envoyé seulement si renseigné. |
 
@@ -494,6 +496,8 @@ Content-Type: application/json
   "target_gender": "UNDEFINED",
   "target_age_group": "ALL",
   "therapeutic_category": "ANALGESIC",
+  "strength": "500 mg",
+  "package": "Boîte de 10 comprimés",
   "sale_price": 1.5,
   "purchase_price": 0.9,
   "current_stock": 100
@@ -515,6 +519,8 @@ Content-Type: application/json
   "target_gender": "UNDEFINED",
   "target_age_group": "ALL",
   "therapeutic_category": "ANALGESIC",
+  "strength": "500 mg",
+  "package": "Boîte de 10 comprimés",
   "sale_price": "1.50",
   "purchase_price": "0.90",
   "current_stock": 100,
@@ -536,14 +542,18 @@ Content-Type: application/json
 - **Service frontend** : `getPharmacyProducts(pharmacyId, filters)` dans `lib/api`
 - **Paramètre query obligatoire** : `pharmacy_reference` (référence PHXXXXXXXX de la pharmacie).
 - **Autres query params** : `search`, `reference`, `name`, `form`, `target_gender`,
-  `target_age_group`, `therapeutic_category`, `stock_status`, `min_stock`, `max_stock`,
-  `min_sale_price`, `max_sale_price`, `min_purchase_price`, `max_purchase_price`,
-  `created_from`, `created_to`, `updated_from`, `updated_to`, `ordering`, `page`.
+  `target_age_group`, `therapeutic_category`, `strength`, `package`, `stock_status`,
+  `min_stock`, `max_stock`, `min_sale_price`, `max_sale_price`, `min_purchase_price`,
+  `max_purchase_price`, `created_from`, `created_to`, `updated_from`, `updated_to`,
+  `ordering`, `page`.
+- **Recherche** : `search` couvre notamment le nom, la référence, la description,
+  la catégorie, le dosage (`strength`) et le conditionnement (`package`).
 - **Réponse attendue (200)** : objet paginé `{ count, next, previous, results }` où
   chaque `result` est un produit (serializer de lecture).
 - **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden`.
 - **Endpoint compagnon** : `GET /api/products/filter-options/?pharmacy_reference={pharmacy_id}`
-  (`getProductFilterOptions`) renvoie les options des filtres (formes, catégories, etc.).
+  (`getProductFilterOptions`) renvoie les options des filtres (formes, catégories, etc.),
+  dont les tris `strength`, `-strength`, `package` et `-package`.
 
 ## Stock (mouvements)
 
@@ -643,9 +653,9 @@ Content-Type: application/json
 - **Scanner IA** : placeholder visuel uniquement. Aucun fichier n'est envoyé et
   aucune analyse IA n'est simulée.
 - **Données temporaires** : aucune donnée produit temporaire n'est utilisée pour la
-  recherche manuelle ; les produits viennent de l'API existante. Les champs non
-  exposés par l'API actuelle (`dosage`, `barcode`, `expirationDate`) restent affichés
-  en repli `Non renseigné`.
+  recherche manuelle ; les produits viennent de l'API existante. Le champ affiché
+  `dosage` est alimenté par `strength`. Les champs non exposés par l'API actuelle
+  (`barcode`, `expirationDate`) restent affichés en repli `Non renseigné`.
 - **Endpoints backend manquants à créer plus tard** :
   - `POST /api/sales/drafts/` ou équivalent si les brouillons doivent être persistés côté serveur.
   - Endpoint d'annulation de facture si l'action `Annuler` doit être activée.
@@ -789,8 +799,9 @@ Content-Type: application/json
 - **Paramètre query obligatoire** : `pharmacy_reference`.
 - **Réponse attendue (200)** : produit complet (serializer de lecture), incluant
   `reference`, `pharmacy_reference`, `name`, `description`, `form`, `target_gender`,
-  `target_age_group`, `therapeutic_category`, `sale_price`, `purchase_price`,
-  `current_stock`, `is_deleted`, `deleted_at`, `created_at`, `updated_at`.
+  `target_age_group`, `therapeutic_category`, `strength`, `package`, `sale_price`,
+  `purchase_price`, `current_stock`, `is_deleted`, `deleted_at`, `created_at`,
+  `updated_at`.
 - **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden`, `404 Not Found`.
 
 ### DELETE /api/products/{reference}/

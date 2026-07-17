@@ -188,6 +188,7 @@ function normalizeSaleProduct(product: ProductSummary): SaleProduct {
     reference: product.reference,
     name: product.name,
     form: product.form,
+    dosage: product.strength,
     salePrice: product.salePrice,
     availableStock: product.currentStock,
   };

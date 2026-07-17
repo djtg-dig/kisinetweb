@@ -139,6 +139,8 @@ export type ProductSummary = {
   targetGender?: string;
   targetAgeGroup?: string;
   therapeuticCategory?: string;
+  strength?: string;
+  package?: string;
   salePrice: number;
   purchasePrice?: number;
   currentStock: number;
@@ -161,6 +163,8 @@ export type ProductFilters = {
   targetGender?: string;
   targetAgeGroup?: string;
   therapeuticCategory?: string;
+  strength?: string;
+  package?: string;
   stockStatus?: string;
   minStock?: string;
   maxStock?: string;
@@ -435,6 +439,8 @@ function normalizeProduct(item: UnknownRecord): ProductSummary {
     targetGender: getText(item.target_gender),
     targetAgeGroup: getText(item.target_age_group),
     therapeuticCategory: getText(item.therapeutic_category),
+    strength: getText(item.strength),
+    package: getText(item.package),
     salePrice: Number(item.sale_price || 0),
     purchasePrice:
       item.purchase_price === null || item.purchase_price === undefined
@@ -942,6 +948,8 @@ export async function getPharmacyProducts(
   appendFilter(params, "target_gender", filters.targetGender);
   appendFilter(params, "target_age_group", filters.targetAgeGroup);
   appendFilter(params, "therapeutic_category", filters.therapeuticCategory);
+  appendFilter(params, "strength", filters.strength);
+  appendFilter(params, "package", filters.package);
   appendFilter(params, "stock_status", filters.stockStatus);
   appendFilter(params, "min_stock", filters.minStock);
   appendFilter(params, "max_stock", filters.maxStock);

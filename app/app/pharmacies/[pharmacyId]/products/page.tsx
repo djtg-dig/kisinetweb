@@ -242,7 +242,7 @@ function ProductFiltersPanel({
         <FilterInput
           label="Recherche"
           value={filters.search || ""}
-          placeholder="Nom, référence, description..."
+          placeholder="Nom, référence, dosage..."
           onChange={(value) => updateFilter("search", value)}
         />
         <FilterSelect
@@ -272,6 +272,18 @@ function ProductFiltersPanel({
             value={filters.reference || ""}
             placeholder="PR..."
             onChange={(value) => updateFilter("reference", value)}
+          />
+          <FilterInput
+            label="Dosage"
+            value={filters.strength || ""}
+            placeholder="500 mg"
+            onChange={(value) => updateFilter("strength", value)}
+          />
+          <FilterInput
+            label="Conditionnement"
+            value={filters.package || ""}
+            placeholder="Boîte, flacon..."
+            onChange={(value) => updateFilter("package", value)}
           />
           <FilterSelect
             label="Public"
@@ -396,9 +408,10 @@ function ProductsList({
 }) {
   return (
     <div className="rounded-lg border border-app-border bg-app-card shadow-sm">
-      <div className="hidden grid-cols-[1.4fr_1fr_0.7fr_0.7fr_0.8fr_0.8fr] gap-4 rounded-t-lg border-b border-app-border bg-app-surface px-5 py-3 text-xs font-bold uppercase text-app-muted lg:grid">
+      <div className="hidden grid-cols-[1.4fr_1fr_0.8fr_0.7fr_0.7fr_0.8fr_0.8fr] gap-4 rounded-t-lg border-b border-app-border bg-app-surface px-5 py-3 text-xs font-bold uppercase text-app-muted lg:grid">
         <span>Produit</span>
         <span>Catégorie</span>
+        <span>Dosage</span>
         <span>Forme</span>
         <span className="text-right">Stock</span>
         <span className="text-right">Prix vente</span>
@@ -409,16 +422,22 @@ function ProductsList({
         {products.map((product, index) => (
           <article
             key={product.reference}
-            className="grid gap-4 px-5 py-4 lg:grid-cols-[1.4fr_1fr_0.7fr_0.7fr_0.8fr_0.8fr] lg:items-center"
+            className="grid gap-4 px-5 py-4 lg:grid-cols-[1.4fr_1fr_0.8fr_0.7fr_0.7fr_0.8fr_0.8fr] lg:items-center"
           >
             <div className="min-w-0">
               <h2 className="truncate font-bold text-app-text">{product.name}</h2>
               <p className="mt-1 text-xs font-semibold text-app-muted">
                 ID : {product.reference}
               </p>
+              {product.package && (
+                <p className="mt-1 truncate text-xs font-semibold text-app-muted">
+                  {product.package}
+                </p>
+              )}
             </div>
 
             <InfoCell label="Catégorie" value={formatValue(product.therapeuticCategory)} />
+            <InfoCell label="Dosage" value={formatValue(product.strength)} />
             <InfoCell label="Forme" value={formatValue(product.form)} />
             <InfoCell
               label="Stock"

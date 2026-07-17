@@ -15,6 +15,8 @@ export type CreateProductPayload = {
   target_gender: string;
   target_age_group: string;
   therapeutic_category: string;
+  strength?: string;
+  package?: string;
   sale_price: number;
   purchase_price?: number | null;
   current_stock?: number;
@@ -29,6 +31,8 @@ export type Product = {
   target_gender?: string;
   target_age_group?: string;
   therapeutic_category?: string;
+  strength?: string;
+  package?: string;
   sale_price: number;
   purchase_price?: number | null;
   current_stock: number;
@@ -46,6 +50,8 @@ export type ProductFormValues = {
   target_gender: string;
   target_age_group: string;
   therapeutic_category: string;
+  strength: string;
+  package: string;
   sale_price: string;
   purchase_price: string;
   current_stock: string;
@@ -114,6 +120,8 @@ export const initialProductFormValues: ProductFormValues = {
   target_gender: TARGET_GENDER_DEFAULT,
   target_age_group: TARGET_AGE_GROUP_DEFAULT,
   therapeutic_category: THERAPEUTIC_CATEGORY_DEFAULT,
+  strength: "",
+  package: "",
   sale_price: "",
   purchase_price: "",
   current_stock: "0",
@@ -140,6 +148,12 @@ export async function createProduct(
 
   if (values.description.trim()) {
     payload.description = values.description.trim();
+  }
+  if (values.strength.trim()) {
+    payload.strength = values.strength.trim();
+  }
+  if (values.package.trim()) {
+    payload.package = values.package.trim();
   }
   if (values.purchase_price.trim()) {
     payload.purchase_price = Number(values.purchase_price);
