@@ -6,6 +6,11 @@ Ce fichier liste les endpoints backend déjà consommés par l'interface fronten
 
 - `GET /api/carri-account/login/`
 
+Les boutons frontend de connexion doivent pointer vers `/auth/carri`. Cette route
+Next appelle `GET /api/carri-account/login/`, redirige vers Carri Account en cas
+de succès, et affiche une page Kisinet si le backend renvoie `429` avec
+`detail`, `code=rate_limited` et `retry_after_seconds`.
+
 ## Comptes
 
 - `GET /api/accounts/me/`
