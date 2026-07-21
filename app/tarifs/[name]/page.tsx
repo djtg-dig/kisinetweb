@@ -232,6 +232,7 @@ export default function PlanDetailPage({ params }: PlanDetailPageProps) {
                     expiresAt={temporarySubscription.expiresAt}
                   />
                   <OrderSummary
+                    analysisCredits={plan.analysisCredits}
                     currency={plan.currency}
                     durationMonths={selectedCommitment.months}
                     monthlyPrice={orderSummary.monthlyPrice}
@@ -461,6 +462,7 @@ function PharmacySubscriptionSection({
 }
 
 function OrderSummary({
+  analysisCredits,
   currency,
   disabled,
   discountAmount,
@@ -472,6 +474,7 @@ function OrderSummary({
   selectedPharmacy,
   totalAmount,
 }: {
+  analysisCredits?: PharmacyPlan["analysisCredits"];
   currency?: string;
   disabled: boolean;
   discountAmount: number;
@@ -490,6 +493,22 @@ function OrderSummary({
         <SummaryRow label="Pharmacie" value={selectedPharmacy?.name || "À sélectionner"} />
         <SummaryRow label="Plan" value={planName} />
         <SummaryRow label="Durée" value={durationMonths + " mois"} />
+        {analysisCredits?.enabled && (
+          <>
+            <SummaryRow
+              label="Crédits d'analyse par utilisateur"
+              value={formatAnalysisCredits(
+                analysisCredits.perUserMonthlyAnalysisCredits * durationMonths,
+              )}
+            />
+            <SummaryRow
+              label="Crédits d'analyse pharmacie"
+              value={formatAnalysisCredits(
+                analysisCredits.monthlyAnalysisCredits * durationMonths,
+              )}
+            />
+          </>
+        )}
         <SummaryRow label="Prix mensuel" value={formatMoney(monthlyPrice, currency)} />
         <SummaryRow
           label="Réduction"
@@ -601,6 +620,12 @@ function formatAmount(amount: number) {
     minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
     maximumFractionDigits: 2,
   }).format(amount);
+}
+
+function formatAnalysisCredits(value: number) {
+  return new Intl.NumberFormat("fr-FR", {
+    maximumFractionDigits: 0,
+  }).format(value);
 }
 
 function canManageSubscription(pharmacy: PharmacySummary) {

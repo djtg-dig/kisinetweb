@@ -15,6 +15,13 @@ export function buildPlanElements(plan: PharmacyPlan): PlanElement[] {
     elements.push({ label: "Produits", value: "Illimité" });
   }
 
+  if (plan.analysisCredits?.enabled) {
+    elements.push({
+      label: plan.analysisCredits.label || "Crédits d'analyse",
+      value: formatCredits(plan.analysisCredits.perUserMonthlyAnalysisCredits) + " / utilisateur / mois",
+    });
+  }
+
   if (plan.unlimitedBranches) {
     elements.push({ label: "Succursales", value: "Illimité" });
   } else if (plan.maxBranches && plan.maxBranches !== 0) {
@@ -22,12 +29,18 @@ export function buildPlanElements(plan: PharmacyPlan): PlanElement[] {
   }
 
   for (const feature of plan.features) {
-    if (feature.enabled) {
+    if (feature.enabled && feature.label !== "Crédits d'analyse") {
       elements.push({ label: feature.label, value: "Inclus" });
     }
   }
 
   return elements;
+}
+
+function formatCredits(value: number) {
+  return new Intl.NumberFormat("fr-FR", {
+    maximumFractionDigits: 0,
+  }).format(value);
 }
 
 export function PlanElements({ plan }: { plan: PharmacyPlan }) {

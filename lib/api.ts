@@ -833,6 +833,16 @@ export type PharmacyPlanDuration = {
   totalAmount: string;
 };
 
+export type PharmacyPlanAnalysisCredits = {
+  enabled: boolean;
+  label: string;
+  monthlyAnalysisCredits: number;
+  perUserMonthlyAnalysisCredits: number;
+  multiplyByDurationMonths: boolean;
+  unusedCreditsExpire: boolean;
+  periodScope: string;
+};
+
 export type PharmacyPlan = {
   id: number;
   code: string;
@@ -847,6 +857,7 @@ export type PharmacyPlan = {
   unlimitedBranches: boolean;
   features: PharmacyPlanFeature[];
   durations: PharmacyPlanDuration[];
+  analysisCredits?: PharmacyPlanAnalysisCredits;
   highlighted?: boolean;
 };
 
@@ -883,7 +894,23 @@ function normalizePharmacyPlan(item: UnknownRecord): PharmacyPlan {
           };
         })
       : [],
+    analysisCredits:
+      item.analysis_credits && typeof item.analysis_credits === "object"
+        ? normalizePharmacyPlanAnalysisCredits(item.analysis_credits as UnknownRecord)
+        : undefined,
     highlighted: Boolean(item.highlighted ?? item.is_popular ?? item.popular),
+  };
+}
+
+function normalizePharmacyPlanAnalysisCredits(item: UnknownRecord): PharmacyPlanAnalysisCredits {
+  return {
+    enabled: Boolean(item.enabled),
+    label: String(item.label || "Crédits d'analyse"),
+    monthlyAnalysisCredits: Number(item.monthly_analysis_credits || 0),
+    perUserMonthlyAnalysisCredits: Number(item.per_user_monthly_analysis_credits || 0),
+    multiplyByDurationMonths: Boolean(item.multiply_by_duration_months),
+    unusedCreditsExpire: Boolean(item.unused_credits_expire),
+    periodScope: String(item.period_scope || ""),
   };
 }
 
