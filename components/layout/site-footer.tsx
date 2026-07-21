@@ -23,6 +23,7 @@ function FooterLinks({ title, links }: FooterLinksProps) {
 export function SiteFooter() {
   const legalLinks = [
     { label: "Conditions d'utilisation", href: "/terms" },
+    { label: "Politique de cookies", href: "/cookies" },
   ];
 
   return (

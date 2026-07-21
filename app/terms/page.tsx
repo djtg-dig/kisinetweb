@@ -34,7 +34,7 @@ type LegalSection = {
   blocks: LegalBlock[];
 };
 
-const lastUpdated = "[À remplacer par la date officielle]";
+const lastUpdated = "2 juillet 2026";
 
 const legalSections: LegalSection[] = [
   {
@@ -615,16 +615,7 @@ export default function TermsPage() {
           </aside>
 
           <div className="min-w-0">
-            <div className="max-w-3xl rounded-lg border border-app-border bg-app-card p-5 shadow-sm sm:p-7">
-              <p className="text-sm leading-7 text-app-muted">
-                Cette page rassemble les règles d'utilisation de Kisinet. Elle
-                doit être lue avec les politiques complémentaires qui seront
-                publiées progressivement, notamment la Politique de
-                confidentialité lorsqu'elle sera disponible.
-              </p>
-            </div>
-
-            <div className="mt-8 max-w-3xl space-y-8">
+            <div className="max-w-3xl space-y-8">
               {legalSections.map((section, index) => (
                 <LegalSectionView
                   key={section.id}
@@ -634,14 +625,15 @@ export default function TermsPage() {
               ))}
             </div>
 
-            <div className="mt-10 flex flex-col gap-3 border-t border-app-border pt-8 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm leading-6 text-app-muted">
-                La Politique de confidentialité et la Politique de cookies
-                seront reliées depuis cette zone lorsqu'elles seront publiées.
-              </p>
-              <LinkButton href="#top" variant="secondary" className="w-fit">
-                Revenir en haut
-              </LinkButton>
+            <div className="mt-10 flex flex-wrap gap-3 border-t border-app-border pt-8">
+              <div className="flex flex-wrap gap-3">
+                <LinkButton href="/cookies" variant="secondary">
+                  Politique de cookies
+                </LinkButton>
+                <LinkButton href="#top" variant="secondary">
+                  Revenir en haut
+                </LinkButton>
+              </div>
             </div>
           </div>
         </div>

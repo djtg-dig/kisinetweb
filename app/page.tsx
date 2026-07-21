@@ -195,13 +195,13 @@ export default function HomePage() {
             <h2 className="text-3xl font-bold">
               Simplifiez la gestion de votre pharmacie dès aujourd'hui.
             </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-primary-50 sm:text-base">
+            <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-white/90 sm:text-base">
               Connectez-vous avec Carri Account et commencez à organiser vos produits,
               stocks, ventes et équipes avec Kisinet.
             </p>
             <PublicAuthLink
               variant="secondary"
-              className="mt-7 border-white bg-white text-primary-700 hover:bg-primary-50"
+              className="mt-7 border-white bg-white text-app-text hover:bg-primary-50 dark:border-app-border dark:bg-app-card dark:text-primary-700 dark:hover:bg-primary-50"
             >
               Se connecter avec Carri Account
             </PublicAuthLink>
