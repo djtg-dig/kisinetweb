@@ -112,7 +112,7 @@ export default function HomePage() {
         <section className="border-b border-app-border bg-app-background">
           <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:px-6 lg:grid-cols-[0.95fr_1.05fr] lg:px-8 lg:py-16">
             <div className="flex flex-col justify-center">
-              <span className="w-fit rounded-full bg-primary-50 px-3 py-1 text-sm font-semibold text-primary-700 ring-1 ring-primary-100">
+              <span className="w-fit rounded-full bg-success-50 px-3 py-1 text-sm font-semibold text-success-700 ring-1 ring-success-100">
                 Gestion pharmaceutique moderne
               </span>
               <h1 className="mt-5 max-w-3xl text-4xl font-bold leading-tight text-app-text sm:text-5xl">
@@ -126,9 +126,13 @@ export default function HomePage() {
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <PublicAuthLink>Se connecter</PublicAuthLink>
-                <LinkButton href="/tarifs" variant="secondary">
-                  Voir les tarifs
-                </LinkButton>
+              <LinkButton
+                href="/tarifs"
+                variant="secondary"
+                className="border-success-200 text-success-700 hover:bg-success-50"
+              >
+                Voir les tarifs
+              </LinkButton>
               </div>
 
               <div className="mt-8 grid gap-3 sm:grid-cols-3">
@@ -217,7 +221,7 @@ export default function HomePage() {
                   key={step.title}
                   className="grid gap-4 rounded-lg border border-app-border bg-app-card p-5 shadow-sm sm:grid-cols-[44px_1fr]"
                 >
-                  <span className="flex h-11 w-11 items-center justify-center rounded-md bg-primary-600 text-sm font-bold text-white">
+                  <span className="flex h-11 w-11 items-center justify-center rounded-md bg-success-600 text-sm font-bold text-white">
                     {index + 1}
                   </span>
                   <div>
@@ -288,7 +292,7 @@ export default function HomePage() {
             <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
               <PublicAuthLink
                 variant="secondary"
-                className="border-white bg-white text-app-text hover:bg-primary-50 dark:border-app-border dark:bg-app-card dark:text-primary-700 dark:hover:bg-primary-50"
+                className="border-white bg-white text-app-text hover:bg-success-50 dark:border-app-border dark:bg-app-card dark:text-primary-700 dark:hover:bg-primary-50"
               >
                 Se connecter avec Carri Account
               </PublicAuthLink>
@@ -363,8 +367,8 @@ function ProductShowcase() {
                 74%
               </span>
             </div>
-            <div className="h-2 overflow-hidden rounded-full bg-primary-100">
-              <div className="h-full w-3/4 rounded-full bg-primary-600" />
+            <div className="h-2 overflow-hidden rounded-full bg-success-100">
+              <div className="h-full w-3/4 rounded-full bg-success-600" />
             </div>
           </div>
         </div>
