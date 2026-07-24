@@ -54,6 +54,7 @@ export default function ReferralsPage() {
   const [paymentMethod, setPaymentMethod] = useState("MOBILE_MONEY");
   const [destination, setDestination] = useState(defaultDestination);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isWithdrawalModalOpen, setIsWithdrawalModalOpen] = useState(false);
 
   function applyReferralDashboard({
     overview,
@@ -133,6 +134,7 @@ export default function ReferralsPage() {
       setAmount("");
       setDestination(defaultDestination);
       applyReferralDashboard(await fetchReferralDashboard());
+      setIsWithdrawalModalOpen(false);
       setMessage("Demande de retrait enregistrée. Le montant est maintenant réservé.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Impossible de créer le retrait.");
@@ -175,6 +177,7 @@ export default function ReferralsPage() {
         )}
 
         {pageState === "ready" && (
+          <>
           <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
             <section className="space-y-6">
               <WalletOverview wallets={wallets} />
@@ -199,107 +202,217 @@ export default function ReferralsPage() {
                   </p>
                 )}
 
-                <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-                  <label className="block text-sm font-semibold text-app-text">
-                    Montant
-                    <input
-                      value={amount}
-                      onChange={(event) => setAmount(event.target.value)}
-                      inputMode="decimal"
-                      required
-                      placeholder="15.00"
-                      className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
-                    />
-                  </label>
+                <p className="mt-4 text-sm leading-6 text-app-muted">
+                  Regroupez plusieurs commissions dans une seule demande pour réduire les frais de retrait.
+                </p>
 
-                  <label className="block text-sm font-semibold text-app-text">
-                    Devise
-                    <select
-                      value={currency}
-                      onChange={(event) => setCurrency(event.target.value)}
-                      className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
-                    >
-                      {(wallets.length ? wallets : [{ currency: "USD" } as ReferralWalletSummary]).map(
-                        (wallet) => (
-                          <option key={wallet.currency} value={wallet.currency}>
-                            {wallet.currency}
-                          </option>
-                        ),
-                      )}
-                    </select>
-                  </label>
+                {message && (
+                  <p className="mt-5 rounded-md border border-app-border bg-app-surface px-4 py-3 text-sm text-app-muted">
+                    {message}
+                  </p>
+                )}
 
-                  <label className="block text-sm font-semibold text-app-text">
-                    Moyen
-                    <select
-                      value={paymentMethod}
-                      onChange={(event) => setPaymentMethod(event.target.value)}
-                      className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
-                    >
-                      <option value="MOBILE_MONEY">Mobile Money</option>
-                      <option value="IKEEPAY">iKeePay</option>
-                      <option value="BANK_TRANSFER">Virement bancaire</option>
-                      <option value="OTHER">Autre</option>
-                    </select>
-                  </label>
-
-                  <label className="block text-sm font-semibold text-app-text">
-                    Opérateur
-                    <input
-                      value={destination.operator}
-                      onChange={(event) =>
-                        setDestination((current) => ({ ...current, operator: event.target.value }))
-                      }
-                      placeholder="MPESA"
-                      className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
-                    />
-                  </label>
-
-                  <label className="block text-sm font-semibold text-app-text">
-                    Téléphone
-                    <input
-                      value={destination.phone_number}
-                      onChange={(event) =>
-                        setDestination((current) => ({
-                          ...current,
-                          phone_number: event.target.value,
-                        }))
-                      }
-                      placeholder="+243XXXXXXXXX"
-                      className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
-                    />
-                  </label>
-
-                  <label className="block text-sm font-semibold text-app-text">
-                    Nom du bénéficiaire
-                    <input
-                      value={destination.account_name}
-                      onChange={(event) =>
-                        setDestination((current) => ({
-                          ...current,
-                          account_name: event.target.value,
-                        }))
-                      }
-                      className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
-                    />
-                  </label>
-
-                  {message && (
-                    <p className="rounded-md border border-app-border bg-app-surface px-4 py-3 text-sm text-app-muted">
-                      {message}
-                    </p>
-                  )}
-
-                  <Button type="submit" disabled={isSubmitting} className="w-full">
-                    {isSubmitting ? "Enregistrement..." : "Demander le retrait"}
-                  </Button>
-                </form>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setMessage("");
+                    setIsWithdrawalModalOpen(true);
+                  }}
+                  className="mt-5 w-full"
+                >
+                  Demander un retrait
+                </Button>
               </section>
             </aside>
           </div>
+          {isWithdrawalModalOpen && (
+            <WithdrawalRequestDialog
+              activeWallet={activeWallet}
+              amount={amount}
+              currency={currency}
+              destination={destination}
+              isSubmitting={isSubmitting}
+              message={message}
+              paymentMethod={paymentMethod}
+              wallets={wallets}
+              onAmountChange={setAmount}
+              onClose={() => setIsWithdrawalModalOpen(false)}
+              onCurrencyChange={setCurrency}
+              onDestinationChange={setDestination}
+              onPaymentMethodChange={setPaymentMethod}
+              onSubmit={handleSubmit}
+            />
+          )}
+          </>
         )}
       </section>
     </MainLayout>
+  );
+}
+
+function WithdrawalRequestDialog({
+  activeWallet,
+  amount,
+  currency,
+  destination,
+  isSubmitting,
+  message,
+  paymentMethod,
+  wallets,
+  onAmountChange,
+  onClose,
+  onCurrencyChange,
+  onDestinationChange,
+  onPaymentMethodChange,
+  onSubmit,
+}: {
+  activeWallet: ReferralWalletSummary | null;
+  amount: string;
+  currency: string;
+  destination: typeof defaultDestination;
+  isSubmitting: boolean;
+  message: string;
+  paymentMethod: string;
+  wallets: ReferralWalletSummary[];
+  onAmountChange: (value: string) => void;
+  onClose: () => void;
+  onCurrencyChange: (value: string) => void;
+  onDestinationChange: (value: typeof defaultDestination) => void;
+  onPaymentMethodChange: (value: string) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[1100] flex items-stretch justify-center bg-black/40 px-3 pb-3 pt-20 sm:items-center sm:px-4 sm:py-6 sm:pt-6">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="withdrawal-dialog-title"
+        className="flex w-full max-w-xl flex-col overflow-hidden rounded-lg border border-app-border bg-app-card shadow-soft"
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-app-border px-5 py-4">
+          <div>
+            <p className="text-sm font-semibold text-primary-700">Retrait groupé</p>
+            <h2 id="withdrawal-dialog-title" className="mt-1 text-xl font-bold text-app-text">
+              Demander un retrait
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-app-border bg-app-surface text-lg font-bold text-app-muted transition hover:bg-primary-50 focus:outline-none focus:ring-4 focus:ring-primary-100"
+            aria-label="Fermer"
+          >
+            ×
+          </button>
+        </div>
+
+        <form onSubmit={onSubmit} className="overflow-y-auto px-5 py-5">
+          {activeWallet && (
+            <p className="mb-5 rounded-md border border-app-border bg-app-surface px-4 py-3 text-sm text-app-muted">
+              Disponible:{" "}
+              <span className="font-semibold text-app-text">
+                {activeWallet.available_balance} {activeWallet.currency}
+              </span>
+            </p>
+          )}
+
+          <div className="space-y-4">
+            <label className="block text-sm font-semibold text-app-text">
+              Montant
+              <input
+                value={amount}
+                onChange={(event) => onAmountChange(event.target.value)}
+                inputMode="decimal"
+                required
+                placeholder="15.00"
+                className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
+              />
+            </label>
+
+            <label className="block text-sm font-semibold text-app-text">
+              Devise
+              <select
+                value={currency}
+                onChange={(event) => onCurrencyChange(event.target.value)}
+                className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
+              >
+                {(wallets.length ? wallets : [{ currency: "USD" } as ReferralWalletSummary]).map(
+                  (wallet) => (
+                    <option key={wallet.currency} value={wallet.currency}>
+                      {wallet.currency}
+                    </option>
+                  ),
+                )}
+              </select>
+            </label>
+
+            <label className="block text-sm font-semibold text-app-text">
+              Moyen
+              <select
+                value={paymentMethod}
+                onChange={(event) => onPaymentMethodChange(event.target.value)}
+                className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
+              >
+                <option value="MOBILE_MONEY">Mobile Money</option>
+                <option value="IKEEPAY">iKeePay</option>
+                <option value="BANK_TRANSFER">Virement bancaire</option>
+                <option value="OTHER">Autre</option>
+              </select>
+            </label>
+
+            <label className="block text-sm font-semibold text-app-text">
+              Opérateur
+              <input
+                value={destination.operator}
+                onChange={(event) =>
+                  onDestinationChange({ ...destination, operator: event.target.value })
+                }
+                placeholder="MPESA"
+                className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
+              />
+            </label>
+
+            <label className="block text-sm font-semibold text-app-text">
+              Téléphone
+              <input
+                value={destination.phone_number}
+                onChange={(event) =>
+                  onDestinationChange({ ...destination, phone_number: event.target.value })
+                }
+                placeholder="+243XXXXXXXXX"
+                className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
+              />
+            </label>
+
+            <label className="block text-sm font-semibold text-app-text">
+              Nom du bénéficiaire
+              <input
+                value={destination.account_name}
+                onChange={(event) =>
+                  onDestinationChange({ ...destination, account_name: event.target.value })
+                }
+                className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
+              />
+            </label>
+
+            {message && (
+              <p className="rounded-md border border-app-border bg-app-surface px-4 py-3 text-sm text-app-muted">
+                {message}
+              </p>
+            )}
+          </div>
+
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+            <Button type="button" variant="secondary" onClick={onClose}>
+              Annuler
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Enregistrement..." : "Demander le retrait"}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
 
