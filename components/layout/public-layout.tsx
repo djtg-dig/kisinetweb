@@ -224,6 +224,9 @@ function UserMenu({
           <MenuLink href="/app/profile" onClose={onClose}>
             Mon profil
           </MenuLink>
+          <MenuLink href="/app/referrals" onClose={onClose}>
+            Parrainage
+          </MenuLink>
           {/* <MenuLink href="/app/subscription" onClose={onClose}>
             Mon abonnement
           </MenuLink> */}

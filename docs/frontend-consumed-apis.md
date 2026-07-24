@@ -896,6 +896,50 @@ Content-Type: application/json
   `customer`, `amount` et `created_at`.
 - **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden`, `404 Not Found`.
 
+## Parrainage
+
+- **Page frontend** : `/app/referrals`
+- **Service frontend** : `lib/api/referrals.ts`
+- **Authentification** : requise avec `Authorization: Bearer <access_token>`.
+- **Règle importante** : le frontend ne crée jamais une commission et ne confirme
+  jamais un paiement iKeePay. Il affiche uniquement les données confirmées par le
+  backend.
+
+Endpoints consommés:
+
+| Usage frontend | Méthode et URL |
+| --- | --- |
+| Résumé portefeuilles | `GET /api/paiements/referrals/me/` |
+| Pharmacies parrainées | `GET /api/paiements/referrals/referred-pharmacies/` |
+| Portefeuilles | `GET /api/paiements/referral-wallets/` |
+| Résumé devise | `GET /api/paiements/referral-wallets/{currency}/summary/` |
+| Transactions devise | `GET /api/paiements/referral-wallets/{currency}/transactions/` |
+| Commissions | `GET /api/paiements/referral-commissions/` |
+| Commissions par devise | `GET /api/paiements/referral-commissions/?currency=USD` |
+| Retraits | `GET /api/paiements/referral-withdrawals/` |
+| Création retrait | `POST /api/paiements/referral-withdrawals/` |
+| Détail retrait | `GET /api/paiements/referral-withdrawals/{reference}/` |
+
+Payload envoyé pour un retrait groupé:
+
+```json
+{
+  "amount": "15.00",
+  "currency": "USD",
+  "payment_method": "MOBILE_MONEY",
+  "destination": {
+    "operator": "MPESA",
+    "phone_number": "+243XXXXXXXXX",
+    "account_name": "Nom du bénéficiaire"
+  }
+}
+```
+
+La page affiche les montants sous forme de chaînes décimales retournées par le
+backend: solde disponible, en attente, réservé, retiré, commissions récentes,
+retraits récents et pharmacies parrainées. Le webhook iKeePay reste une route
+backend uniquement, à configurer côté iKeePay sur `POST /api/webhook/`.
+
 > Note : `{pharmacy_id}` dans les URLs pharmacies correspond à la **référence** publique
 > de la pharmacie (ex. `PH0UKUI3NQ`), jamais à l'identifiant interne. Le frontend utilise
 > dynamiquement le `pharmacyId` de l'URL, jamais une valeur en dur.

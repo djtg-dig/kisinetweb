@@ -120,6 +120,11 @@ export default function AccountSettingsPage() {
                     description="Consulter les informations de votre compte."
                   />
                   <SettingsLink
+                    href="/app/referrals"
+                    title="Parrainage"
+                    description="Suivre vos commissions et demander un retrait groupé."
+                  />
+                  <SettingsLink
                     href="/app/select-pharmacy"
                     title="Mes pharmacies"
                     description="Changer de pharmacie ou ouvrir un espace de travail."

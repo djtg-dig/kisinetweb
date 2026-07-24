@@ -274,6 +274,9 @@ function MenuPanel({
       <MenuLink href="/app/select-pharmacy" onClose={onClose}>
         Mes pharmacies
       </MenuLink>
+      <MenuLink href="/app/referrals" onClose={onClose}>
+        Parrainage
+      </MenuLink>
       {/* <MenuLink href="/app/subscription" onClose={onClose}>
         Mon abonnement
       </MenuLink> */}
