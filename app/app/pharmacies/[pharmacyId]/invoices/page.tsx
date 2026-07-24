@@ -77,19 +77,29 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
+    let isCurrent = true;
+
     // Dans l'App Router, `params` est reçu comme Promise dans ce composant client.
     async function readParams() {
       const resolvedParams = await params;
-      setPharmacyId(resolvedParams.pharmacyId);
+      if (isCurrent) {
+        setPharmacyId(resolvedParams.pharmacyId);
+      }
     }
 
     readParams();
+
+    return () => {
+      isCurrent = false;
+    };
   }, [params]);
 
   useEffect(() => {
     if (!pharmacyId) {
       return;
     }
+
+    let isCurrent = true;
 
     async function loadInvoicesPage() {
       setState("loading");
@@ -102,6 +112,9 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
           getPharmacyDetail(pharmacyId),
         ]);
 
+        if (!isCurrent) {
+          return;
+        }
         setPermissions(userPermissions);
         setPharmacyName(pharmacy.name || "");
         setCurrency(pharmacy.devise || "USD");
@@ -116,6 +129,9 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
           getInvoiceMetadata(pharmacyId).catch(() => null),
         ]);
 
+        if (!isCurrent) {
+          return;
+        }
         if (metadata) {
           setStatusOptions(buildStatusOptions(metadata.statuses, metadata.paymentStatuses));
         }
@@ -127,6 +143,9 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
         setHasPreviousPage(Boolean(page.previous));
         setState(page.results.length ? "ready" : "empty");
       } catch {
+        if (!isCurrent) {
+          return;
+        }
         setErrorMessage(
           "Une erreur s'est produite lors du chargement des factures. Veuillez réessayer.",
         );
@@ -135,6 +154,10 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
     }
 
     loadInvoicesPage();
+
+    return () => {
+      isCurrent = false;
+    };
   }, [pharmacyId, filters, reloadKey]);
 
   const currentPage = Number(filters.page || 1);

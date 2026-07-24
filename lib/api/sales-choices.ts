@@ -1,3 +1,4 @@
+import { dedupeRequest } from "@/lib/api-request-cache";
 import { apiBaseUrl } from "@/lib/carri-account";
 
 export type SalesChoiceOption = {
@@ -13,26 +14,38 @@ export type SalesChoices = {
 };
 
 export const SALES_CHOICES_STORAGE_KEY = "kisinet_sales_choices";
+const SALES_CHOICES_TTL_MS = 24 * 60 * 60 * 1000;
 
 export async function refreshSalesChoices(): Promise<SalesChoices> {
-  const [paymentMethods, paymentStatuses, saleStatuses] = await Promise.all([
-    fetchSalesChoiceList("/api/sales/payment-methods/"),
-    fetchSalesChoiceList("/api/sales/payment-statuses/"),
-    fetchSalesChoiceList("/api/sales/statuses/"),
-  ]);
+  return dedupeRequest(
+    "public:GET:sales-choices",
+    async () => {
+      const cachedChoices = readCachedSalesChoices();
+      if (cachedChoices) {
+        return cachedChoices;
+      }
 
-  const choices = {
-    paymentMethods,
-    paymentStatuses,
-    saleStatuses,
-    updatedAt: new Date().toISOString(),
-  };
+      const [paymentMethods, paymentStatuses, saleStatuses] = await Promise.all([
+        fetchSalesChoiceList("/api/sales/payment-methods/"),
+        fetchSalesChoiceList("/api/sales/payment-statuses/"),
+        fetchSalesChoiceList("/api/sales/statuses/"),
+      ]);
 
-  if (typeof window !== "undefined") {
-    localStorage.setItem(SALES_CHOICES_STORAGE_KEY, JSON.stringify(choices));
-  }
+      const choices = {
+        paymentMethods,
+        paymentStatuses,
+        saleStatuses,
+        updatedAt: new Date().toISOString(),
+      };
 
-  return choices;
+      if (typeof window !== "undefined") {
+        localStorage.setItem(SALES_CHOICES_STORAGE_KEY, JSON.stringify(choices));
+      }
+
+      return choices;
+    },
+    { ttlMs: SALES_CHOICES_TTL_MS },
+  );
 }
 
 async function fetchSalesChoiceList(path: string): Promise<SalesChoiceOption[]> {
@@ -63,4 +76,34 @@ function isSalesChoiceOption(value: unknown): value is SalesChoiceOption {
 
   const option = value as { value?: unknown; label?: unknown };
   return typeof option.value === "string" && typeof option.label === "string";
+}
+
+function readCachedSalesChoices(): SalesChoices | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const value = localStorage.getItem(SALES_CHOICES_STORAGE_KEY);
+    if (!value) {
+      return null;
+    }
+
+    const choices = JSON.parse(value) as Partial<SalesChoices>;
+    const updatedAt = choices.updatedAt ? new Date(choices.updatedAt).getTime() : 0;
+    const isFresh = Number.isFinite(updatedAt) && Date.now() - updatedAt < SALES_CHOICES_TTL_MS;
+
+    if (
+      !isFresh ||
+      !Array.isArray(choices.paymentMethods) ||
+      !Array.isArray(choices.paymentStatuses) ||
+      !Array.isArray(choices.saleStatuses)
+    ) {
+      return null;
+    }
+
+    return choices as SalesChoices;
+  } catch {
+    return null;
+  }
 }

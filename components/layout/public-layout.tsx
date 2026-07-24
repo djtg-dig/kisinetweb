@@ -47,25 +47,36 @@ function PublicNavbar({ activePharmacy = null }: { activePharmacy?: PharmacySumm
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    let isMounted = true;
+
     async function loadUserMenu() {
       saveTokensFromUrlHash();
 
       const accessToken = getAccessToken();
 
       if (!accessToken) {
-        setUserMenu({ isLoggedIn: false, contextPharmacy: null });
+        if (isMounted) {
+          setUserMenu({ isLoggedIn: false, contextPharmacy: null });
+        }
         return;
       }
 
       if (activePharmacy) {
-        setUserMenu({ isLoggedIn: true, contextPharmacy: activePharmacy });
+        if (isMounted) {
+          setUserMenu({ isLoggedIn: true, contextPharmacy: activePharmacy });
+        }
         return;
       }
 
-      setUserMenu({ isLoggedIn: true, contextPharmacy: null });
+      if (isMounted) {
+        setUserMenu({ isLoggedIn: true, contextPharmacy: null });
+      }
 
       try {
         const pharmacies = await getUserPharmacies();
+        if (!isMounted) {
+          return;
+        }
         const lastPharmacyId = getActivePharmacyId();
         const lastPharmacy = pharmacies.find(
           (pharmacy) => pharmacy.id === lastPharmacyId,
@@ -76,11 +87,17 @@ function PublicNavbar({ activePharmacy = null }: { activePharmacy?: PharmacySumm
           contextPharmacy: lastPharmacy || null,
         });
       } catch {
-        setUserMenu({ isLoggedIn: true, contextPharmacy: null });
+        if (isMounted) {
+          setUserMenu({ isLoggedIn: true, contextPharmacy: null });
+        }
       }
     }
 
     loadUserMenu();
+
+    return () => {
+      isMounted = false;
+    };
   }, [activePharmacy]);
 
   useEffect(() => {

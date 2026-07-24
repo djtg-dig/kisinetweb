@@ -23,18 +23,28 @@ export default function PharmacyDashboardPage({ params }: DashboardPageProps) {
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
+    let isCurrent = true;
+
     async function readParams() {
       const resolvedParams = await params;
-      setPharmacyId(resolvedParams.pharmacyId);
+      if (isCurrent) {
+        setPharmacyId(resolvedParams.pharmacyId);
+      }
     }
 
     readParams();
+
+    return () => {
+      isCurrent = false;
+    };
   }, [params]);
 
   useEffect(() => {
     if (!pharmacyId) {
       return;
     }
+
+    let isCurrent = true;
 
     async function loadDashboard() {
       setState("loading");
@@ -45,11 +55,17 @@ export default function PharmacyDashboardPage({ params }: DashboardPageProps) {
           getPharmacyDashboard(pharmacyId),
           getPharmacyPermissions(pharmacyId),
         ]);
+        if (!isCurrent) {
+          return;
+        }
         setActivePharmacyId(data.pharmacy.id);
         setDashboardData(data);
         setPermissions(userPermissions);
         setState("ready");
       } catch (error) {
+        if (!isCurrent) {
+          return;
+        }
         const message = error instanceof Error ? error.message : "";
         if (message.toLowerCase().includes("introuvable")) {
           setState("empty");
@@ -62,6 +78,10 @@ export default function PharmacyDashboardPage({ params }: DashboardPageProps) {
     }
 
     loadDashboard();
+
+    return () => {
+      isCurrent = false;
+    };
   }, [pharmacyId]);
 
   return (

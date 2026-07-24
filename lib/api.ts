@@ -1,4 +1,5 @@
 import { getAccessToken } from "@/lib/auth";
+import { dedupeRequest } from "@/lib/api-request-cache";
 import { apiBaseUrl } from "@/lib/carri-account";
 
 export type PharmacySummary = {
@@ -546,41 +547,43 @@ export async function getUserPharmacies(): Promise<PharmacySummary[]> {
     throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
   }
 
-  const response = await fetch(apiBaseUrl.replace(/\/$/, "") + "/api/pharmacies/", {
-    cache: "no-store",
-    headers: {
-      Authorization: "Bearer " + accessToken,
-      Accept: "application/json",
-    },
-  });
+  return dedupeRequest("auth:" + accessToken + ":GET:/api/pharmacies/", async () => {
+    const response = await fetch(apiBaseUrl.replace(/\/$/, "") + "/api/pharmacies/", {
+      cache: "no-store",
+      headers: {
+        Authorization: "Bearer " + accessToken,
+        Accept: "application/json",
+      },
+    });
 
-  if (!response.ok) {
-    let message = "Impossible de charger vos pharmacies.";
+    if (!response.ok) {
+      let message = "Impossible de charger vos pharmacies.";
 
-    try {
-      const data = await response.json();
-      if (typeof data.detail === "string") {
-        message = data.detail;
+      try {
+        const data = await response.json();
+        if (typeof data.detail === "string") {
+          message = data.detail;
+        }
+      } catch {
+        // Le backend peut parfois renvoyer une reponse non JSON.
       }
-    } catch {
-      // Le backend peut parfois renvoyer une reponse non JSON.
+
+      throw new Error(message);
     }
 
-    throw new Error(message);
-  }
+    const responseText = await response.text();
+    if (!responseText.trim()) {
+      return [];
+    }
 
-  const responseText = await response.text();
-  if (!responseText.trim()) {
-    return [];
-  }
+    const data = JSON.parse(responseText);
+    const rows = Array.isArray(data) ? data : Array.isArray(data.results) ? data.results : [];
 
-  const data = JSON.parse(responseText);
-  const rows = Array.isArray(data) ? data : Array.isArray(data.results) ? data.results : [];
-
-  return rows
-    .filter((item: unknown): item is UnknownRecord => Boolean(item) && typeof item === "object")
-    .map(normalizePharmacy)
-    .filter((pharmacy: PharmacySummary) => Boolean(pharmacy.id));
+    return rows
+      .filter((item: unknown): item is UnknownRecord => Boolean(item) && typeof item === "object")
+      .map(normalizePharmacy)
+      .filter((pharmacy: PharmacySummary) => Boolean(pharmacy.id));
+  });
 }
 
 async function fetchApiJson<T>(path: string, fallbackMessage: string): Promise<T> {
@@ -589,40 +592,44 @@ async function fetchApiJson<T>(path: string, fallbackMessage: string): Promise<T
     throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
   }
 
-  const response = await fetch(apiBaseUrl.replace(/\/$/, "") + path, {
-    cache: "no-store",
-    headers: {
-      Authorization: "Bearer " + accessToken,
-      Accept: "application/json",
-    },
+  return dedupeRequest("auth:" + accessToken + ":GET:" + path, async () => {
+    const response = await fetch(apiBaseUrl.replace(/\/$/, "") + path, {
+      cache: "no-store",
+      headers: {
+        Authorization: "Bearer " + accessToken,
+        Accept: "application/json",
+      },
+    });
+
+    const responseText = await response.text();
+    const data = parseJsonResponse(responseText);
+
+    if (!response.ok) {
+      throw new Error(getApiErrorMessage(data, fallbackMessage));
+    }
+
+    return data as T;
   });
-
-  const responseText = await response.text();
-  const data = parseJsonResponse(responseText);
-
-  if (!response.ok) {
-    throw new Error(getApiErrorMessage(data, fallbackMessage));
-  }
-
-  return data as T;
 }
 
 async function fetchPublicApiJson<T>(path: string, fallbackMessage: string): Promise<T> {
-  const response = await fetch(apiBaseUrl.replace(/\/$/, "") + path, {
-    cache: "no-store",
-    headers: {
-      Accept: "application/json",
-    },
+  return dedupeRequest("public:GET:" + path, async () => {
+    const response = await fetch(apiBaseUrl.replace(/\/$/, "") + path, {
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+      },
+    });
+
+    const responseText = await response.text();
+    const data = parseJsonResponse(responseText);
+
+    if (!response.ok) {
+      throw new Error(getApiErrorMessage(data, fallbackMessage));
+    }
+
+    return data as T;
   });
-
-  const responseText = await response.text();
-  const data = parseJsonResponse(responseText);
-
-  if (!response.ok) {
-    throw new Error(getApiErrorMessage(data, fallbackMessage));
-  }
-
-  return data as T;
 }
 
 async function postApiJson<T>(path: string, fallbackMessage: string): Promise<T> {

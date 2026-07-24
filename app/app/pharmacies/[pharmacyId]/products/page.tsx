@@ -75,18 +75,28 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
   }
 
   useEffect(() => {
+    let isCurrent = true;
+
     async function readParams() {
       const resolvedParams = await params;
-      setPharmacyId(resolvedParams.pharmacyId);
+      if (isCurrent) {
+        setPharmacyId(resolvedParams.pharmacyId);
+      }
     }
 
     readParams();
+
+    return () => {
+      isCurrent = false;
+    };
   }, [params]);
 
   useEffect(() => {
     if (!pharmacyId) {
       return;
     }
+
+    let isCurrent = true;
 
     async function loadProducts() {
       setState("loading");
@@ -98,6 +108,9 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
           getProductFilterOptions(pharmacyId),
           getPharmacyPermissions(pharmacyId),
         ]);
+        if (!isCurrent) {
+          return;
+        }
         setProducts(page.results);
         setTotalProducts(page.count);
         setHasNextPage(Boolean(page.next));
@@ -106,6 +119,9 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
         setPermissions(pharmacyPermissions);
         setState(page.results.length ? "ready" : "empty");
       } catch (error) {
+        if (!isCurrent) {
+          return;
+        }
         const message = error instanceof Error ? error.message : "";
         setErrorMessage(message || "Impossible de charger les produits.");
         setState("error");
@@ -113,6 +129,10 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
     }
 
     loadProducts();
+
+    return () => {
+      isCurrent = false;
+    };
   }, [pharmacyId, filters, reloadKey]);
 
   const totalStock = useMemo(

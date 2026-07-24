@@ -1,3 +1,5 @@
+import { clearApiRequestCache } from "@/lib/api-request-cache";
+
 export const ACCESS_TOKEN_KEY = "kisinet:access_token";
 export const REFRESH_TOKEN_KEY = "kisinet:refresh_token";
 export const ACTIVE_PHARMACY_KEY = "kisinet:active_pharmacy_id";
@@ -62,6 +64,7 @@ export function logout() {
     return;
   }
 
+  clearApiRequestCache();
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
   localStorage.removeItem(ACTIVE_PHARMACY_KEY);

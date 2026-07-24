@@ -66,18 +66,28 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
 
   useEffect(() => {
+    let isCurrent = true;
+
     async function readParams() {
       const resolvedParams = await params;
-      setPharmacyId(resolvedParams.pharmacyId);
+      if (isCurrent) {
+        setPharmacyId(resolvedParams.pharmacyId);
+      }
     }
 
     readParams();
+
+    return () => {
+      isCurrent = false;
+    };
   }, [params]);
 
   useEffect(() => {
     if (!pharmacyId) {
       return;
     }
+
+    let isCurrent = true;
 
     async function loadPageContext() {
       setPageState("loading");
@@ -89,6 +99,9 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
           getCurrentCashierName(),
         ]);
         const savedDraft = getSavedSaleDraft(pharmacyId);
+        if (!isCurrent) {
+          return;
+        }
         setPharmacyName(dashboard.pharmacy.name);
         setCurrency(dashboard.pharmacy.devise || "");
         setCashierName(cashier);
@@ -98,6 +111,9 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
         }
         setPageState("ready");
       } catch (error) {
+        if (!isCurrent) {
+          return;
+        }
         const message = error instanceof Error ? error.message : "";
         setPageError(message || "Impossible de préparer la page de vente.");
         setPageState("error");
@@ -105,6 +121,10 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
     }
 
     loadPageContext();
+
+    return () => {
+      isCurrent = false;
+    };
   }, [pharmacyId]);
 
   const subtotal = useMemo(

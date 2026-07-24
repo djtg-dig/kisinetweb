@@ -65,18 +65,28 @@ export default function PharmacyStockPage({ params }: StockPageProps) {
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
+    let isCurrent = true;
+
     async function readParams() {
       const resolvedParams = await params;
-      setPharmacyId(resolvedParams.pharmacyId);
+      if (isCurrent) {
+        setPharmacyId(resolvedParams.pharmacyId);
+      }
     }
 
     readParams();
+
+    return () => {
+      isCurrent = false;
+    };
   }, [params]);
 
   useEffect(() => {
     if (!pharmacyId) {
       return;
     }
+
+    let isCurrent = true;
 
     async function loadStockPage() {
       // Au premier chargement uniquement, on affiche l'etat de chargement.
@@ -91,6 +101,9 @@ export default function PharmacyStockPage({ params }: StockPageProps) {
 
       try {
         const pharmacyPermissions = await getPharmacyPermissions(pharmacyId);
+        if (!isCurrent) {
+          return;
+        }
         setPermissions(pharmacyPermissions);
 
         if (!pharmacyPermissions.stock_view) {
@@ -104,12 +117,18 @@ export default function PharmacyStockPage({ params }: StockPageProps) {
             page: String(currentPage),
           });
 
+          if (!isCurrent) {
+            return;
+          }
           setMovements(movementsPage.results);
           setTotalMovements(movementsPage.count);
         setHasNextPage(Boolean(movementsPage.next));
         setHasPreviousPage(Boolean(movementsPage.previous));
         setState(movementsPage.results.length ? "ready" : "empty");
       } catch (error) {
+        if (!isCurrent) {
+          return;
+        }
         if (isFirstLoad) {
           setErrorMessage(
             error instanceof Error ? error.message : "Impossible de charger le stock.",
@@ -124,6 +143,10 @@ export default function PharmacyStockPage({ params }: StockPageProps) {
     }
 
     loadStockPage();
+
+    return () => {
+      isCurrent = false;
+    };
   }, [pharmacyId, currentPage, reloadKey]);
 
   const totalQuantity = useMemo(

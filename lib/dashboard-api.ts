@@ -1,4 +1,5 @@
 import { getAccessToken } from "@/lib/auth";
+import { dedupeRequest } from "@/lib/api-request-cache";
 import { apiBaseUrl } from "@/lib/carri-account";
 import {
   formatDate,
@@ -104,26 +105,28 @@ async function fetchDashboardJson<T>(path: string): Promise<T> {
     throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
   }
 
-  const response = await fetch(apiBaseUrl.replace(/\/$/, "") + path, {
-    cache: "no-store",
-    headers: {
-      Authorization: "Bearer " + accessToken,
-      Accept: "application/json",
-    },
+  return dedupeRequest("auth:" + accessToken + ":GET:" + path, async () => {
+    const response = await fetch(apiBaseUrl.replace(/\/$/, "") + path, {
+      cache: "no-store",
+      headers: {
+        Authorization: "Bearer " + accessToken,
+        Accept: "application/json",
+      },
+    });
+
+    const responseText = await response.text();
+    const data = responseText.trim() ? JSON.parse(responseText) : null;
+
+    if (!response.ok) {
+      const detail =
+        data && typeof data === "object" && typeof data.detail === "string"
+          ? data.detail
+          : "Impossible de charger le dashboard.";
+      throw new Error(detail);
+    }
+
+    return data as T;
   });
-
-  const responseText = await response.text();
-  const data = responseText.trim() ? JSON.parse(responseText) : null;
-
-  if (!response.ok) {
-    const detail =
-      data && typeof data === "object" && typeof data.detail === "string"
-        ? data.detail
-        : "Impossible de charger le dashboard.";
-    throw new Error(detail);
-  }
-
-  return data as T;
 }
 
 export async function getPharmacyDashboard(pharmacyId: string): Promise<PharmacyDashboardData> {
