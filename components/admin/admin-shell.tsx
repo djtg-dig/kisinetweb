@@ -23,9 +23,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-app-background text-app-text">
+    <div className="min-h-screen w-full bg-app-background text-app-text">
       <header className="border-b border-app-border bg-app-surface">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+        <div className="flex w-full flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
           <div>
             <p className="text-sm font-semibold text-primary-700">Kisinet interne</p>
             <h1 className="text-2xl font-bold text-app-text">Administration</h1>
@@ -36,8 +36,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[240px_1fr] lg:px-8">
-        <nav className="rounded-lg border border-app-border bg-app-card p-3 shadow-sm">
+      <div className="grid min-h-[calc(100vh-81px)] w-full gap-4 px-4 py-4 sm:px-6 lg:grid-cols-[240px_minmax(0,1fr)] lg:px-8">
+        <nav className="h-fit rounded-lg border border-app-border bg-app-card p-3 shadow-sm lg:sticky lg:top-4">
           {adminNavItems.map((item) => {
             const isActive = pathname === item.href;
             return (
@@ -55,7 +55,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
-        <main>{children}</main>
+        <main className="min-w-0">{children}</main>
       </div>
     </div>
   );

@@ -7,6 +7,7 @@ import {
 import { apiBaseUrl } from "@/lib/carri-account";
 
 export type AdminProfile = {
+  id: string;
   reference: string;
   email: string;
   first_name: string;
@@ -15,8 +16,11 @@ export type AdminProfile = {
   is_staff: boolean;
   is_superuser: boolean;
   is_active: boolean;
+  last_login: string | null;
   date_joined: string;
   updated_at: string;
+  groups: string[];
+  user_permissions: string[];
 };
 
 export type AdminSession = {
@@ -28,6 +32,13 @@ export type AdminLoginResponse = {
   access: string;
   refresh: string;
   admin: AdminProfile;
+};
+
+export type AdminUsersPage = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: AdminProfile[];
 };
 
 export async function loginAdmin(email: string, password: string): Promise<AdminLoginResponse> {
@@ -44,12 +55,21 @@ export async function getAdminSession(): Promise<AdminSession> {
   return fetchAdminJson<AdminSession>("/api/admin/auth/me/");
 }
 
-export async function getAdminUsers(search = ""): Promise<AdminProfile[]> {
+export async function getAdminUsers({
+  search = "",
+  page = 1,
+}: {
+  search?: string;
+  page?: number;
+} = {}): Promise<AdminUsersPage> {
   const params = new URLSearchParams();
   if (search.trim()) {
     params.set("search", search.trim());
   }
-  return fetchAdminJson<AdminProfile[]>(
+  if (page > 1) {
+    params.set("page", String(page));
+  }
+  return fetchAdminJson<AdminUsersPage>(
     "/api/admin/users/" + (params.toString() ? "?" + params.toString() : ""),
   );
 }
