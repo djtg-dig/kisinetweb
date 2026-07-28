@@ -41,6 +41,30 @@ export type AdminUsersPage = {
   results: AdminProfile[];
 };
 
+export type AdminReferralWithdrawal = {
+  reference: string;
+  requester_email: string;
+  requester_reference: string;
+  amount: string;
+  currency: string;
+  payout_account_reference: string;
+  payment_method: string;
+  destination_snapshot: Record<string, unknown>;
+  status: string;
+  provider_reference: string;
+  rejection_reason: string;
+  requested_at: string;
+  processing_at: string | null;
+  paid_at: string | null;
+};
+
+export type AdminReferralWithdrawalsPage = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: AdminReferralWithdrawal[];
+};
+
 export async function loginAdmin(email: string, password: string): Promise<AdminLoginResponse> {
   const data = await fetchAdminJson<AdminLoginResponse>("/api/admin/auth/login/", {
     method: "POST",
@@ -71,6 +95,57 @@ export async function getAdminUsers({
   }
   return fetchAdminJson<AdminUsersPage>(
     "/api/admin/users/" + (params.toString() ? "?" + params.toString() : ""),
+  );
+}
+
+export async function getAdminReferralWithdrawals({
+  search = "",
+  page = 1,
+  status = "",
+  currency = "",
+}: {
+  search?: string;
+  page?: number;
+  status?: string;
+  currency?: string;
+} = {}): Promise<AdminReferralWithdrawalsPage> {
+  const params = new URLSearchParams();
+  if (search.trim()) {
+    params.set("search", search.trim());
+  }
+  if (status.trim()) {
+    params.set("status", status.trim());
+  }
+  if (currency.trim()) {
+    params.set("currency", currency.trim());
+  }
+  if (page > 1) {
+    params.set("page", String(page));
+  }
+  return fetchAdminJson<AdminReferralWithdrawalsPage>(
+    "/api/admin/referral-withdrawals/" + (params.toString() ? "?" + params.toString() : ""),
+  );
+}
+
+export async function transitionAdminReferralWithdrawal(
+  reference: string,
+  action: "processing" | "paid" | "reject" | "failed",
+  payload: {
+    provider_reference?: string;
+    reason?: string;
+    provider_metadata?: Record<string, unknown>;
+  } = {},
+): Promise<AdminReferralWithdrawal> {
+  return fetchAdminJson<AdminReferralWithdrawal>(
+    "/api/admin/referral-withdrawals/" +
+      encodeURIComponent(reference) +
+      "/" +
+      encodeURIComponent(action) +
+      "/",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
   );
 }
 

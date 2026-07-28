@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useParams } from "next/navigation";
 import { PublicLayout } from "@/components/layout/public-layout";
 import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/ui/link-button";
@@ -8,8 +9,11 @@ import { LoadingBubble } from "@/components/ui/loading-bubble";
 import { CurrentSubscriptionCard } from "@/components/pricing/current-subscription-card";
 import { PlanElements } from "@/components/pricing/plan-elements";
 import {
+  getPharmacySubscriptionPayment,
   getPharmacyPlan,
   getUserPharmacies,
+  initiateAgregateurSubscriptionCheckout,
+  type PharmacySubscriptionPayment,
   type PharmacyPlan,
   type PharmacyPlanDuration,
   type PharmacySummary,
@@ -22,12 +26,9 @@ import {
   setActivePharmacyId,
 } from "@/lib/auth";
 
-type PlanDetailPageProps = {
-  params: Promise<{ name: string }>;
-};
-
 type PageState = "loading" | "error" | "ready";
 type PharmacyState = "idle" | "unauthenticated" | "loading" | "error" | "empty" | "ready";
+type PaymentState = "idle" | "starting" | "opening" | "paying" | "confirming" | "validated" | "error";
 
 type CommitmentOption = {
   months: number;
@@ -45,7 +46,9 @@ const temporarySubscription = {
   expiresAt: "10 août 2026",
 };
 
-export default function PlanDetailPage({ params }: PlanDetailPageProps) {
+export default function PlanDetailPage() {
+  const params = useParams<{ name?: string }>();
+  const routePlanName = typeof params.name === "string" ? params.name : "";
   const [planName, setPlanName] = useState("");
   const [state, setState] = useState<PageState>("loading");
   const [pharmacyState, setPharmacyState] = useState<PharmacyState>("idle");
@@ -55,13 +58,16 @@ export default function PlanDetailPage({ params }: PlanDetailPageProps) {
   const [selectedPharmacyId, setSelectedPharmacyId] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [pharmacyErrorMessage, setPharmacyErrorMessage] = useState("");
+  const [paymentState, setPaymentState] = useState<PaymentState>("idle");
+  const [paymentMessage, setPaymentMessage] = useState("");
+  const [checkoutUrl, setCheckoutUrl] = useState("");
+  const [activePayment, setActivePayment] = useState<PharmacySubscriptionPayment | null>(null);
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadPlan() {
-      const resolvedParams = await params;
-      const name = decodeURIComponent(resolvedParams.name);
+      const name = decodeURIComponent(routePlanName);
 
       if (!isMounted) {
         return;
@@ -95,7 +101,7 @@ export default function PlanDetailPage({ params }: PlanDetailPageProps) {
     return () => {
       isMounted = false;
     };
-  }, [params]);
+  }, [routePlanName]);
 
   useEffect(() => {
     let isMounted = true;
@@ -168,9 +174,102 @@ export default function PlanDetailPage({ params }: PlanDetailPageProps) {
     setActivePharmacyId(pharmacyId);
   }
 
-  function handlePaymentPlaceholder() {
-    // Cette action sera connectee au systeme de paiement plus tard.
-    window.alert("Le paiement sera connecté prochainement.");
+  useEffect(() => {
+    if (!checkoutUrl) {
+      return;
+    }
+
+    function handleAgregateurMessage(event: MessageEvent) {
+      const legacyPrefix = "ikee" + "pay";
+      const message = String(event.data || "");
+
+      if (message === "agregateur-ready" || message === legacyPrefix + "-ready") {
+        setPaymentState("paying");
+        setPaymentMessage("");
+      }
+
+      if (message === "agregateur-close" || message === legacyPrefix + "-close") {
+        closeAgregateurCheckout();
+      }
+
+      if (message === "agregateur-success" || message === legacyPrefix + "-success") {
+        const payment = activePayment;
+        const pharmacyReference = selectedPharmacy?.reference || selectedPharmacy?.id || "";
+        closeAgregateurCheckout();
+        setPaymentState("confirming");
+        setPaymentMessage("Paiement reçu. Confirmation serveur en cours...");
+        if (payment && pharmacyReference) {
+          void pollPaymentConfirmation(payment.id, pharmacyReference);
+        }
+      }
+    }
+
+    window.addEventListener("message", handleAgregateurMessage);
+    return () => window.removeEventListener("message", handleAgregateurMessage);
+  }, [activePayment, checkoutUrl, selectedPharmacy]);
+
+  function closeAgregateurCheckout() {
+    setCheckoutUrl("");
+    if (paymentState === "opening" || paymentState === "paying") {
+      setPaymentState("idle");
+    }
+  }
+
+  async function pollPaymentConfirmation(paymentId: number, pharmacyReference: string) {
+    try {
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        if (attempt > 0) {
+          await wait(3000);
+        }
+
+        const payment = await getPharmacySubscriptionPayment(paymentId, pharmacyReference);
+        setActivePayment(payment);
+        if (payment.status === "VALIDATED") {
+          setPaymentState("validated");
+          setPaymentMessage("Paiement confirmé. Votre abonnement est actif.");
+          return;
+        }
+      }
+
+      setPaymentState("confirming");
+      setPaymentMessage(
+        "Le paiement est encore en cours de confirmation. Vous pouvez vérifier le statut dans quelques instants.",
+      );
+    } catch (error) {
+      setPaymentState("error");
+      setPaymentMessage(
+        error instanceof Error
+          ? error.message
+          : "Impossible de vérifier la confirmation du paiement.",
+      );
+    }
+  }
+
+  async function handleStartPayment() {
+    if (!plan || !selectedPharmacy) {
+      return;
+    }
+
+    setPaymentState("starting");
+    setPaymentMessage("");
+
+    try {
+      const checkout = await initiateAgregateurSubscriptionCheckout({
+        pharmacyReference: selectedPharmacy.reference || selectedPharmacy.id,
+        planCode: plan.code,
+        durationMonths: selectedCommitment.months,
+        currency: plan.currency || "USD",
+      });
+      setActivePayment(checkout.payment);
+      setCheckoutUrl(checkout.checkoutUrl);
+      setPaymentState("opening");
+      setPaymentMessage("Ouverture du paiement sécurisé...");
+    } catch (error) {
+      setPaymentState("error");
+      setPaymentMessage(
+        error instanceof Error ? error.message : "Impossible de démarrer le paiement.",
+      );
+    }
   }
 
   return (
@@ -241,14 +340,29 @@ export default function PlanDetailPage({ params }: PlanDetailPageProps) {
                     planName={plan.name}
                     selectedPharmacy={selectedPharmacy}
                     totalAmount={orderSummary.totalAmount}
-                    onContinue={handlePaymentPlaceholder}
-                    disabled={pharmacyState !== "ready" || !selectedPharmacy}
+                    onContinue={handleStartPayment}
+                    disabled={
+                      pharmacyState !== "ready" ||
+                      !selectedPharmacy ||
+                      paymentState === "starting" ||
+                      paymentState === "opening" ||
+                      paymentState === "paying" ||
+                      paymentState === "confirming"
+                    }
+                    paymentMessage={paymentMessage}
+                    paymentState={paymentState}
                   />
                 </aside>
               </div>
             )}
           </div>
         </section>
+        {checkoutUrl && (
+          <AgregateurCheckoutModal
+            checkoutUrl={checkoutUrl}
+            onClose={closeAgregateurCheckout}
+          />
+        )}
       </main>
     </PublicLayout>
   );
@@ -470,6 +584,8 @@ function OrderSummary({
   durationMonths,
   monthlyPrice,
   onContinue,
+  paymentMessage,
+  paymentState,
   planName,
   selectedPharmacy,
   totalAmount,
@@ -482,10 +598,21 @@ function OrderSummary({
   durationMonths: number;
   monthlyPrice: number;
   onContinue: () => void;
+  paymentMessage: string;
+  paymentState: PaymentState;
   planName: string;
   selectedPharmacy: PharmacySummary | null;
   totalAmount: number;
 }) {
+  const buttonLabel =
+    paymentState === "starting" || paymentState === "opening"
+      ? "Ouverture du paiement..."
+      : paymentState === "paying"
+        ? "Paiement en cours..."
+        : paymentState === "confirming"
+          ? "Confirmation serveur..."
+          : "Continuer vers le paiement";
+
   return (
     <section className="rounded-lg border border-app-border bg-app-card p-5 shadow-soft">
       <h2 className="text-xl font-bold text-app-text">Résumé de la commande</h2>
@@ -526,15 +653,57 @@ function OrderSummary({
           />
         </div>
       </div>
+      {paymentMessage && (
+        <p
+          className={`mt-5 rounded-md border px-4 py-3 text-sm leading-6 ${
+            paymentState === "error"
+              ? "border-red-200 bg-red-50 text-red-700"
+              : paymentState === "validated"
+                ? "border-success-200 bg-success-50 text-success-700"
+                : "border-app-border bg-app-surface text-app-muted"
+          }`}
+        >
+          {paymentMessage}
+        </p>
+      )}
       <Button
         type="button"
         className="mt-6 w-full"
         onClick={onContinue}
         disabled={disabled}
       >
-        Continuer vers le paiement
+        {buttonLabel}
       </Button>
     </section>
+  );
+}
+
+function AgregateurCheckoutModal({
+  checkoutUrl,
+  onClose,
+}: {
+  checkoutUrl: string;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-0 backdrop-blur-sm sm:p-6">
+      <div className="relative h-full w-full max-w-[450px] sm:h-[85vh]">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-xl font-bold text-app-text shadow-sm transition hover:bg-red-50 hover:text-red-600 sm:-top-12 sm:right-0 sm:bg-transparent sm:text-white sm:shadow-none"
+          aria-label="Fermer le paiement"
+        >
+          ×
+        </button>
+        <iframe
+          title="Paiement sécurisé agrégateur"
+          src={checkoutUrl}
+          allow="payment"
+          className="h-full w-full border-0 bg-transparent sm:rounded-[2rem]"
+        />
+      </div>
+    </div>
   );
 }
 
@@ -650,6 +819,10 @@ function formatRole(role?: string) {
   }
 
   return "Membre " + role;
+}
+
+function wait(milliseconds: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 }
 
 function buildLoginHref(returnPath: string) {

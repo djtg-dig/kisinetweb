@@ -868,6 +868,44 @@ export type PharmacyPlan = {
   highlighted?: boolean;
 };
 
+export type PharmacySubscriptionPayment = {
+  id: number;
+  pharmacyReference?: string;
+  planCode: string;
+  durationMonths: number;
+  amount: string;
+  currency: string;
+  status: string;
+  paidAt?: string | null;
+  reference: string;
+  orderId: string;
+  providerReference?: string;
+  createdAt?: string;
+};
+
+export type AgregateurSubscriptionCheckout = {
+  checkoutUrl: string;
+  payment: PharmacySubscriptionPayment;
+  subscription?: unknown;
+};
+
+function normalizeSubscriptionPayment(item: UnknownRecord): PharmacySubscriptionPayment {
+  return {
+    id: Number(item.id),
+    pharmacyReference: getText(item.pharmacy_reference),
+    planCode: String(item.plan_code || ""),
+    durationMonths: Number(item.duration_months || 0),
+    amount: String(item.amount ?? ""),
+    currency: String(item.currency || ""),
+    status: String(item.status || ""),
+    paidAt: getText(item.paid_at),
+    reference: String(item.reference || ""),
+    orderId: String(item.order_id || ""),
+    providerReference: getText(item.provider_reference),
+    createdAt: getText(item.created_at),
+  };
+}
+
 function normalizePharmacyPlan(item: UnknownRecord): PharmacyPlan {
   return {
     id: Number(item.id),
@@ -946,6 +984,46 @@ export async function getPharmacyPlan(name: string): Promise<PharmacyPlan> {
   );
 
   return normalizePharmacyPlan(data);
+}
+
+export async function initiateAgregateurSubscriptionCheckout(payload: {
+  pharmacyReference: string;
+  planCode: string;
+  durationMonths: number;
+  currency: string;
+}): Promise<AgregateurSubscriptionCheckout> {
+  const data = await postJson<UnknownRecord>(
+    "/api/paiements/pharmacy-subscriptions/agregateur/checkout/",
+    "Impossible d'initialiser le paiement.",
+    {
+      pharmacy_reference: payload.pharmacyReference,
+      plan_code: payload.planCode,
+      duration_months: payload.durationMonths,
+      currency: payload.currency,
+    },
+  );
+
+  const payment = normalizeSubscriptionPayment((data.payment || {}) as UnknownRecord);
+  return {
+    checkoutUrl: String(data.checkout_url || ""),
+    payment,
+    subscription: data.subscription,
+  };
+}
+
+export async function getPharmacySubscriptionPayment(
+  paymentId: number,
+  pharmacyReference: string,
+): Promise<PharmacySubscriptionPayment> {
+  const params = new URLSearchParams({ pharmacy_reference: pharmacyReference });
+  const data = await fetchApiJson<UnknownRecord>(
+    "/api/paiements/subscription-payments/" +
+      encodeURIComponent(String(paymentId)) +
+      "/?" +
+      params.toString(),
+    "Impossible de vérifier le statut du paiement.",
+  );
+  return normalizeSubscriptionPayment(data);
 }
 
 export async function getCitiesOrProvinces(country: string): Promise<CityOrProvinceOption[]> {

@@ -65,16 +65,23 @@ Endpoints consommés:
 | Session admin | `GET /api/admin/auth/me/` | Oui, admin `is_staff` |
 | Déconnexion admin | `POST /api/admin/auth/logout/` | Oui, admin `is_staff` |
 | Refresh admin | `POST /api/admin/auth/refresh/` | Non, refresh token admin |
-| Liste utilisateurs admin | `GET /api/admin/users/?search=...` | Oui, admin `is_staff` |
+| Liste utilisateurs admin | `GET /api/admin/users/?search=...&page=...` | Oui, admin `is_staff` |
+| Liste retraits parrainage admin | `GET /api/admin/referral-withdrawals/?search=...&status=...&currency=...&page=...` | Oui, admin `is_staff` |
+| Action retrait parrainage admin | `POST /api/admin/referral-withdrawals/{reference}/{action}/` | Oui, admin `is_staff` |
 
 Le frontend utilise des clés de stockage séparées pour les tokens admin. La
 protection réelle reste côté backend: chaque endpoint admin vérifie que
 l'utilisateur est actif et `is_staff`.
 
 La page `/admin/users` consomme `GET /api/admin/users/` et affiche les
-utilisateurs dans un tableau. Les sections Swagger des APIs admin doivent garder
-un préfixe `Admin-`, par exemple `Admin-Authentication`, `Admin-Dashboard` et
-`Admin-Users`.
+utilisateurs dans un tableau paginé à 20 lignes maximum. Les sections Swagger des
+APIs admin doivent garder un préfixe `Admin-`, par exemple
+`Admin-Authentication`, `Admin-Dashboard`, `Admin-User` et `Admin-Referral`.
+
+La page `/admin/payments` consomme `GET /api/admin/referral-withdrawals/` pour
+traiter manuellement les demandes de retrait de commission: passage en
+traitement, paiement manuel avec référence, rejet ou échec. Aucune API de retrait
+agrégateur n'est appelée pour le moment.
 
 ## Pharmacies
 
@@ -944,13 +951,42 @@ Content-Type: application/json
   `customer`, `amount` et `created_at`.
 - **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden`, `404 Not Found`.
 
+## Abonnements et paiements
+
+- **Page frontend** : `/tarifs/[name]`
+- **Service frontend** : `lib/api.ts`
+- **Authentification** : requise avec `Authorization: Bearer <access_token>` pour
+  initialiser un paiement ou consulter un reçu.
+
+Endpoints consommés:
+
+| Usage frontend | Méthode et URL |
+| --- | --- |
+| Plans pharmacie | `GET /api/paiements/pharmacy-plans/` |
+| Détail plan | `GET /api/paiements/pharmacy-plans/{name}/` |
+| Initialiser checkout agrégateur | `POST /api/paiements/pharmacy-subscriptions/agregateur/checkout/` |
+| Détail reçu abonnement | `GET /api/paiements/subscription-payments/{payment_id}/?pharmacy_reference=PHXXXXXXXX` |
+
+Flux agrégateur:
+
+1. `/tarifs/[name]` appelle l'endpoint de checkout avec `pharmacy_reference`,
+   `plan_code`, `duration_months` et `currency`.
+2. Le backend crée un paiement `PENDING` et renvoie `checkout_url`.
+3. Le frontend ouvre `checkout_url` dans une iframe agrégateur.
+4. Le message frontend `agregateur-success` affiche une confirmation en cours mais ne
+   valide pas l'abonnement.
+5. Le frontend relit le reçu jusqu'au statut backend `VALIDATED`, produit par le
+   webhook `/api/webhook/`.
+
+Statuts paiement consommés: `PENDING`, `VALIDATED`, `CANCELED`, `REFUNDED`.
+
 ## Parrainage
 
 - **Page frontend** : `/app/referrals`
 - **Service frontend** : `lib/api/referrals.ts`
 - **Authentification** : requise avec `Authorization: Bearer <access_token>`.
 - **Règle importante** : le frontend ne crée jamais une commission et ne confirme
-  jamais un paiement iKeePay. Il affiche uniquement les données confirmées par le
+  jamais un paiement. Il affiche uniquement les données confirmées par le
   backend.
 
 Endpoints consommés:
@@ -976,7 +1012,7 @@ Payload envoyé depuis `/app/settings` pour configurer le compte de réception:
 ```json
 {
   "currency": "USD",
-  "provider": "IKEEPAY",
+  "provider": "AGREGATEUR",
   "payment_method": "MOBILE_MONEY",
   "operator": "MPESA",
   "phone_number": "+243XXXXXXXXX",
@@ -999,8 +1035,8 @@ La page affiche les montants sous forme de chaînes décimales retournées par l
 backend: solde disponible, en attente, réservé, retiré, commissions récentes,
 retraits récents et pharmacies parrainées. Les coordonnées de destination sont
 configurées dans les paramètres globaux du compte utilisateur, pas dans l'espace
-pharmacie. Le webhook iKeePay reste une route backend uniquement, à configurer
-côté iKeePay sur `POST /api/webhook/`.
+pharmacie. Le webhook agrégateur reste une route backend uniquement, à configurer
+côté agrégateur sur `POST /api/webhook/`.
 
 > Note : `{pharmacy_id}` dans les URLs pharmacies correspond à la **référence** publique
 > de la pharmacie (ex. `PH0UKUI3NQ`), jamais à l'identifiant interne. Le frontend utilise

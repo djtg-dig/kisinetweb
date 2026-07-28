@@ -190,7 +190,7 @@ function PayoutAccountPanel({
   onAccountsChange: (accounts: ReferralPayoutAccount[]) => void;
 }) {
   const [currency, setCurrency] = useState(accounts[0]?.currency || "USD");
-  const [provider, setProvider] = useState(accounts[0]?.provider || "IKEEPAY");
+  const [provider, setProvider] = useState(accounts[0]?.provider || "AGREGATEUR");
   const [paymentMethod, setPaymentMethod] = useState(accounts[0]?.payment_method || "MOBILE_MONEY");
   const [operator, setOperator] = useState(accounts[0]?.operator || "");
   const [phoneNumber, setPhoneNumber] = useState(accounts[0]?.phone_number || "");
@@ -274,7 +274,7 @@ function PayoutAccountPanel({
             onChange={(event) => setProvider(event.target.value)}
             className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
           >
-            <option value="IKEEPAY">iKeePay</option>
+            <option value="AGREGATEUR">agrégateur</option>
             <option value="MOBILE_MONEY">Mobile Money</option>
             <option value="OTHER">Autre</option>
           </select>
@@ -288,7 +288,7 @@ function PayoutAccountPanel({
             className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
           >
             <option value="MOBILE_MONEY">Mobile Money</option>
-            <option value="IKEEPAY">iKeePay</option>
+            <option value="AGREGATEUR">agrégateur</option>
             <option value="BANK_TRANSFER">Virement bancaire</option>
             <option value="OTHER">Autre</option>
           </select>
