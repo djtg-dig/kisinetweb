@@ -90,14 +90,14 @@ export function PublicPharmacyDetail({ pharmacy }: PublicPharmacyDetailProps) {
                 <Detail label="Email" value={pharmacy.email} />
                 <Detail label="Téléphone" value={pharmacy.phoneNumber} />
                 <Detail label="Pays" value={pharmacy.country} />
-                <Detail label="Ville ou province" value={pharmacy.cityOrProvince} />
+                <Detail label="Ville,province,égion ou territoire." value={pharmacy.cityOrProvince} />
               </div>
             </article>
 
             <article className="rounded-lg border border-app-border bg-app-card p-5">
               <h2 className="text-lg font-bold text-app-text">Adresse</h2>
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                <Detail label="Quartier" value={pharmacy.neighborhood} />
+                <Detail label="Quartier,arrondissement, secteur, village ou repère local" value={pharmacy.neighborhood} />
                 <Detail label="Rue" value={pharmacy.street} />
                 <Detail label="Latitude" value={pharmacy.latitude} />
                 <Detail label="Longitude" value={pharmacy.longitude} />

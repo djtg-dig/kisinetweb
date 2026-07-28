@@ -174,7 +174,7 @@ export default function PublicPharmaciesPage() {
                 options={filterOptions?.countries || []}
               />
               <SelectInput
-                label="Ville ou province"
+                label="Nom de la ville, province ou région"
                 value={filters.cityOrProvince || ""}
                 onChange={(value) => updateFilter("cityOrProvince", value)}
                 options={cityOptions}

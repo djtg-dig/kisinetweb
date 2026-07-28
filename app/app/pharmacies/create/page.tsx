@@ -291,7 +291,7 @@ export default function CreatePharmacyPage() {
                   </div>
                   <SelectField
                     id="cityOrProvince"
-                    label="Ville ou province"
+                    label="Ville, province ou région."
                     value={form.cityOrProvinceId}
                     onChange={(value) => updateField("cityOrProvinceId", value)}
                     options={citiesOrProvinces.map((cityOrProvince) => ({
@@ -303,7 +303,7 @@ export default function CreatePharmacyPage() {
                   />
                   <TextField
                     id="neighborhood"
-                    label="Quartier ou commune"
+                    label="Quartier,commune,arrondissement, secteur, village ou repère local."
                     value={form.neighborhood}
                     onChange={(value) => updateField("neighborhood", value)}
                     placeholder="Ex. Gombe"

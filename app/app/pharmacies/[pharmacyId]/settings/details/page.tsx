@@ -576,7 +576,7 @@ export default function SettingsDetailsPage({ params }: SettingsDetailsPageProps
               ) : (
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
                   <Detail label="Pays" value={countryName} />
-                  <Detail label="Ville ou province" value={cityName} />
+                  <Detail label="Ville, province ou région." value={cityName} />
                   <Detail label="Quartier" value={pharmacy.address.neighborhood} />
                   <Detail label="Rue" value={pharmacy.address.street} />
                   <Detail label="Complément" value={pharmacy.address.complementAdresse} />
