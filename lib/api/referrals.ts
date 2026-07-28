@@ -62,6 +62,7 @@ export type ReferralWithdrawal = {
   reference: string;
   amount: string;
   currency: string;
+  payout_account_reference: string;
   payment_method: string;
   destination_snapshot: Record<string, unknown>;
   status: string;
@@ -72,16 +73,35 @@ export type ReferralWithdrawal = {
   paid_at: string | null;
 };
 
+export type ReferralPayoutAccount = {
+  reference: string;
+  currency: string;
+  provider: string;
+  payment_method: string;
+  operator: string;
+  phone_number: string;
+  account_name: string;
+  metadata: Record<string, unknown>;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ReferralPayoutAccountPayload = {
+  currency: string;
+  provider: string;
+  payment_method: string;
+  operator?: string;
+  phone_number?: string;
+  account_name?: string;
+  metadata?: Record<string, unknown>;
+  is_active?: boolean;
+};
+
 export type CreateReferralWithdrawalPayload = {
   amount: string;
   currency: string;
-  payment_method: string;
-  destination: {
-    operator?: string;
-    phone_number?: string;
-    account_name?: string;
-    [key: string]: string | undefined;
-  };
+  payout_account_reference?: string;
 };
 
 export async function getReferralOverview(): Promise<ReferralWalletSummary[]> {
@@ -117,6 +137,32 @@ export async function getReferralCommissions(currency?: string): Promise<Referra
   }
   const suffix = params.toString() ? "?" + params.toString() : "";
   return fetchReferralJson<ReferralCommission[]>("/api/paiements/referral-commissions/" + suffix);
+}
+
+export async function getReferralPayoutAccounts(): Promise<ReferralPayoutAccount[]> {
+  return fetchReferralJson<ReferralPayoutAccount[]>("/api/paiements/referral-payout-accounts/");
+}
+
+export async function createReferralPayoutAccount(
+  payload: ReferralPayoutAccountPayload,
+): Promise<ReferralPayoutAccount> {
+  return fetchReferralJson<ReferralPayoutAccount>("/api/paiements/referral-payout-accounts/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateReferralPayoutAccount(
+  reference: string,
+  payload: Partial<ReferralPayoutAccountPayload>,
+): Promise<ReferralPayoutAccount> {
+  return fetchReferralJson<ReferralPayoutAccount>(
+    "/api/paiements/referral-payout-accounts/" + encodeURIComponent(reference) + "/",
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    },
+  );
 }
 
 export async function getReferralWithdrawals(): Promise<ReferralWithdrawal[]> {

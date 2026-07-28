@@ -28,6 +28,54 @@ de succès, et affiche une page Kisinet si le backend renvoie `429` avec
 - **Comportement frontend** : le menu `Compte > Mon profil` mène vers la page
   profil global de l'utilisateur. Cette page ne dépend pas d'une pharmacie active.
 
+## Administration interne
+
+L'espace d'administration interne est séparé de l'espace pharmacie et n'utilise
+pas Carri Account pour cette première version.
+
+Route de connexion frontend:
+
+- `/lapatatedoucue/admin/` par défaut;
+- le segment `lapatatedoucue` est centralisé dans `lib/admin/config.ts`;
+- il peut être remplacé par `NEXT_PUBLIC_ADMIN_ENTRY_PATH`;
+- cette valeur n'est pas un secret.
+
+La route demandée `/api/lapatatedoucue/admin/` n'est pas utilisée côté frontend
+Next.js, car le préfixe `/api` est réservé aux Route Handlers/API Routes et peut
+entrer en collision avec un reverse proxy qui route `/api/*` vers Django.
+
+Routes frontend protégées:
+
+- `/admin`
+- `/admin/dashboard`
+- `/admin/users`
+- `/admin/pharmacies`
+- `/admin/subscriptions`
+- `/admin/payments`
+- `/admin/settings`
+
+Ces pages déclarent `noindex, nofollow` et ne sont liées depuis aucune navigation
+publique, aucun menu utilisateur et aucun menu pharmacie.
+
+Endpoints consommés:
+
+| Usage frontend | Méthode et URL | Auth |
+| --- | --- | --- |
+| Connexion admin | `POST /api/admin/auth/login/` | Non |
+| Session admin | `GET /api/admin/auth/me/` | Oui, admin `is_staff` |
+| Déconnexion admin | `POST /api/admin/auth/logout/` | Oui, admin `is_staff` |
+| Refresh admin | `POST /api/admin/auth/refresh/` | Non, refresh token admin |
+| Liste utilisateurs admin | `GET /api/admin/users/?search=...` | Oui, admin `is_staff` |
+
+Le frontend utilise des clés de stockage séparées pour les tokens admin. La
+protection réelle reste côté backend: chaque endpoint admin vérifie que
+l'utilisateur est actif et `is_staff`.
+
+La page `/admin/users` consomme `GET /api/admin/users/` et affiche les
+utilisateurs dans un tableau. Les sections Swagger des APIs admin doivent garder
+un préfixe `Admin-`, par exemple `Admin-Authentication`, `Admin-Dashboard` et
+`Admin-Users`.
+
 ## Pharmacies
 
 - `GET /api/pharmacies/public/`
@@ -916,29 +964,43 @@ Endpoints consommés:
 | Transactions devise | `GET /api/paiements/referral-wallets/{currency}/transactions/` |
 | Commissions | `GET /api/paiements/referral-commissions/` |
 | Commissions par devise | `GET /api/paiements/referral-commissions/?currency=USD` |
+| Comptes de retrait | `GET /api/paiements/referral-payout-accounts/` |
+| Créer compte retrait | `POST /api/paiements/referral-payout-accounts/` |
+| Modifier compte retrait | `PATCH /api/paiements/referral-payout-accounts/{reference}/` |
 | Retraits | `GET /api/paiements/referral-withdrawals/` |
 | Création retrait | `POST /api/paiements/referral-withdrawals/` |
 | Détail retrait | `GET /api/paiements/referral-withdrawals/{reference}/` |
 
-Payload envoyé pour un retrait groupé:
+Payload envoyé depuis `/app/settings` pour configurer le compte de réception:
+
+```json
+{
+  "currency": "USD",
+  "provider": "IKEEPAY",
+  "payment_method": "MOBILE_MONEY",
+  "operator": "MPESA",
+  "phone_number": "+243XXXXXXXXX",
+  "account_name": "Nom du bénéficiaire",
+  "metadata": {}
+}
+```
+
+Payload envoyé depuis `/app/referrals` pour un retrait groupé:
 
 ```json
 {
   "amount": "15.00",
   "currency": "USD",
-  "payment_method": "MOBILE_MONEY",
-  "destination": {
-    "operator": "MPESA",
-    "phone_number": "+243XXXXXXXXX",
-    "account_name": "Nom du bénéficiaire"
-  }
+  "payout_account_reference": "PAXXXXXXXX"
 }
 ```
 
 La page affiche les montants sous forme de chaînes décimales retournées par le
 backend: solde disponible, en attente, réservé, retiré, commissions récentes,
-retraits récents et pharmacies parrainées. Le webhook iKeePay reste une route
-backend uniquement, à configurer côté iKeePay sur `POST /api/webhook/`.
+retraits récents et pharmacies parrainées. Les coordonnées de destination sont
+configurées dans les paramètres globaux du compte utilisateur, pas dans l'espace
+pharmacie. Le webhook iKeePay reste une route backend uniquement, à configurer
+côté iKeePay sur `POST /api/webhook/`.
 
 > Note : `{pharmacy_id}` dans les URLs pharmacies correspond à la **référence** publique
 > de la pharmacie (ex. `PH0UKUI3NQ`), jamais à l'identifiant interne. Le frontend utilise

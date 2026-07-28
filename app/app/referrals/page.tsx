@@ -8,11 +8,13 @@ import { LoadingBubble } from "@/components/ui/loading-bubble";
 import { carriAccountLoginUrl } from "@/lib/carri-account";
 import {
   createReferralWithdrawal,
+  getReferralPayoutAccounts,
   getReferralCommissions,
   getReferralOverview,
   getReferralWithdrawals,
   getReferredPharmacies,
   type ReferralCommission,
+  type ReferralPayoutAccount,
   type ReferralWalletSummary,
   type ReferralWithdrawal,
   type ReferredPharmacy,
@@ -20,18 +22,13 @@ import {
 
 type PageState = "loading" | "anonymous" | "ready" | "error";
 
-const defaultDestination = {
-  operator: "",
-  phone_number: "",
-  account_name: "",
-};
-
 async function fetchReferralDashboard() {
-  const [overview, commissionList, withdrawalList, referredList] = await Promise.all([
+  const [overview, commissionList, withdrawalList, referredList, payoutAccountList] = await Promise.all([
     getReferralOverview(),
     getReferralCommissions(),
     getReferralWithdrawals(),
     getReferredPharmacies(),
+    getReferralPayoutAccounts(),
   ]);
 
   return {
@@ -39,6 +36,7 @@ async function fetchReferralDashboard() {
     commissionList,
     withdrawalList,
     referredList,
+    payoutAccountList,
   };
 }
 
@@ -49,10 +47,10 @@ export default function ReferralsPage() {
   const [commissions, setCommissions] = useState<ReferralCommission[]>([]);
   const [withdrawals, setWithdrawals] = useState<ReferralWithdrawal[]>([]);
   const [pharmacies, setPharmacies] = useState<ReferredPharmacy[]>([]);
+  const [payoutAccounts, setPayoutAccounts] = useState<ReferralPayoutAccount[]>([]);
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState("USD");
-  const [paymentMethod, setPaymentMethod] = useState("MOBILE_MONEY");
-  const [destination, setDestination] = useState(defaultDestination);
+  const [payoutAccountReference, setPayoutAccountReference] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isWithdrawalModalOpen, setIsWithdrawalModalOpen] = useState(false);
 
@@ -61,12 +59,15 @@ export default function ReferralsPage() {
     commissionList,
     withdrawalList,
     referredList,
+    payoutAccountList,
   }: Awaited<ReturnType<typeof fetchReferralDashboard>>) {
     setWallets(overview);
     setCommissions(commissionList);
     setWithdrawals(withdrawalList);
     setPharmacies(referredList);
+    setPayoutAccounts(payoutAccountList);
     setCurrency((current) => overview[0]?.currency || current);
+    setPayoutAccountReference((current) => current || payoutAccountList[0]?.reference || "");
     setPageState("ready");
   }
 
@@ -118,6 +119,22 @@ export default function ReferralsPage() {
     () => wallets.find((wallet) => wallet.currency === currency) || wallets[0] || null,
     [currency, wallets],
   );
+  const activePayoutAccounts = useMemo(
+    () =>
+      payoutAccounts.filter(
+        (account) => account.currency === currency && account.is_active,
+      ),
+    [currency, payoutAccounts],
+  );
+
+  function handleWithdrawalCurrencyChange(nextCurrency: string) {
+    setCurrency(nextCurrency);
+    setPayoutAccountReference(
+      payoutAccounts.find(
+        (account) => account.currency === nextCurrency && account.is_active,
+      )?.reference || "",
+    );
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -128,11 +145,9 @@ export default function ReferralsPage() {
       await createReferralWithdrawal({
         amount,
         currency,
-        payment_method: paymentMethod,
-        destination,
+        payout_account_reference: payoutAccountReference,
       });
       setAmount("");
-      setDestination(defaultDestination);
       applyReferralDashboard(await fetchReferralDashboard());
       setIsWithdrawalModalOpen(false);
       setMessage("Demande de retrait enregistrée. Le montant est maintenant réservé.");
@@ -230,16 +245,15 @@ export default function ReferralsPage() {
               activeWallet={activeWallet}
               amount={amount}
               currency={currency}
-              destination={destination}
               isSubmitting={isSubmitting}
               message={message}
-              paymentMethod={paymentMethod}
+              payoutAccountReference={payoutAccountReference}
+              payoutAccounts={activePayoutAccounts}
               wallets={wallets}
               onAmountChange={setAmount}
               onClose={() => setIsWithdrawalModalOpen(false)}
-              onCurrencyChange={setCurrency}
-              onDestinationChange={setDestination}
-              onPaymentMethodChange={setPaymentMethod}
+              onCurrencyChange={handleWithdrawalCurrencyChange}
+              onPayoutAccountChange={setPayoutAccountReference}
               onSubmit={handleSubmit}
             />
           )}
@@ -254,31 +268,29 @@ function WithdrawalRequestDialog({
   activeWallet,
   amount,
   currency,
-  destination,
   isSubmitting,
   message,
-  paymentMethod,
+  payoutAccountReference,
+  payoutAccounts,
   wallets,
   onAmountChange,
   onClose,
   onCurrencyChange,
-  onDestinationChange,
-  onPaymentMethodChange,
+  onPayoutAccountChange,
   onSubmit,
 }: {
   activeWallet: ReferralWalletSummary | null;
   amount: string;
   currency: string;
-  destination: typeof defaultDestination;
   isSubmitting: boolean;
   message: string;
-  paymentMethod: string;
+  payoutAccountReference: string;
+  payoutAccounts: ReferralPayoutAccount[];
   wallets: ReferralWalletSummary[];
   onAmountChange: (value: string) => void;
   onClose: () => void;
   onCurrencyChange: (value: string) => void;
-  onDestinationChange: (value: typeof defaultDestination) => void;
-  onPaymentMethodChange: (value: string) => void;
+  onPayoutAccountChange: (value: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   return (
@@ -347,53 +359,28 @@ function WithdrawalRequestDialog({
             </label>
 
             <label className="block text-sm font-semibold text-app-text">
-              Moyen
+              Compte de retrait
               <select
-                value={paymentMethod}
-                onChange={(event) => onPaymentMethodChange(event.target.value)}
+                value={payoutAccountReference}
+                onChange={(event) => onPayoutAccountChange(event.target.value)}
+                required
                 className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
               >
-                <option value="MOBILE_MONEY">Mobile Money</option>
-                <option value="IKEEPAY">iKeePay</option>
-                <option value="BANK_TRANSFER">Virement bancaire</option>
-                <option value="OTHER">Autre</option>
+                <option value="">Sélectionner un compte</option>
+                {payoutAccounts.map((account) => (
+                  <option key={account.reference} value={account.reference}>
+                    {account.payment_method} · {account.operator || account.provider} ·{" "}
+                    {account.phone_number || account.account_name}
+                  </option>
+                ))}
               </select>
             </label>
 
-            <label className="block text-sm font-semibold text-app-text">
-              Opérateur
-              <input
-                value={destination.operator}
-                onChange={(event) =>
-                  onDestinationChange({ ...destination, operator: event.target.value })
-                }
-                placeholder="MPESA"
-                className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
-              />
-            </label>
-
-            <label className="block text-sm font-semibold text-app-text">
-              Téléphone
-              <input
-                value={destination.phone_number}
-                onChange={(event) =>
-                  onDestinationChange({ ...destination, phone_number: event.target.value })
-                }
-                placeholder="+243XXXXXXXXX"
-                className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
-              />
-            </label>
-
-            <label className="block text-sm font-semibold text-app-text">
-              Nom du bénéficiaire
-              <input
-                value={destination.account_name}
-                onChange={(event) =>
-                  onDestinationChange({ ...destination, account_name: event.target.value })
-                }
-                className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
-              />
-            </label>
+            {!payoutAccounts.length && (
+              <p className="rounded-md border border-app-border bg-app-surface px-4 py-3 text-sm text-app-muted">
+                Configurez d'abord un compte de retrait dans les paramètres du compte.
+              </p>
+            )}
 
             {message && (
               <p className="rounded-md border border-app-border bg-app-surface px-4 py-3 text-sm text-app-muted">
@@ -406,7 +393,7 @@ function WithdrawalRequestDialog({
             <Button type="button" variant="secondary" onClick={onClose}>
               Annuler
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" disabled={isSubmitting || !payoutAccountReference}>
               {isSubmitting ? "Enregistrement..." : "Demander le retrait"}
             </Button>
           </div>

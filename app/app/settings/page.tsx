@@ -1,11 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/ui/link-button";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
 import { getUserPharmacies, type PharmacySummary } from "@/lib/api";
+import {
+  createReferralPayoutAccount,
+  getReferralPayoutAccounts,
+  updateReferralPayoutAccount,
+  type ReferralPayoutAccount,
+} from "@/lib/api/referrals";
 import {
   getAccessToken,
   getActivePharmacyId,
@@ -22,6 +28,7 @@ export default function AccountSettingsPage() {
   const [activePharmacy, setActivePharmacy] = useState<PharmacySummary | null>(null);
   const [pharmacyCount, setPharmacyCount] = useState(0);
   const [pharmacyLoadMessage, setPharmacyLoadMessage] = useState("");
+  const [payoutAccounts, setPayoutAccounts] = useState<ReferralPayoutAccount[]>([]);
 
   useEffect(() => {
     async function loadSettingsContext() {
@@ -37,8 +44,12 @@ export default function AccountSettingsPage() {
       setActivePharmacyId(storedPharmacyId);
 
       try {
-        const pharmacies = await getUserPharmacies();
+        const [pharmacies, accounts] = await Promise.all([
+          getUserPharmacies(),
+          getReferralPayoutAccounts(),
+        ]);
         setPharmacyCount(pharmacies.length);
+        setPayoutAccounts(accounts);
         setActivePharmacy(
           pharmacies.find((pharmacy) => pharmacy.id === storedPharmacyId) || null,
         );
@@ -107,6 +118,11 @@ export default function AccountSettingsPage() {
                   <InfoTile label="Espace actif" value={activePharmacyId || "Non sélectionné"} />
                 </div>
               </section>
+
+              <PayoutAccountPanel
+                accounts={payoutAccounts}
+                onAccountsChange={setPayoutAccounts}
+              />
             </section>
 
             <aside className="space-y-6">
@@ -163,6 +179,163 @@ export default function AccountSettingsPage() {
         )}
       </section>
     </MainLayout>
+  );
+}
+
+function PayoutAccountPanel({
+  accounts,
+  onAccountsChange,
+}: {
+  accounts: ReferralPayoutAccount[];
+  onAccountsChange: (accounts: ReferralPayoutAccount[]) => void;
+}) {
+  const [currency, setCurrency] = useState(accounts[0]?.currency || "USD");
+  const [provider, setProvider] = useState(accounts[0]?.provider || "IKEEPAY");
+  const [paymentMethod, setPaymentMethod] = useState(accounts[0]?.payment_method || "MOBILE_MONEY");
+  const [operator, setOperator] = useState(accounts[0]?.operator || "");
+  const [phoneNumber, setPhoneNumber] = useState(accounts[0]?.phone_number || "");
+  const [accountName, setAccountName] = useState(accounts[0]?.account_name || "");
+  const [message, setMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    const account = accounts[0];
+    if (!account || phoneNumber || accountName || operator) {
+      return;
+    }
+    setCurrency(account.currency);
+    setProvider(account.provider);
+    setPaymentMethod(account.payment_method);
+    setOperator(account.operator);
+    setPhoneNumber(account.phone_number);
+    setAccountName(account.account_name);
+  }, [accounts, accountName, operator, phoneNumber]);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setMessage("");
+    setIsSubmitting(true);
+
+    const payload = {
+      currency,
+      provider,
+      payment_method: paymentMethod,
+      operator,
+      phone_number: phoneNumber,
+      account_name: accountName,
+      is_active: true,
+    };
+
+    try {
+      const existing = accounts.find((account) => account.currency === currency);
+      const saved = existing
+        ? await updateReferralPayoutAccount(existing.reference, payload)
+        : await createReferralPayoutAccount(payload);
+      const nextAccounts = existing
+        ? accounts.map((account) => (account.reference === saved.reference ? saved : account))
+        : [saved, ...accounts];
+      onAccountsChange(nextAccounts);
+      setMessage("Compte de retrait enregistré.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Impossible d'enregistrer le compte de retrait.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <section className="rounded-lg border border-app-border bg-app-card p-6 shadow-sm">
+      <p className="text-sm font-semibold text-primary-700">Retraits de commissions</p>
+      <h2 className="mt-2 text-xl font-bold text-app-text">Compte de réception</h2>
+      <p className="mt-3 text-sm leading-6 text-app-muted">
+        Ce compte est utilisé pour recevoir les retraits groupés de vos commissions
+        de parrainage. Les demandes de retrait copieront ces informations au moment
+        de l'envoi.
+      </p>
+
+      <form onSubmit={handleSubmit} className="mt-5 grid gap-4 sm:grid-cols-2">
+        <label className="block text-sm font-semibold text-app-text">
+          Devise
+          <input
+            value={currency}
+            onChange={(event) => setCurrency(event.target.value.toUpperCase())}
+            maxLength={3}
+            required
+            className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
+          />
+        </label>
+
+        <label className="block text-sm font-semibold text-app-text">
+          Prestataire
+          <select
+            value={provider}
+            onChange={(event) => setProvider(event.target.value)}
+            className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
+          >
+            <option value="IKEEPAY">iKeePay</option>
+            <option value="MOBILE_MONEY">Mobile Money</option>
+            <option value="OTHER">Autre</option>
+          </select>
+        </label>
+
+        <label className="block text-sm font-semibold text-app-text">
+          Moyen
+          <select
+            value={paymentMethod}
+            onChange={(event) => setPaymentMethod(event.target.value)}
+            className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
+          >
+            <option value="MOBILE_MONEY">Mobile Money</option>
+            <option value="IKEEPAY">iKeePay</option>
+            <option value="BANK_TRANSFER">Virement bancaire</option>
+            <option value="OTHER">Autre</option>
+          </select>
+        </label>
+
+        <label className="block text-sm font-semibold text-app-text">
+          Opérateur
+          <input
+            value={operator}
+            onChange={(event) => setOperator(event.target.value)}
+            placeholder="MPESA"
+            className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
+          />
+        </label>
+
+        <label className="block text-sm font-semibold text-app-text">
+          Téléphone
+          <input
+            value={phoneNumber}
+            onChange={(event) => setPhoneNumber(event.target.value)}
+            placeholder="+243XXXXXXXXX"
+            className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
+          />
+        </label>
+
+        <label className="block text-sm font-semibold text-app-text">
+          Nom du bénéficiaire
+          <input
+            value={accountName}
+            onChange={(event) => setAccountName(event.target.value)}
+            className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
+          />
+        </label>
+
+        {message && (
+          <p className="rounded-md border border-app-border bg-app-surface px-4 py-3 text-sm text-app-muted sm:col-span-2">
+            {message}
+          </p>
+        )}
+
+        <div className="sm:col-span-2">
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Enregistrement..." : "Enregistrer le compte"}
+          </Button>
+        </div>
+      </form>
+    </section>
   );
 }
 
