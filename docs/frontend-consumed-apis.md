@@ -531,6 +531,7 @@ Content-Type: application/json
 - `GET /api/products/filter-options/?pharmacy_reference={pharmacy_id}`
 - `GET /api/products/{reference}/?pharmacy_reference={pharmacy_id}`
 - `POST /api/products/`
+- `PATCH /api/products/{reference}/?pharmacy_reference={pharmacy_id}`
 - `DELETE /api/products/{reference}/?pharmacy_reference={pharmacy_id}`
 
 ### POST /api/products/
@@ -910,6 +911,23 @@ Content-Type: application/json
 - **Réponse attendue** : `204 No Content` (aucun corps).
 - **Erreurs possibles** : `400 Bad Request` (paramètre manquant), `401 Unauthorized`,
   `403 Forbidden`, `404 Not Found`.
+
+### PATCH /api/products/{reference}/
+
+- **Objectif** : modifier un produit existant.
+- **Méthode HTTP** : `PATCH`
+- **URL** : `/api/products/{reference}/?pharmacy_reference={pharmacy_id}`
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/products/[reference]/edit`
+- **Service frontend** : `updateProduct(pharmacyId, reference, values)` dans `lib/api/products.ts`
+- **Paramètre query obligatoire** : `pharmacy_reference`.
+- **Payload envoyé (JSON)** : mêmes champs que la création, mais en mise à jour partielle.
+  Le frontend envoie systématiquement `name`, `form`, `target_gender`,
+  `target_age_group`, `therapeutic_category` et `sale_price`, ainsi que les champs
+  optionnels seulement s'ils sont renseignés (`description`, `strength`, `package`,
+  `purchase_price`, `current_stock`, `expiration_date`).
+- **Réponse attendue (200)** : produit mis à jour (serializer de lecture).
+- **Erreurs possibles** : `400 Bad Request`, `401 Unauthorized`, `403 Forbidden`,
+  `404 Not Found`.
 
 ## Permissions et dashboard
 
