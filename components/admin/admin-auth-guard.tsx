@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { adminLoginPath } from "@/lib/admin/config";
-import { clearAdminTokens } from "@/lib/admin/auth";
+import { clearAdminTokens, getAdminAccessToken } from "@/lib/admin/auth";
 import { getAdminSession } from "@/lib/api/admin";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
 
@@ -15,13 +15,21 @@ export function AdminAuthGuard({ children }: { children: React.ReactNode }) {
     let isMounted = true;
 
     async function verifySession() {
+      const hasToken = Boolean(getAdminAccessToken());
+
+      if (!hasToken) {
+        if (!isMounted) return;
+        clearAdminTokens();
+        window.location.replace(adminLoginPath);
+        return;
+      }
+
       try {
         await getAdminSession();
-        if (!isMounted) {
-          return;
-        }
+        if (!isMounted) return;
         setState("ready");
       } catch {
+        if (!isMounted) return;
         clearAdminTokens();
         window.location.replace(adminLoginPath);
       }
