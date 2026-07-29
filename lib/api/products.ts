@@ -20,6 +20,7 @@ export type CreateProductPayload = {
   sale_price: number;
   purchase_price?: number | null;
   current_stock?: number;
+  expiration_date?: string;
 };
 
 export type Product = {
@@ -36,6 +37,7 @@ export type Product = {
   sale_price: number;
   purchase_price?: number | null;
   current_stock: number;
+  expiration_date?: string | null;
   is_deleted?: boolean;
   deleted_at?: string | null;
   created_at?: string;
@@ -55,6 +57,7 @@ export type ProductFormValues = {
   sale_price: string;
   purchase_price: string;
   current_stock: string;
+  expiration_date: string;
 };
 
 export const PRODUCT_FORM_DEFAULT = "TABLET";
@@ -125,6 +128,7 @@ export const initialProductFormValues: ProductFormValues = {
   sale_price: "",
   purchase_price: "",
   current_stock: "0",
+  expiration_date: "",
 };
 
 export async function createProduct(
@@ -160,6 +164,9 @@ export async function createProduct(
   }
   if (values.current_stock.trim()) {
     payload.current_stock = Number(values.current_stock);
+  }
+  if (values.expiration_date.trim()) {
+    payload.expiration_date = values.expiration_date.trim();
   }
 
   const response = await fetch(apiBaseUrl.replace(/\/$/, "") + "/api/products/", {

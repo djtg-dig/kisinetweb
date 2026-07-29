@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { LinkButton } from "@/components/ui/link-button";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -251,9 +251,59 @@ function ProductFiltersPanel({
   onReset: () => void;
 }) {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [localSearch, setLocalSearch] = useState(filters.search || "");
+  const filtersRef = useRef(filters);
+  const localSearchRef = useRef(localSearch);
+  const onChangeRef = useRef(onChange);
+  const onApplyRef = useRef(onApply);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  function updateFilter(name: keyof ProductFilters, value: string) {
-    onChange({ ...filters, [name]: value });
+  filtersRef.current = filters;
+  localSearchRef.current = localSearch;
+  onChangeRef.current = onChange;
+  onApplyRef.current = onApply;
+
+  useEffect(() => {
+    setLocalSearch(filters.search || "");
+  }, [filters.search]);
+
+  useEffect(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      const currentSearch = filtersRef.current.search || "";
+      if (localSearchRef.current !== currentSearch) {
+        onChangeRef.current({ ...filtersRef.current, search: localSearchRef.current || undefined });
+        onApplyRef.current();
+      }
+      debounceTimerRef.current = null;
+    }, 300);
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+    };
+  }, [localSearch]);
+
+  function updateFilter(name: keyof ProductFilters, value: string, autoApply = false) {
+    if (name === "search") {
+      setLocalSearch(value);
+    } else {
+      const newFilters = { ...filtersRef.current, [name]: value };
+      onChangeRef.current(newFilters);
+      if (autoApply) {
+        if (debounceTimerRef.current) {
+          clearTimeout(debounceTimerRef.current);
+          debounceTimerRef.current = null;
+          onChangeRef.current({ ...newFilters, search: localSearchRef.current || undefined });
+          onApplyRef.current();
+        } else {
+          onApplyRef.current();
+        }
+      }
+    }
   }
 
   return (
@@ -261,7 +311,7 @@ function ProductFiltersPanel({
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <FilterInput
           label="Recherche"
-          value={filters.search || ""}
+          value={localSearch}
           placeholder="Nom, référence, dosage..."
           onChange={(value) => updateFilter("search", value)}
         />
@@ -269,19 +319,19 @@ function ProductFiltersPanel({
           label="Catégorie"
           value={filters.therapeuticCategory || ""}
           options={options.therapeuticCategories}
-          onChange={(value) => updateFilter("therapeuticCategory", value)}
+          onChange={(value) => updateFilter("therapeuticCategory", value, true)}
         />
         <FilterSelect
           label="Forme"
           value={filters.form || ""}
           options={options.forms}
-          onChange={(value) => updateFilter("form", value)}
+          onChange={(value) => updateFilter("form", value, true)}
         />
         <FilterSelect
           label="Tri"
           value={filters.ordering || "name"}
           options={options.orderings}
-          onChange={(value) => updateFilter("ordering", value || "name")}
+          onChange={(value) => updateFilter("ordering", value || "name", true)}
         />
       </div>
 

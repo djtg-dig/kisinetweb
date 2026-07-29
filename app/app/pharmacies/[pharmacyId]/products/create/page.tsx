@@ -235,6 +235,15 @@ export default function CreateProductPage({ params }: CreatePageProps) {
             />
           </div>
 
+          <div className="grid gap-5 md:grid-cols-3">
+            <TextField
+              label="Date de péremption"
+              value={values.expiration_date}
+              placeholder="AAAA-MM-JJ"
+              onChange={(value) => updateField("expiration_date", value)}
+            />
+          </div>
+
           <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
             <LinkButton
               href={productsPath(pharmacyId)}
