@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { LinkButton } from "@/components/ui/link-button";
+import { LoadingBubble } from "@/components/ui/loading-bubble";
 import {
   getProductDetail,
   initialProductFormValues,
@@ -146,9 +147,7 @@ export default function EditProductPage({ params }: EditPageProps) {
           </div>
         </header>
         <section className="py-8">
-          <div className="rounded-lg border border-app-border bg-app-card p-8 shadow-sm">
-            <p className="text-sm font-semibold text-app-muted">Chargement...</p>
-          </div>
+          <LoadingBubble label="Chargement du produit" />
         </section>
       </main>
     );
