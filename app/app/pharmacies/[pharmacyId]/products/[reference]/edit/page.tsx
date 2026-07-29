@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { LinkButton } from "@/components/ui/link-button";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
+import { ToastMessage } from "@/components/ui/toast-message";
 import {
   getProductDetail,
   initialProductFormValues,
@@ -31,7 +32,12 @@ export default function EditProductPage({ params }: EditPageProps) {
   const [dataLoaded, setDataLoaded] = useState(false);
   const [status, setStatus] = useState<SubmitStatus>("idle");
   const [errorMessage, setErrorMessage] = useState("");
+  const [toast, setToast] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  function showToast(message: string) {
+    setToast(message);
+  }
 
   useEffect(() => {
     async function readParams() {
@@ -119,6 +125,7 @@ export default function EditProductPage({ params }: EditPageProps) {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setErrorMessage("");
+    setToast(null);
 
     if (!validate()) {
       return;
@@ -130,10 +137,9 @@ export default function EditProductPage({ params }: EditPageProps) {
       await updateProduct(pharmacyId, reference, values);
       setStatus("success");
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Impossible de modifier ce produit.",
-      );
-      setStatus("error");
+      const message = error instanceof Error ? error.message : "Impossible de modifier ce produit.";
+      showToast(message);
+      setStatus("idle");
     }
   }
 
@@ -172,13 +178,6 @@ export default function EditProductPage({ params }: EditPageProps) {
         </header>
 
         <section className="py-8">
-          {status === "error" && errorMessage && (
-            <div className="mb-6 whitespace-pre-line rounded-lg border border-red-200 bg-red-50 p-4">
-              <p className="text-sm font-semibold text-red-600">Erreur</p>
-              <p className="mt-1 text-sm text-red-600">{errorMessage}</p>
-            </div>
-          )}
-
           {status === "success" && (
             <div className="mb-6 rounded-lg border border-green-200 bg-green-50 p-4">
               <p className="text-sm font-semibold text-green-700">Produit modifié</p>
@@ -310,6 +309,11 @@ export default function EditProductPage({ params }: EditPageProps) {
           </form>
         </section>
       </main>
+      {toast && (
+        <ToastMessage tone="error" onClose={() => setToast(null)}>
+          {toast}
+        </ToastMessage>
+      )}
     </>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { LinkButton } from "@/components/ui/link-button";
+import { ToastMessage } from "@/components/ui/toast-message";
 import {
   createProduct,
   initialProductFormValues,
@@ -26,7 +27,12 @@ export default function CreateProductPage({ params }: CreatePageProps) {
   const [values, setValues] = useState<ProductFormValues>(initialProductFormValues);
   const [status, setStatus] = useState<SubmitStatus>("idle");
   const [errorMessage, setErrorMessage] = useState("");
+  const [toast, setToast] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  function showToast(message: string) {
+    setToast(message);
+  }
 
   useEffect(() => {
     async function readParams() {
@@ -76,6 +82,7 @@ export default function CreateProductPage({ params }: CreatePageProps) {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setErrorMessage("");
+    setToast(null);
 
     if (!validate()) {
       return;
@@ -87,10 +94,9 @@ export default function CreateProductPage({ params }: CreatePageProps) {
       await createProduct(pharmacyId, values);
       setStatus("success");
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Impossible de créer le produit.",
-      );
-      setStatus("error");
+      const message = error instanceof Error ? error.message : "Impossible de créer le produit.";
+      showToast(message);
+      setStatus("idle");
     }
   }
 
@@ -139,13 +145,6 @@ export default function CreateProductPage({ params }: CreatePageProps) {
                 Ajouter un autre produit
               </button>
             </div>
-          </div>
-        )}
-
-        {status === "error" && errorMessage && (
-          <div className="mb-6 whitespace-pre-line rounded-lg border border-red-200 bg-red-50 p-4">
-            <p className="text-sm font-semibold text-red-600">Erreur</p>
-            <p className="mt-1 text-sm text-red-600">{errorMessage}</p>
           </div>
         )}
 
@@ -263,7 +262,11 @@ export default function CreateProductPage({ params }: CreatePageProps) {
         </form>
       </section>
     </main>
-
+    {toast && (
+      <ToastMessage tone="error" onClose={() => setToast(null)}>
+        {toast}
+      </ToastMessage>
+    )}
   </>
   );
 }

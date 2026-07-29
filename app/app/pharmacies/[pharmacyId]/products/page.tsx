@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { LinkButton } from "@/components/ui/link-button";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ToastMessage } from "@/components/ui/toast-message";
 import {
   getPharmacyProducts,
   getPharmacyPermissions,
@@ -45,10 +46,14 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
     orderings: [],
   });
   const [state, setState] = useState<PageState>("loading");
-  const [errorMessage, setErrorMessage] = useState("");
+  const [toast, setToast] = useState<string | null>(null);
   const [deletingReference, setDeletingReference] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
   const [pendingDelete, setPendingDelete] = useState<ProductSummary | null>(null);
+
+  function showToast(message: string) {
+    setToast(message);
+  }
 
   function handleDeleteProduct(product: ProductSummary) {
     setPendingDelete(product);
@@ -60,14 +65,14 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
     }
 
     setDeletingReference(pendingDelete.reference);
-    setErrorMessage("");
+    setToast(null);
 
     try {
       await deleteProduct(pharmacyId, pendingDelete.reference);
       setReloadKey((key) => key + 1);
       setPendingDelete(null);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Impossible de supprimer ce produit.");
+      showToast(error instanceof Error ? error.message : "Impossible de supprimer ce produit.");
       setPendingDelete(null);
     } finally {
       setDeletingReference("");
@@ -100,7 +105,7 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
 
     async function loadProducts() {
       setState("loading");
-      setErrorMessage("");
+      setToast(null);
 
       try {
         const [page, options, pharmacyPermissions] = await Promise.all([
@@ -123,8 +128,8 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
           return;
         }
         const message = error instanceof Error ? error.message : "";
-        setErrorMessage(message || "Impossible de charger les produits.");
-        setState("error");
+        showToast(message || "Impossible de charger les produits.");
+        setState("ready");
       }
     }
 
@@ -185,17 +190,11 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
             <LoadingBubble label="Chargement des produits" className="min-h-[220px]" />
           </section>
         )}
-        {state === "error" && <ErrorState message={errorMessage} pharmacyId={pharmacyId} />}
         {state === "empty" && (
           <EmptyState
             canCreate={Boolean(permissions.product_create)}
             pharmacyId={pharmacyId}
           />
-        )}
-        {state === "ready" && errorMessage && (
-          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4">
-            <p className="text-sm font-semibold text-red-600">{errorMessage}</p>
-          </div>
         )}
         {state === "ready" && (
           <>
@@ -217,6 +216,11 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
               }}
             />
           </>
+        )}
+        {toast && (
+          <ToastMessage tone="error" onClose={() => setToast(null)}>
+            {toast}
+          </ToastMessage>
         )}
       </section>
 
@@ -808,23 +812,6 @@ function EmptyState({
       <div className="mt-5">
         <AddProductButton canCreate={canCreate} pharmacyId={pharmacyId} />
       </div>
-    </div>
-  );
-}
-
-function ErrorState({ message, pharmacyId }: { message: string; pharmacyId: string }) {
-  return (
-    <div className="rounded-lg border border-red-200 bg-app-card p-6 shadow-sm">
-      <p className="text-sm font-semibold text-red-600">Erreur</p>
-      <h2 className="mt-2 text-2xl font-bold text-app-text">Produits indisponibles</h2>
-      <p className="mt-3 whitespace-pre-line text-sm leading-6 text-app-muted">{message}</p>
-      <LinkButton
-        href={"/app/pharmacies/" + pharmacyId + "/dashboard"}
-        variant="secondary"
-        className="mt-5"
-      >
-        Retour au dashboard
-      </LinkButton>
     </div>
   );
 }
