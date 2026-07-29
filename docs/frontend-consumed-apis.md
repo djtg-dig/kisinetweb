@@ -66,6 +66,7 @@ Endpoints consommés:
 | Déconnexion admin | `POST /api/admin/auth/logout/` | Oui, admin `is_staff` |
 | Refresh admin | `POST /api/admin/auth/refresh/` | Non, refresh token admin |
 | Liste utilisateurs admin | `GET /api/admin/users/?search=...&page=...` | Oui, admin `is_staff` |
+| Liste pharmacies admin | `GET /api/admin/pharmacies/?search=...&devise=...&country=...&city_or_province=...&neighborhood=...&archived=...&has_email=...&has_phone=...&page=...` | Oui, admin `is_staff` |
 | Liste retraits parrainage admin | `GET /api/admin/referral-withdrawals/?search=...&status=...&currency=...&page=...` | Oui, admin `is_staff` |
 | Action retrait parrainage admin | `POST /api/admin/referral-withdrawals/{reference}/{action}/` | Oui, admin `is_staff` |
 
@@ -76,7 +77,22 @@ l'utilisateur est actif et `is_staff`.
 La page `/admin/users` consomme `GET /api/admin/users/` et affiche les
 utilisateurs dans un tableau paginé à 20 lignes maximum. Les sections Swagger des
 APIs admin doivent garder un préfixe `Admin-`, par exemple
-`Admin-Authentication`, `Admin-Dashboard`, `Admin-User` et `Admin-Referral`.
+`Admin-Authentication`, `Admin-Dashboard`, `Admin-User`, `Admin-Pharmacy` et
+`Admin-Referral`.
+
+La page `/admin/pharmacies` consomme `GET /api/admin/pharmacies/` et affiche les
+pharmacies dans un tableau paginé à 10 lignes maximum. Les filtres frontend sont
+envoyés au backend après debounce: recherche globale, devise, pays,
+ville/province, quartier, archivage, présence d'email et présence de téléphone.
+La réponse backend est paginée (`count`, `next`, `previous`, `results`) et chaque
+pharmacie expose les champs administrateur: `id`, `reference`, `name`, `devise`,
+`slug`, `email`, `phone_number`, `owner_id`, `owner_reference`, `owner_email`,
+`owner_first_name`, `owner_last_name`, `invited_by_id`,
+`invited_by_reference`, `invited_by_email`, `address_id`, `country`,
+`country_phone_code`, `city_or_province`, `neighborhood`, `street`,
+`complement_adresse`, `postal_code`, `proximite_transports`,
+`formatted_address`, `latitude`, `longitude`, `members_count`,
+`active_members_count`, `is_archived_at`, `created_at` et `updated_at`.
 
 La page `/admin/payments` consomme `GET /api/admin/referral-withdrawals/` pour
 traiter manuellement les demandes de retrait de commission: passage en

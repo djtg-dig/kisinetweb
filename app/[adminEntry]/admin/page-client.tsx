@@ -17,7 +17,7 @@ export function AdminLoginPageClient() {
     setIsSubmitting(true);
 
     try {
-      await loginAdmin(email, password);
+      await loginAdmin(email.trim(), password);
       window.location.href = adminDashboardPath;
     } catch {
       setMessage("Identifiants invalides.");

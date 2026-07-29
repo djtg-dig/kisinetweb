@@ -41,6 +41,48 @@ export type AdminUsersPage = {
   results: AdminProfile[];
 };
 
+export type AdminPharmacy = {
+  id: number;
+  reference: string;
+  name: string;
+  devise: string;
+  slug: string;
+  email: string;
+  phone_number: string;
+  owner_id: string;
+  owner_reference: string;
+  owner_email: string;
+  owner_first_name: string;
+  owner_last_name: string;
+  invited_by_id: string | null;
+  invited_by_reference: string | null;
+  invited_by_email: string | null;
+  address_id: number;
+  country: string;
+  country_phone_code: string;
+  city_or_province: string;
+  neighborhood: string;
+  street: string;
+  complement_adresse: string;
+  postal_code: string;
+  proximite_transports: string;
+  formatted_address: string;
+  latitude: string | null;
+  longitude: string | null;
+  members_count: number;
+  active_members_count: number;
+  is_archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AdminPharmaciesPage = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: AdminPharmacy[];
+};
+
 export type AdminReferralWithdrawal = {
   reference: string;
   requester_email: string;
@@ -95,6 +137,60 @@ export async function getAdminUsers({
   }
   return fetchAdminJson<AdminUsersPage>(
     "/api/admin/users/" + (params.toString() ? "?" + params.toString() : ""),
+  );
+}
+
+export async function getAdminPharmacies({
+  search = "",
+  page = 1,
+  devise = "",
+  country = "",
+  cityOrProvince = "",
+  neighborhood = "",
+  archived = "",
+  hasEmail = "",
+  hasPhone = "",
+}: {
+  search?: string;
+  page?: number;
+  devise?: string;
+  country?: string;
+  cityOrProvince?: string;
+  neighborhood?: string;
+  archived?: string;
+  hasEmail?: string;
+  hasPhone?: string;
+} = {}): Promise<AdminPharmaciesPage> {
+  const params = new URLSearchParams();
+  if (search.trim()) {
+    params.set("search", search.trim());
+  }
+  if (devise.trim()) {
+    params.set("devise", devise.trim());
+  }
+  if (country.trim()) {
+    params.set("country", country.trim());
+  }
+  if (cityOrProvince.trim()) {
+    params.set("city_or_province", cityOrProvince.trim());
+  }
+  if (neighborhood.trim()) {
+    params.set("neighborhood", neighborhood.trim());
+  }
+  if (archived.trim()) {
+    params.set("archived", archived.trim());
+  }
+  if (hasEmail.trim()) {
+    params.set("has_email", hasEmail.trim());
+  }
+  if (hasPhone.trim()) {
+    params.set("has_phone", hasPhone.trim());
+  }
+  if (page > 1) {
+    params.set("page", String(page));
+  }
+  return fetchAdminJson<AdminPharmaciesPage>(
+    "/api/admin/pharmacies/" + (params.toString() ? "?" + params.toString() : ""),
   );
 }
 
