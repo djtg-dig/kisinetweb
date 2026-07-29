@@ -83,6 +83,52 @@ export type AdminPharmaciesPage = {
   results: AdminPharmacy[];
 };
 
+export type AdminSubscription = {
+  id: number;
+  reference: string;
+  pharmacy_id: number;
+  pharmacy_reference: string;
+  pharmacy_name: string;
+  pharmacy_devise: string;
+  pharmacy_email: string;
+  pharmacy_phone_number: string;
+  owner_id: string;
+  owner_reference: string;
+  owner_email: string;
+  owner_first_name: string;
+  owner_last_name: string;
+  plan_code: string;
+  plan_name: string;
+  plan_monthly_price: string;
+  plan_currency: string;
+  status: string;
+  duration_months: number;
+  discount_percentage: string;
+  total_amount: string;
+  starts_at: string;
+  trial_starts_at: string | null;
+  trial_ends_at: string | null;
+  expires_at: string | null;
+  auto_renew: boolean;
+  is_trial_active: boolean;
+  is_active: boolean;
+  payments_count: number;
+  last_payment_reference: string | null;
+  last_payment_status: string | null;
+  last_payment_amount: string | null;
+  last_payment_currency: string | null;
+  last_payment_paid_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AdminSubscriptionsPage = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: AdminSubscription[];
+};
+
 export type AdminReferralWithdrawal = {
   reference: string;
   requester_email: string;
@@ -191,6 +237,40 @@ export async function getAdminPharmacies({
   }
   return fetchAdminJson<AdminPharmaciesPage>(
     "/api/admin/pharmacies/" + (params.toString() ? "?" + params.toString() : ""),
+  );
+}
+
+export async function getAdminSubscriptions({
+  search = "",
+  page = 1,
+  reference = "",
+  planCode = "",
+  status = "",
+}: {
+  search?: string;
+  page?: number;
+  reference?: string;
+  planCode?: string;
+  status?: string;
+} = {}): Promise<AdminSubscriptionsPage> {
+  const params = new URLSearchParams();
+  if (search.trim()) {
+    params.set("search", search.trim());
+  }
+  if (reference.trim()) {
+    params.set("reference", reference.trim());
+  }
+  if (planCode.trim()) {
+    params.set("plan_code", planCode.trim());
+  }
+  if (status.trim()) {
+    params.set("status", status.trim());
+  }
+  if (page > 1) {
+    params.set("page", String(page));
+  }
+  return fetchAdminJson<AdminSubscriptionsPage>(
+    "/api/admin/subscriptions/" + (params.toString() ? "?" + params.toString() : ""),
   );
 }
 

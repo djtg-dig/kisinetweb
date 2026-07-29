@@ -67,6 +67,7 @@ Endpoints consommés:
 | Refresh admin | `POST /api/admin/auth/refresh/` | Non, refresh token admin |
 | Liste utilisateurs admin | `GET /api/admin/users/?search=...&page=...` | Oui, admin `is_staff` |
 | Liste pharmacies admin | `GET /api/admin/pharmacies/?search=...&devise=...&country=...&city_or_province=...&neighborhood=...&archived=...&has_email=...&has_phone=...&page=...` | Oui, admin `is_staff` |
+| Liste abonnements admin | `GET /api/admin/subscriptions/?search=...&reference=...&plan_code=...&status=...&page=...` | Oui, admin `is_staff` |
 | Liste retraits parrainage admin | `GET /api/admin/referral-withdrawals/?search=...&status=...&currency=...&page=...` | Oui, admin `is_staff` |
 | Action retrait parrainage admin | `POST /api/admin/referral-withdrawals/{reference}/{action}/` | Oui, admin `is_staff` |
 
@@ -93,6 +94,24 @@ pharmacie expose les champs administrateur: `id`, `reference`, `name`, `devise`,
 `complement_adresse`, `postal_code`, `proximite_transports`,
 `formatted_address`, `latitude`, `longitude`, `members_count`,
 `active_members_count`, `is_archived_at`, `created_at` et `updated_at`.
+
+La page `/admin/subscriptions` consomme `GET /api/admin/subscriptions/` et affiche
+les abonnements pharmacies dans un tableau paginé à 10 lignes maximum. Chaque
+abonnement possède une référence publique auto-générée `reference` au format
+`SUBXXXXXXXX`. Les filtres frontend sont envoyés au backend après debounce:
+recherche globale, référence abonnement, plan, statut d'abonnement. La référence
+de pharmacie n'est plus un filtre séparé car elle est déjà couverte par la
+recherche globale. La réponse backend est paginée (`count`, `next`, `previous`,
+`results`) et chaque abonnement expose les champs administrateur: `reference`,
+`id`, `pharmacy_id`, `pharmacy_reference`, `pharmacy_name`, `pharmacy_email`,
+`pharmacy_phone_number`, `owner_id`, `owner_reference`, `owner_email`,
+`owner_first_name`, `owner_last_name`, `plan_code`, `plan_name`,
+`plan_monthly_price`, `plan_currency`, `status`, `duration_months`,
+`discount_percentage`, `total_amount`, `starts_at`, `trial_starts_at`,
+`trial_ends_at`, `expires_at`, `auto_renew`, `is_trial_active`, `is_active`,
+`payments_count`, `last_payment_reference`, `last_payment_status`,
+`last_payment_amount`, `last_payment_currency`, `last_payment_paid_at`,
+`created_at` et `updated_at`.
 
 La page `/admin/payments` consomme `GET /api/admin/referral-withdrawals/` pour
 traiter manuellement les demandes de retrait de commission: passage en
