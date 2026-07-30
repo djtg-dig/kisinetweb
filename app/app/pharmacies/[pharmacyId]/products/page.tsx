@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { LinkButton } from "@/components/ui/link-button";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { ToastMessage } from "@/components/ui/toast-message";
 import {
   getPharmacyProducts,
   getPharmacyPermissions,
@@ -46,14 +45,10 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
     orderings: [],
   });
   const [state, setState] = useState<PageState>("loading");
-  const [toast, setToast] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState("");
   const [deletingReference, setDeletingReference] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
   const [pendingDelete, setPendingDelete] = useState<ProductSummary | null>(null);
-
-  function showToast(message: string) {
-    setToast(message);
-  }
 
   function handleDeleteProduct(product: ProductSummary) {
     setPendingDelete(product);
@@ -65,14 +60,14 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
     }
 
     setDeletingReference(pendingDelete.reference);
-    setToast(null);
+    setErrorMessage("");
 
     try {
       await deleteProduct(pharmacyId, pendingDelete.reference);
       setReloadKey((key) => key + 1);
       setPendingDelete(null);
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Impossible de supprimer ce produit.");
+      setErrorMessage(error instanceof Error ? error.message : "Impossible de supprimer ce produit.");
       setPendingDelete(null);
     } finally {
       setDeletingReference("");
@@ -105,7 +100,7 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
 
     async function loadProducts() {
       setState("loading");
-      setToast(null);
+      setErrorMessage("");
 
       try {
         const [page, options, pharmacyPermissions] = await Promise.all([
@@ -128,8 +123,8 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
           return;
         }
         const message = error instanceof Error ? error.message : "";
-        showToast(message || "Impossible de charger les produits.");
-        setState("ready");
+        setErrorMessage(message || "Impossible de charger les produits.");
+        setState("error");
       }
     }
 
@@ -190,11 +185,17 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
             <LoadingBubble label="Chargement des produits" className="min-h-[220px]" />
           </section>
         )}
+        {state === "error" && <ErrorState message={errorMessage} pharmacyId={pharmacyId} />}
         {state === "empty" && (
           <EmptyState
             canCreate={Boolean(permissions.product_create)}
             pharmacyId={pharmacyId}
           />
+        )}
+        {state === "ready" && errorMessage && (
+          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4">
+            <p className="text-sm font-semibold text-red-600">{errorMessage}</p>
+          </div>
         )}
         {state === "ready" && (
           <>
@@ -216,11 +217,6 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
               }}
             />
           </>
-        )}
-        {toast && (
-          <ToastMessage tone="error" onClose={() => setToast(null)}>
-            {toast}
-          </ToastMessage>
         )}
       </section>
 
@@ -255,59 +251,9 @@ function ProductFiltersPanel({
   onReset: () => void;
 }) {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [localSearch, setLocalSearch] = useState(filters.search || "");
-  const filtersRef = useRef(filters);
-  const localSearchRef = useRef(localSearch);
-  const onChangeRef = useRef(onChange);
-  const onApplyRef = useRef(onApply);
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  filtersRef.current = filters;
-  localSearchRef.current = localSearch;
-  onChangeRef.current = onChange;
-  onApplyRef.current = onApply;
-
-  useEffect(() => {
-    setLocalSearch(filters.search || "");
-  }, [filters.search]);
-
-  useEffect(() => {
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-    debounceTimerRef.current = setTimeout(() => {
-      const currentSearch = filtersRef.current.search || "";
-      if (localSearchRef.current !== currentSearch) {
-        onChangeRef.current({ ...filtersRef.current, search: localSearchRef.current || undefined });
-        onApplyRef.current();
-      }
-      debounceTimerRef.current = null;
-    }, 300);
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-        debounceTimerRef.current = null;
-      }
-    };
-  }, [localSearch]);
-
-  function updateFilter(name: keyof ProductFilters, value: string, autoApply = false) {
-    if (name === "search") {
-      setLocalSearch(value);
-    } else {
-      const newFilters = { ...filtersRef.current, [name]: value };
-      onChangeRef.current(newFilters);
-      if (autoApply) {
-        if (debounceTimerRef.current) {
-          clearTimeout(debounceTimerRef.current);
-          debounceTimerRef.current = null;
-          onChangeRef.current({ ...newFilters, search: localSearchRef.current || undefined });
-          onApplyRef.current();
-        } else {
-          onApplyRef.current();
-        }
-      }
-    }
+  function updateFilter(name: keyof ProductFilters, value: string) {
+    onChange({ ...filters, [name]: value });
   }
 
   return (
@@ -315,7 +261,7 @@ function ProductFiltersPanel({
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <FilterInput
           label="Recherche"
-          value={localSearch}
+          value={filters.search || ""}
           placeholder="Nom, référence, dosage..."
           onChange={(value) => updateFilter("search", value)}
         />
@@ -323,19 +269,19 @@ function ProductFiltersPanel({
           label="Catégorie"
           value={filters.therapeuticCategory || ""}
           options={options.therapeuticCategories}
-          onChange={(value) => updateFilter("therapeuticCategory", value, true)}
+          onChange={(value) => updateFilter("therapeuticCategory", value)}
         />
         <FilterSelect
           label="Forme"
           value={filters.form || ""}
           options={options.forms}
-          onChange={(value) => updateFilter("form", value, true)}
+          onChange={(value) => updateFilter("form", value)}
         />
         <FilterSelect
           label="Tri"
           value={filters.ordering || "name"}
           options={options.orderings}
-          onChange={(value) => updateFilter("ordering", value || "name", true)}
+          onChange={(value) => updateFilter("ordering", value || "name")}
         />
       </div>
 
@@ -812,6 +758,23 @@ function EmptyState({
       <div className="mt-5">
         <AddProductButton canCreate={canCreate} pharmacyId={pharmacyId} />
       </div>
+    </div>
+  );
+}
+
+function ErrorState({ message, pharmacyId }: { message: string; pharmacyId: string }) {
+  return (
+    <div className="rounded-lg border border-red-200 bg-app-card p-6 shadow-sm">
+      <p className="text-sm font-semibold text-red-600">Erreur</p>
+      <h2 className="mt-2 text-2xl font-bold text-app-text">Produits indisponibles</h2>
+      <p className="mt-3 whitespace-pre-line text-sm leading-6 text-app-muted">{message}</p>
+      <LinkButton
+        href={"/app/pharmacies/" + pharmacyId + "/dashboard"}
+        variant="secondary"
+        className="mt-5"
+      >
+        Retour au dashboard
+      </LinkButton>
     </div>
   );
 }

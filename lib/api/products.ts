@@ -131,22 +131,6 @@ export const initialProductFormValues: ProductFormValues = {
   expiration_date: "",
 };
 
-export type UpdateProductPayload = {
-  pharmacy_reference: string;
-  name: string;
-  description?: string;
-  form: string;
-  target_gender: string;
-  target_age_group: string;
-  therapeutic_category: string;
-  strength?: string;
-  package?: string;
-  sale_price: number;
-  purchase_price?: number | null;
-  current_stock?: number;
-  expiration_date?: string;
-};
-
 export async function createProduct(
   pharmacyId: string,
   values: ProductFormValues,
@@ -205,74 +189,6 @@ export async function createProduct(
 
   if (!data || typeof data !== "object") {
     throw new Error("Le produit a été créé, mais la réponse du serveur est invalide.");
-  }
-
-  return data as Product;
-}
-
-export async function updateProduct(
-  pharmacyId: string,
-  reference: string,
-  values: ProductFormValues,
-): Promise<Product> {
-  const accessToken = getAccessToken();
-  if (!accessToken) {
-    throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
-  }
-
-  const payload: UpdateProductPayload = {
-    pharmacy_reference: pharmacyId,
-    name: values.name.trim(),
-    form: values.form,
-    target_gender: values.target_gender,
-    target_age_group: values.target_age_group,
-    therapeutic_category: values.therapeutic_category,
-    sale_price: Number(values.sale_price),
-  };
-
-  if (values.description.trim()) {
-    payload.description = values.description.trim();
-  }
-  if (values.strength.trim()) {
-    payload.strength = values.strength.trim();
-  }
-  if (values.package.trim()) {
-    payload.package = values.package.trim();
-  }
-  if (values.purchase_price.trim()) {
-    payload.purchase_price = Number(values.purchase_price);
-  }
-  if (values.current_stock.trim()) {
-    payload.current_stock = Number(values.current_stock);
-  }
-  if (values.expiration_date.trim()) {
-    payload.expiration_date = values.expiration_date.trim();
-  }
-
-  const params = new URLSearchParams({ pharmacy_reference: pharmacyId });
-  const url =
-    apiBaseUrl.replace(/\/$/, "") + "/api/products/" + reference + "/?" + params.toString();
-
-  const response = await fetch(url, {
-    method: "PATCH",
-    cache: "no-store",
-    headers: {
-      Authorization: "Bearer " + accessToken,
-      Accept: "application/json",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-
-  const responseText = await response.text();
-  const data = parseJsonResponse(responseText);
-
-  if (!response.ok) {
-    throw new Error(getApiErrorMessage(data, "Impossible de modifier ce produit."));
-  }
-
-  if (!data || typeof data !== "object") {
-    throw new Error("Le produit a été modifié, mais la réponse du serveur est invalide.");
   }
 
   return data as Product;
