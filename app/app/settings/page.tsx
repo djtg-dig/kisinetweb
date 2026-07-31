@@ -131,14 +131,9 @@ export default function AccountSettingsPage() {
                 <h2 className="mt-2 text-xl font-bold text-app-text">Accès rapides</h2>
                 <div className="mt-5 grid gap-3">
                   <SettingsLink
-                    href="/app/profile"
+                    href="/app/compte"
                     title="Compte"
                     description="Consulter les informations de votre compte."
-                  />
-                  <SettingsLink
-                    href="/app/referrals"
-                    title="Parrainage"
-                    description="Suivre vos commissions et demander un retrait groupé."
                   />
                   <SettingsLink
                     href="/app/select-pharmacy"

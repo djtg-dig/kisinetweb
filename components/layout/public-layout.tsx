@@ -186,7 +186,7 @@ function UserMenu({
         onClick={onToggle}
         className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-app-border bg-app-card px-4 py-2.5 text-sm font-semibold text-app-text transition hover:bg-primary-50 focus:outline-none focus:ring-4 focus:ring-primary-100"
       >
-        Mon compte
+        Compte
         <span aria-hidden="true" className="text-xs text-app-muted">
           ▼
         </span>
@@ -221,11 +221,8 @@ function UserMenu({
           <MenuLink href="/app/pharmacies/create" onClose={onClose}>
             Créer une pharmacie
           </MenuLink>
-          <MenuLink href="/app/profile" onClose={onClose}>
+          <MenuLink href="/app/compte" onClose={onClose}>
             Mon compte
-          </MenuLink>
-          <MenuLink href="/app/referrals" onClose={onClose}>
-            Parrainage
           </MenuLink>
           {/* <MenuLink href="/app/subscription" onClose={onClose}>
             Mon abonnement

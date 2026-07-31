@@ -1,4 +1,5 @@
-import { getAccessToken } from "@/lib/auth";
+import { getAccessToken, getRefreshToken } from "@/lib/auth";
+import { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY } from "@/lib/auth";
 import { dedupeRequest } from "@/lib/api-request-cache";
 import { apiBaseUrl } from "@/lib/carri-account";
 
@@ -284,6 +285,96 @@ export type PublicPharmacyFilterOptions = {
 
 type UnknownRecord = Record<string, unknown>;
 
+// ──────────────────────────────────────────────────
+// Gestion du refresh token automatique
+// ──────────────────────────────────────────────────
+
+let isRefreshing = false;
+let refreshPromise: Promise<boolean> | null = null;
+
+async function refreshAccessTokenIfNeeded(): Promise<boolean> {
+  if (isRefreshing && refreshPromise) {
+    return refreshPromise;
+  }
+
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) {
+    return false;
+  }
+
+  isRefreshing = true;
+  refreshPromise = (async () => {
+    try {
+      const response = await fetch(
+        apiBaseUrl.replace(/\/$/, "") + "/api/accounts/token/refresh/",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({ refresh: refreshToken }),
+        },
+      );
+
+      if (!response.ok) {
+        return false;
+      }
+
+      const data = await response.json();
+      if (data.access) {
+        localStorage.setItem(ACCESS_TOKEN_KEY, data.access);
+        if (data.refresh) {
+          localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh);
+        }
+        return true;
+      }
+
+      return false;
+    } catch {
+      return false;
+    } finally {
+      isRefreshing = false;
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
+
+async function authenticatedFetch(
+  input: RequestInfo,
+  init?: RequestInit,
+): Promise<Response> {
+  const accessToken = getAccessToken();
+  if (!accessToken) {
+    throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
+  }
+
+  const headers = new Headers(init?.headers);
+  headers.set("Authorization", "Bearer " + accessToken);
+
+  let response = await fetch(input, {
+    ...init,
+    headers,
+  });
+
+  // En cas de 401, tenter un refresh du token puis rejouer la requete
+  if (response.status === 401) {
+    const refreshed = await refreshAccessTokenIfNeeded();
+    if (refreshed) {
+      const newToken = getAccessToken();
+      headers.set("Authorization", "Bearer " + newToken);
+      response = await fetch(input, {
+        ...init,
+        headers,
+      });
+    }
+  }
+
+  return response;
+}
+
 function getText(value: unknown) {
   return typeof value === "string" && value.trim() ? value : undefined;
 }
@@ -548,10 +639,9 @@ export async function getUserPharmacies(): Promise<PharmacySummary[]> {
   }
 
   return dedupeRequest("auth:" + accessToken + ":GET:/api/pharmacies/", async () => {
-    const response = await fetch(apiBaseUrl.replace(/\/$/, "") + "/api/pharmacies/", {
+    const response = await authenticatedFetch(apiBaseUrl.replace(/\/$/, "") + "/api/pharmacies/", {
       cache: "no-store",
       headers: {
-        Authorization: "Bearer " + accessToken,
         Accept: "application/json",
       },
     });
@@ -593,10 +683,9 @@ async function fetchApiJson<T>(path: string, fallbackMessage: string): Promise<T
   }
 
   return dedupeRequest("auth:" + accessToken + ":GET:" + path, async () => {
-    const response = await fetch(apiBaseUrl.replace(/\/$/, "") + path, {
+    const response = await authenticatedFetch(apiBaseUrl.replace(/\/$/, "") + path, {
       cache: "no-store",
       headers: {
-        Authorization: "Bearer " + accessToken,
         Accept: "application/json",
       },
     });
@@ -638,11 +727,10 @@ async function postApiJson<T>(path: string, fallbackMessage: string): Promise<T>
     throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
   }
 
-  const response = await fetch(apiBaseUrl.replace(/\/$/, "") + path, {
+  const response = await authenticatedFetch(apiBaseUrl.replace(/\/$/, "") + path, {
     method: "POST",
     cache: "no-store",
     headers: {
-      Authorization: "Bearer " + accessToken,
       Accept: "application/json",
     },
   });
@@ -667,11 +755,10 @@ async function postJson<T>(
     throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
   }
 
-  const response = await fetch(apiBaseUrl.replace(/\/$/, "") + path, {
+  const response = await authenticatedFetch(apiBaseUrl.replace(/\/$/, "") + path, {
     method: "POST",
     cache: "no-store",
     headers: {
-      Authorization: "Bearer " + accessToken,
       Accept: "application/json",
       "Content-Type": "application/json",
     },
@@ -700,7 +787,6 @@ async function sendApiJson<T>(
   }
 
   const headers: HeadersInit = {
-    Authorization: "Bearer " + accessToken,
     Accept: "application/json",
   };
 
@@ -708,7 +794,7 @@ async function sendApiJson<T>(
     headers["Content-Type"] = "application/json";
   }
 
-  const response = await fetch(apiBaseUrl.replace(/\/$/, "") + path, {
+  const response = await authenticatedFetch(apiBaseUrl.replace(/\/$/, "") + path, {
     method,
     cache: "no-store",
     headers,
@@ -1372,11 +1458,10 @@ export async function createPharmacy(input: CreatePharmacyInput): Promise<Pharma
     adresse,
   };
 
-  const response = await fetch(apiBaseUrl.replace(/\/$/, "") + "/api/pharmacies/", {
+  const response = await authenticatedFetch(apiBaseUrl.replace(/\/$/, "") + "/api/pharmacies/", {
     method: "POST",
     cache: "no-store",
     headers: {
-      Authorization: "Bearer " + accessToken,
       Accept: "application/json",
       "Content-Type": "application/json",
     },
@@ -1411,13 +1496,12 @@ export async function createPharmacyJoinRequest(
     message: input.message || "",
   };
 
-  const response = await fetch(
+  const response = await authenticatedFetch(
     apiBaseUrl.replace(/\/$/, "") + "/api/pharmacies/join-requests/",
     {
       method: "POST",
       cache: "no-store",
       headers: {
-        Authorization: "Bearer " + accessToken,
         Accept: "application/json",
         "Content-Type": "application/json",
       },

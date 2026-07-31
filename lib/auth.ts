@@ -35,6 +35,13 @@ export function getAccessToken() {
   return localStorage.getItem(ACCESS_TOKEN_KEY) || "";
 }
 
+export function getRefreshToken() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+  return localStorage.getItem(REFRESH_TOKEN_KEY) || "";
+}
+
 export function getActivePharmacyId() {
   if (typeof window === "undefined") {
     return "";

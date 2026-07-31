@@ -276,104 +276,6 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section id="contact" className="border-y border-app-border bg-app-surface">
-          <div className="mx-auto max-w-6xl scroll-mt-24 px-4 py-16 sm:px-6 lg:px-8">
-            <div className="mx-auto max-w-2xl">
-              <SectionHeading
-                eyebrow="Contact"
-                title="Contactez-nous"
-                description="Une question sur Kisinet ? Une demande pour une démo ? Remplissez notre formulaire et un expert vous répondra rapidement."
-              />
-              <form
-                action="mailto:contact@kisinet.fr"
-                method="post"
-                encType="text/plain"
-                className="mt-8 grid gap-5"
-              >
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label htmlFor="contact-name" className="block text-sm font-medium text-app-text mb-2">
-                      Nom complet
-                    </label>
-                    <input
-                      id="contact-name"
-                      name="name"
-                      type="text"
-                      required
-                      className="w-full rounded-md border border-app-border bg-app-surface px-4 py-2 text-sm text-app-text focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                      placeholder="Jean Dupont"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="contact-email" className="block text-sm font-medium text-app-text mb-2">
-                      Email professionnel
-                    </label>
-                    <input
-                      id="contact-email"
-                      name="email"
-                      type="email"
-                      required
-                      className="w-full rounded-md border border-app-border bg-app-surface px-4 py-2 text-sm text-app-text focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                      placeholder="contact@pharmacie.fr"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="contact-pharmacy" className="block text-sm font-medium text-app-text mb-2">
-                    Pharmacie / Établissement
-                  </label>
-                  <input
-                    id="contact-pharmacy"
-                    name="pharmacy"
-                    type="text"
-                    className="w-full rounded-md border border-app-border bg-app-surface px-4 py-2 text-sm text-app-text focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                    placeholder="Nom de la pharmacie"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="contact-subject" className="block text-sm font-medium text-app-text mb-2">
-                    Sujet
-                  </label>
-                  <select
-                    id="contact-subject"
-                    name="subject"
-                    className="w-full rounded-md border border-app-border bg-app-surface px-4 py-2 text-sm text-app-text focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                  >
-                    <option value="demo">Demande de démonstration</option>
-                    <option value="pricing">Informations sur les tarifs</option>
-                    <option value="support">Assistance technique</option>
-                    <option value="partnership">Partenariat / Affiliation</option>
-                    <option value="other">Autre</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label htmlFor="contact-message" className="block text-sm font-medium text-app-text mb-2">
-                    Message
-                  </label>
-                  <textarea
-                    id="contact-message"
-                    name="message"
-                    rows={5}
-                    required
-                    className="w-full rounded-md border border-app-border bg-app-surface px-4 py-2 text-sm text-app-text focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                    placeholder="Décrivez votre besoin ou votre question..."
-                  ></textarea>
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-fit self-start rounded-md bg-primary-600 px-6 py-2 text-sm font-semibold text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
-                >
-                  Envoyer le message
-                </button>
-              </form>
-            </div>
-          </div>
-        </section>
-
         <section className="px-4 py-16 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-6xl rounded-lg bg-primary-600 px-6 py-12 text-center text-white sm:px-10">
             <h2 className="text-3xl font-bold">
@@ -397,6 +299,54 @@ export default function HomePage() {
               >
                 Comparer les plans
               </LinkButton>
+            </div>
+          </div>
+        </section>
+
+        {/* Section Contact — coordonnées pour joindre Kisinet */}
+        <section
+          id="contact"
+          className="scroll-mt-24 border-y border-app-border bg-app-surface px-4 py-16 sm:px-6 lg:px-8"
+        >
+          <div className="mx-auto max-w-6xl">
+            <div className="max-w-2xl">
+              <p className="text-sm font-semibold uppercase tracking-wide text-primary-700">
+                Contact
+              </p>
+              <h2 className="mt-3 text-3xl font-bold leading-tight text-app-text">
+                Une question&nbsp;? Contactez-nous
+              </h2>
+              <p className="mt-3 text-sm leading-6 text-app-muted sm:text-base">
+                Notre équipe est disponible pour vous accompagner.
+              </p>
+            </div>
+            <div className="mt-8 grid gap-4">
+              {/* Carte E-mail — coordonnée principale de contact */}
+              <article className="rounded-lg border border-app-border bg-app-card p-5 shadow-sm">
+                <h3 className="text-lg font-bold text-app-text">E-mail</h3>
+                <p className="mt-2 text-sm leading-6 text-app-muted">
+                  <a
+                    href="mailto:contact@kisinet.com"
+                    className="text-primary-700 hover:underline"
+                  >
+                    contact@kisinet.com
+                  </a>
+                </p>
+              </article>
+              {/* Carte Téléphone — coordonnée secondaire de contact */}
+              <article className="rounded-lg border border-app-border bg-app-card p-5 shadow-sm">
+                <h3 className="text-lg font-bold text-app-text">Téléphone</h3>
+                <p className="mt-2 text-sm leading-6 text-app-muted">
+                  +243 000 000 000
+                </p>
+              </article>
+              {/* Carte Adresse — localisation de l'entreprise */}
+              <article className="rounded-lg border border-app-border bg-app-card p-5 shadow-sm">
+                <h3 className="text-lg font-bold text-app-text">Adresse</h3>
+                <p className="mt-2 text-sm leading-6 text-app-muted">
+                  Kinshasa, République Démocratique du Congo
+                </p>
+              </article>
             </div>
           </div>
         </section>
