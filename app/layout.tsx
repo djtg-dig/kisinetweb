@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { SalesChoicesBootstrap } from "@/components/sales/sales-choices-bootstrap";
+import { ThemeProvider } from "@/components/theme/theme-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -18,8 +19,10 @@ export default function RootLayout({
   return (
     <html lang="fr">
       <body>
-        <SalesChoicesBootstrap />
-        {children}
+        <ThemeProvider>
+          <SalesChoicesBootstrap />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

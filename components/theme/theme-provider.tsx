@@ -2,36 +2,43 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 
-type Theme = "light" | "dark";
+type Theme = "light" | "dark" | "system";
 
 const THEME_KEY = "kisinet:theme";
 
 type ThemeContextValue = {
   theme: Theme;
-  toggleTheme: () => void;
+  setTheme: (theme: Theme) => void;
 };
 
 const ThemeContext = createContext<ThemeContextValue>({
-  theme: "light",
-  toggleTheme: () => {},
+  theme: "system",
+  setTheme: () => {},
 });
 
-function getSystemTheme(): Theme {
+function getSystemTheme(): "light" | "dark" {
   if (typeof window === "undefined") {
     return "light";
   }
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
+function resolveTheme(theme: Theme): "light" | "dark" {
+  if (theme === "system") {
+    return getSystemTheme();
+  }
+  return theme;
+}
+
 function readStoredTheme(): Theme {
   if (typeof window === "undefined") {
-    return "light";
+    return "system";
   }
   const stored = window.localStorage.getItem(THEME_KEY);
-  if (stored === "dark" || stored === "light") {
+  if (stored === "light" || stored === "dark" || stored === "system") {
     return stored;
   }
-  return getSystemTheme();
+  return "system";
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
@@ -39,8 +46,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const root = document.documentElement;
+    const resolved = resolveTheme(theme);
     root.classList.remove("dark");
-    if (theme === "dark") {
+    if (resolved === "dark") {
       root.classList.add("dark");
     }
     window.localStorage.setItem(THEME_KEY, theme);
@@ -49,21 +57,20 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
     function handleSystemChange() {
-      const stored = window.localStorage.getItem(THEME_KEY);
-      if (!stored) {
-        setTheme(media.matches ? "dark" : "light");
+      if (theme === "system") {
+        const root = document.documentElement;
+        root.classList.remove("dark");
+        if (media.matches) {
+          root.classList.add("dark");
+        }
       }
     }
     media.addEventListener("change", handleSystemChange);
     return () => media.removeEventListener("change", handleSystemChange);
-  }, []);
-
-  function toggleTheme() {
-    setTheme((current) => (current === "dark" ? "light" : "dark"));
-  }
+  }, [theme]);
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, setTheme }}>
       {children}
     </ThemeContext.Provider>
   );

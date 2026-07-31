@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { LinkButton } from "@/components/ui/link-button";
 import { SiteFooter } from "@/components/layout/site-footer";
+import { ThemeSwitcher } from "@/components/theme/theme-switcher";
 import { getUserPharmacies, type PharmacySummary } from "@/lib/api";
 import { carriAccountLoginUrl } from "@/lib/carri-account";
 import { getAccessToken, getActivePharmacyId, logout, saveTokensFromUrlHash } from "@/lib/auth";
@@ -34,6 +35,10 @@ export function PublicLayout({ children, activePharmacy = null }: PublicLayoutPr
       {children}
 
       <SiteFooter />
+
+      <div className="fixed bottom-4 left-4 z-40">
+        <ThemeSwitcher />
+      </div>
     </div>
   );
 }
