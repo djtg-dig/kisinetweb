@@ -12,9 +12,12 @@ const themes = [
 export function ThemeSwitcher({ className }: { className?: string }) {
   const { theme, setTheme } = useTheme();
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const current = themes.find((item) => item.value === theme) ?? themes[2];
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -27,6 +30,8 @@ export function ThemeSwitcher({ className }: { className?: string }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open]);
 
+  const current = themes.find((item) => item.value === theme) ?? themes[2];
+
   return (
     <div className={`relative ${className ?? ""}`} ref={menuRef}>
       <button
@@ -38,10 +43,10 @@ export function ThemeSwitcher({ className }: { className?: string }) {
         title="Changer le thème"
         className="inline-flex items-center justify-center rounded-full border border-app-border bg-app-card p-2 shadow-sm transition hover:bg-app-surface"
       >
-        <span aria-hidden="true">{current.icon}</span>
+        <span aria-hidden="true">{mounted ? current.icon : "💻"}</span>
       </button>
 
-      {open && (
+      {open && mounted && (
         <div
           role="menu"
           className="absolute bottom-full left-0 mb-2 w-40 overflow-hidden rounded-lg border border-app-border bg-app-card py-1 shadow-sm"
