@@ -38,7 +38,7 @@ export default function AccountProfilePage() {
         <div className="mx-auto flex max-w-6xl flex-col gap-5 px-4 py-8 sm:px-6 lg:px-8">
           <div>
             <p className="text-sm font-semibold text-primary-700">Compte</p>
-            <h1 className="mt-2 text-3xl font-bold text-app-text">Mon profil</h1>
+            <h1 className="mt-2 text-3xl font-bold text-app-text">Mon compte</h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-app-muted">
               Informations d'identité associées à votre compte Kisinet connecté.
             </p>

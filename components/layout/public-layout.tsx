@@ -222,7 +222,7 @@ function UserMenu({
             Créer une pharmacie
           </MenuLink>
           <MenuLink href="/app/profile" onClose={onClose}>
-            Mon profil
+            Mon compte
           </MenuLink>
           <MenuLink href="/app/referrals" onClose={onClose}>
             Parrainage

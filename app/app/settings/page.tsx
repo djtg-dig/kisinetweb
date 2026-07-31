@@ -132,7 +132,7 @@ export default function AccountSettingsPage() {
                 <div className="mt-5 grid gap-3">
                   <SettingsLink
                     href="/app/profile"
-                    title="Mon profil"
+                    title="Compte"
                     description="Consulter les informations de votre compte."
                   />
                   <SettingsLink
