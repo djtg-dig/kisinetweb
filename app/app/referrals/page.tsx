@@ -488,20 +488,29 @@ function ReferralTables({
         )}
       </ListSection>
 
-      <ListSection title="Pharmacies parrainées">
-        {pharmacies.length ? (
-          pharmacies.slice(0, 6).map((pharmacy) => (
-            <ListRow
-              key={pharmacy.id}
-              title={pharmacy.pharmacy_name}
-              meta={pharmacy.pharmacy_reference + " · " + pharmacy.status}
-              value={pharmacy.referral_code || "Code non renseigné"}
-            />
-          ))
-        ) : (
-          <EmptyLine label="Aucune pharmacie parrainée." />
-        )}
-      </ListSection>
+      <div className="flex items-center justify-between">
+        <ListSection title="Pharmacies parrainées" className="flex-1">
+          {pharmacies.length ? (
+            pharmacies.slice(0, 6).map((pharmacy) => (
+              <ListRow
+                key={pharmacy.id}
+                title={pharmacy.pharmacy_name}
+                meta={pharmacy.pharmacy_reference + " · " + pharmacy.status}
+                value={pharmacy.referral_code || "Code non renseigné"}
+              />
+            ))
+          ) : (
+            <EmptyLine label="Aucune pharmacie parrainée." />
+          )}
+        </ListSection>
+        <LinkButton
+          href="/app/referrals/pharmacies"
+          className="ml-4 whitespace-nowrap"
+          variant="secondary"
+        >
+          Voir tout
+        </LinkButton>
+      </div>
     </div>
   );
 }
@@ -515,9 +524,9 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ListSection({ title, children }: { title: string; children: React.ReactNode }) {
+function ListSection({ title, children, className }: { title: string; children: React.ReactNode; className?: string }) {
   return (
-    <section className="rounded-lg border border-app-border bg-app-card p-6 shadow-sm">
+    <section className={`rounded-lg border border-app-border bg-app-card p-6 shadow-sm ${className || ""}`}>
       <h2 className="text-xl font-bold text-app-text">{title}</h2>
       <div className="mt-4 divide-y divide-app-border">{children}</div>
     </section>
