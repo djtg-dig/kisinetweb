@@ -5,6 +5,7 @@ import { MainLayout } from "@/components/layout/main-layout";
 import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/ui/link-button";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
+import { ThemeSwitcher } from "@/components/theme/theme-switcher";
 import { getUserPharmacies, type PharmacySummary } from "@/lib/api";
 import {
   createReferralPayoutAccount,
@@ -114,7 +115,12 @@ export default function AccountSettingsPage() {
                 <div className="mt-5 grid gap-3 sm:grid-cols-2">
                   <InfoTile label="Langue" value="Français" />
                   <InfoTile label="Connexion" value="Carri Account" />
-                  <InfoTile label="Thème" value="Compatible clair et sombre" />
+                  <div className="rounded-md border border-app-border bg-app-surface px-4 py-3">
+                    <p className="text-xs font-semibold text-app-muted">Thème</p>
+                    <div className="mt-2">
+                      <ThemeSwitcher />
+                    </div>
+                  </div>
                   <InfoTile label="Espace actif" value={activePharmacyId || "Non sélectionné"} />
                 </div>
               </section>
