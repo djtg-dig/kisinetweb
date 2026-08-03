@@ -12,7 +12,7 @@ type ThemeContextValue = {
 };
 
 const ThemeContext = createContext<ThemeContextValue>({
-  theme: "dark",
+  theme: "system",
   setTheme: () => {},
 });
 
@@ -32,13 +32,13 @@ function resolveTheme(theme: Theme): "light" | "dark" {
 
 function readStoredTheme(): Theme {
   if (typeof window === "undefined") {
-    return "dark";
+    return "system";
   }
   const stored = window.localStorage.getItem(THEME_KEY);
   if (stored === "light" || stored === "dark" || stored === "system") {
     return stored;
   }
-  return "dark";
+  return "system";
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {

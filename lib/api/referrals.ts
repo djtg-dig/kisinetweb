@@ -33,6 +33,14 @@ export type ReferredPharmacy = {
   referral_code: string;
   status: string;
   created_at: string;
+  subscription_status: string | null;
+  subscription_is_trial: boolean;
+  subscription_is_active: boolean;
+  subscription_plan_name: string | null;
+  subscription_expires_at: string | null;
+  total_commissions_earned: string;
+  total_payments: string;
+  pharmacy_devise: string;
 };
 
 export type ReferralCommission = {
