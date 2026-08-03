@@ -330,7 +330,7 @@ function WithdrawalRequestDialog({
 
           <div className="space-y-4">
             <label className="block text-sm font-semibold text-app-text">
-              Montant
+              Montant en USD
               <input
                 value={amount}
                 onChange={(event) => onAmountChange(event.target.value)}
@@ -341,22 +341,6 @@ function WithdrawalRequestDialog({
               />
             </label>
 
-            <label className="block text-sm font-semibold text-app-text">
-              Devise
-              <select
-                value={currency}
-                onChange={(event) => onCurrencyChange(event.target.value)}
-                className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
-              >
-                {(wallets.length ? wallets : [{ currency: "USD" } as ReferralWalletSummary]).map(
-                  (wallet) => (
-                    <option key={wallet.currency} value={wallet.currency}>
-                      {wallet.currency}
-                    </option>
-                  ),
-                )}
-              </select>
-            </label>
 
             <label className="block text-sm font-semibold text-app-text">
               Compte de retrait
@@ -488,29 +472,32 @@ function ReferralTables({
         )}
       </ListSection>
 
-      <div className="flex items-center justify-between">
-        <ListSection title="Pharmacies parrainées" className="flex-1">
-          {pharmacies.length ? (
-            pharmacies.slice(0, 6).map((pharmacy) => (
-              <ListRow
-                key={pharmacy.id}
-                title={pharmacy.pharmacy_name}
-                meta={pharmacy.pharmacy_reference + " · " + pharmacy.status}
-                value={pharmacy.referral_code || "Code non renseigné"}
-              />
-            ))
-          ) : (
-            <EmptyLine label="Aucune pharmacie parrainée." />
-          )}
-        </ListSection>
-        <LinkButton
-          href="/app/referrals/pharmacies"
-          className="ml-4 whitespace-nowrap"
-          variant="secondary"
-        >
-          Voir tout
-        </LinkButton>
-      </div>
+      <ListSection
+        title="Pharmacies parrainées"
+        className="flex-1"
+        action={
+          <LinkButton
+            href="/app/referrals/pharmacies"
+            className="whitespace-nowrap"
+            variant="secondary"
+          >
+            Voir tout
+          </LinkButton>
+        }
+      >
+        {pharmacies.length ? (
+          pharmacies.slice(0, 6).map((pharmacy) => (
+            <ListRow
+              key={pharmacy.id}
+              title={pharmacy.pharmacy_name}
+              meta={pharmacy.pharmacy_reference + " · " + pharmacy.status}
+              value={pharmacy.referral_code || "Code non renseigné"}
+            />
+          ))
+        ) : (
+          <EmptyLine label="Aucune pharmacie parrainée." />
+        )}
+      </ListSection>
     </div>
   );
 }
@@ -524,10 +511,13 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ListSection({ title, children, className }: { title: string; children: React.ReactNode; className?: string }) {
+function ListSection({ title, children, className, action }: { title: string; children: React.ReactNode; className?: string; action?: React.ReactNode }) {
   return (
     <section className={`rounded-lg border border-app-border bg-app-card p-6 shadow-sm ${className || ""}`}>
-      <h2 className="text-xl font-bold text-app-text">{title}</h2>
+      <div className="flex items-start justify-between gap-3">
+        <h2 className="text-xl font-bold text-app-text">{title}</h2>
+        {action}
+      </div>
       <div className="mt-4 divide-y divide-app-border">{children}</div>
     </section>
   );

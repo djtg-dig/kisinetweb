@@ -257,46 +257,35 @@ function PayoutAccountPanel({
       </p>
 
       <form onSubmit={handleSubmit} className="mt-5 grid gap-4 sm:grid-cols-2">
-        <label className="block text-sm font-semibold text-app-text">
-          Devise
-          <input
-            value={currency}
-            onChange={(event) => setCurrency(event.target.value.toUpperCase())}
-            maxLength={3}
-            required
-            className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
-          />
-        </label>
 
         <label className="block text-sm font-semibold text-app-text">
-          Prestataire
-          <select
-            value={provider}
-            onChange={(event) => setProvider(event.target.value)}
-            className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
-          >
-            <option value="AGREGATEUR">agrégateur</option>
-            <option value="MOBILE_MONEY">Mobile Money</option>
-            <option value="OTHER">Autre</option>
-          </select>
-        </label>
-
-        <label className="block text-sm font-semibold text-app-text">
-          Moyen
+          Systeme de paiement
           <select
             value={paymentMethod}
             onChange={(event) => setPaymentMethod(event.target.value)}
             className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
           >
             <option value="MOBILE_MONEY">Mobile Money</option>
-            <option value="AGREGATEUR">agrégateur</option>
             <option value="BANK_TRANSFER">Virement bancaire</option>
+          </select>
+        </label>
+
+          <label className="block text-sm font-semibold text-app-text">
+          Prestataire
+          <select
+            value={provider}
+            onChange={(event) => setProvider(event.target.value)}
+            className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
+          >
+            <option value="AGREGATEUR">M-pesa</option>
+            <option value="AGREGATEUR">Orange money</option>
+            <option value="MOBILE_MONEY">....</option>
             <option value="OTHER">Autre</option>
           </select>
         </label>
 
         <label className="block text-sm font-semibold text-app-text">
-          Opérateur
+          Numero du Compte
           <input
             value={operator}
             onChange={(event) => setOperator(event.target.value)}
