@@ -153,6 +153,41 @@ export type AdminReferralWithdrawalsPage = {
   results: AdminReferralWithdrawal[];
 };
 
+export type AdminPaymentProvider = {
+  id: number;
+  name?: string;
+  code?: string;
+  slug?: string;
+  display_name?: string;
+  is_active?: boolean;
+  is_default?: boolean;
+  created_at?: string;
+  updated_at?: string;
+  [key: string]: unknown;
+};
+
+export type AdminPaymentProvidersResponse =
+  | AdminPaymentProvider[]
+  | {
+      count?: number;
+      next?: string | null;
+      previous?: string | null;
+      results?: AdminPaymentProvider[];
+    };
+
+// Charge la liste des fournisseurs de paiement accessibles depuis l'interface admin.
+export async function getAdminPaymentProviders(): Promise<AdminPaymentProvider[]> {
+  const data = await fetchAdminJson<AdminPaymentProvidersResponse>(
+    "/api/admin/payment-providers/",
+  );
+
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  return Array.isArray(data.results) ? data.results : [];
+}
+
 export async function loginAdmin(email: string, password: string): Promise<AdminLoginResponse> {
   const data = await fetchAdminJson<AdminLoginResponse>("/api/admin/auth/login/", {
     method: "POST",
