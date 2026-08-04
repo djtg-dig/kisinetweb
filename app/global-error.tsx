@@ -2,6 +2,7 @@
 
 import "./error-globals.css";
 import { AppErrorScreen } from "@/components/app-error-screen";
+import { ThemeProvider } from "@/components/theme/theme-provider";
 
 type GlobalErrorPageProps = {
   error: Error & { digest?: string };
@@ -13,7 +14,9 @@ export default function GlobalErrorPage({ error, reset }: GlobalErrorPageProps) 
   return (
     <html lang="fr" suppressHydrationWarning>
       <body>
-        <AppErrorScreen error={error} reset={reset} />
+        <ThemeProvider>
+          <AppErrorScreen error={error} reset={reset} />
+        </ThemeProvider>
       </body>
     </html>
   );

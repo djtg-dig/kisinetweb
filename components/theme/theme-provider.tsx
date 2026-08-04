@@ -98,8 +98,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   if (!isHydrated) {
     return (
       <ThemeContext.Provider value={{ theme: "system", setTheme }}>
-        <div className="fixed inset-0 bg-background dark:bg-app-background transition-colors duration-300" />
-        <div className="absolute inset-0 -z-10">{children}</div>
+        {children}
       </ThemeContext.Provider>
     );
   }
