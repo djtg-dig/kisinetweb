@@ -1,6 +1,6 @@
 "use client";
 
-import "./error-globals.css";
+import "./globals.css";
 import { AppErrorScreen } from "@/components/app-error-screen";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 
