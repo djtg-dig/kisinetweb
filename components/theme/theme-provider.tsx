@@ -41,50 +41,65 @@ function readStoredTheme(): Theme {
   return "system";
 }
 
+function applyTheme(theme: Theme) {
+  const root = document.documentElement;
+  const resolved = resolveTheme(theme);
+  if (resolved === "dark") {
+    root.classList.add("dark");
+  } else {
+    root.classList.remove("dark");
+  }
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>("system");
-  const [mounted, setMounted] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
     const storedTheme = readStoredTheme();
     setTheme(storedTheme);
-    setMounted(true);
+    setIsHydrated(true);
+    applyTheme(storedTheme);
   }, []);
 
   useEffect(() => {
-    if (!mounted) return;
+    if (!isHydrated) return;
 
     const root = document.documentElement;
-    const resolved = resolveTheme(theme);
-    root.classList.remove("dark");
-    if (resolved === "dark") {
-      root.classList.add("dark");
-    }
-    window.localStorage.setItem(THEME_KEY, theme);
-  }, [theme, mounted]);
-
-  useEffect(() => {
-    if (!mounted) return;
-
     const media = window.matchMedia("(prefers-color-scheme: dark)");
-    function handleSystemChange() {
-      if (theme === "system") {
-        const root = document.documentElement;
-        root.classList.remove("dark");
-        if (media.matches) {
-          root.classList.add("dark");
-        }
-      }
-    }
-    media.addEventListener("change", handleSystemChange);
-    return () => media.removeEventListener("change", handleSystemChange);
-  }, [theme, mounted]);
 
-  // Éviter le flash de thème en attendant le montage
-  if (!mounted) {
+    const updateTheme = () => {
+      applyTheme(theme);
+    };
+
+    updateTheme();
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === THEME_KEY && e.newValue !== null) {
+        setTheme(e.newValue as Theme);
+        applyTheme(e.newValue as Theme);
+      }
+    };
+    window.addEventListener("storage", handleStorageChange);
+
+    const handleSystemChange = () => {
+      if (theme === "system") {
+        updateTheme();
+      }
+    };
+    media.addEventListener("change", handleSystemChange);
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      media.removeEventListener("change", handleSystemChange);
+    };
+  }, [theme, isHydrated]);
+
+  if (!isHydrated) {
     return (
       <ThemeContext.Provider value={{ theme: "system", setTheme }}>
-        <div style={{ visibility: "hidden" }}>{children}</div>
+        <div className="fixed inset-0 bg-background dark:bg-app-background transition-colors duration-300" />
+        <div className="absolute inset-0 -z-10">{children}</div>
       </ThemeContext.Provider>
     );
   }

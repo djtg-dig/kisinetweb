@@ -12,6 +12,11 @@ import { getAccessToken, getActivePharmacyId, logout, saveTokensFromUrlHash } fr
 type PublicLayoutProps = {
   children: React.ReactNode;
   activePharmacy?: PharmacySummary | null;
+  userData?: {
+    isLoggedIn: boolean;
+    contextPharmacy: PharmacySummary | null;
+    pharmacies: PharmacySummary[];
+  };
 };
 
 const navLinks = [
@@ -22,34 +27,21 @@ const navLinks = [
   { label: "Contact", href: "/#contact" },
 ];
 
-type UserMenuState = {
-  isLoggedIn: boolean;
-  contextPharmacy: PharmacySummary | null;
-};
-
-export function PublicLayout({ children, activePharmacy = null }: PublicLayoutProps) {
-  return (
-    <div className="min-h-screen bg-app-background pt-[77px] text-app-text">
-      <PublicNavbar activePharmacy={activePharmacy} />
-
-      {children}
-
-      <SiteFooter />
-
-      <div className="fixed bottom-4 left-4 z-40">
-        <ThemeSwitcher />
-      </div>
-    </div>
-  );
-}
-
-function PublicNavbar({ activePharmacy = null }: { activePharmacy?: PharmacySummary | null }) {
-  const [userMenu, setUserMenu] = useState<UserMenuState>({
-    isLoggedIn: false,
-    contextPharmacy: activePharmacy,
+export function PublicLayout({ children, activePharmacy = null, userData: initialUserData }: PublicLayoutProps) {
+  const [isMounted, setIsMounted] = useState(false);
+  const [userMenu, setUserMenu] = useState<{
+    isLoggedIn: boolean;
+    contextPharmacy: PharmacySummary | null;
+  }>({
+    isLoggedIn: initialUserData?.isLoggedIn ?? false,
+    contextPharmacy: initialUserData?.contextPharmacy ?? activePharmacy ?? null,
   });
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -66,22 +58,20 @@ function PublicNavbar({ activePharmacy = null }: { activePharmacy?: PharmacySumm
         return;
       }
 
-      if (activePharmacy) {
+      if (activePharmacy || initialUserData?.contextPharmacy) {
         if (isMounted) {
-          setUserMenu({ isLoggedIn: true, contextPharmacy: activePharmacy });
+          setUserMenu({ 
+            isLoggedIn: true, 
+            contextPharmacy: activePharmacy ?? initialUserData?.contextPharmacy ?? null 
+          });
         }
         return;
       }
 
-      if (isMounted) {
-        setUserMenu({ isLoggedIn: true, contextPharmacy: null });
-      }
-
       try {
         const pharmacies = await getUserPharmacies();
-        if (!isMounted) {
-          return;
-        }
+        if (!isMounted) return;
+        
         const lastPharmacyId = getActivePharmacyId();
         const lastPharmacy = pharmacies.find(
           (pharmacy) => pharmacy.id === lastPharmacyId,
@@ -103,14 +93,83 @@ function PublicNavbar({ activePharmacy = null }: { activePharmacy?: PharmacySumm
     return () => {
       isMounted = false;
     };
-  }, [activePharmacy]);
+  }, [activePharmacy, initialUserData?.contextPharmacy]);
 
   useEffect(() => {
     function closeMenuOnOutsideClick(event: MouseEvent) {
       if (!menuRef.current || menuRef.current.contains(event.target as Node)) {
         return;
       }
+      setIsMenuOpen(false);
+    }
 
+    document.addEventListener("mousedown", closeMenuOnOutsideClick);
+    return () => {
+      document.removeEventListener("mousedown", closeMenuOnOutsideClick);
+    };
+  }, []);
+
+  if (!isMounted) {
+    return (
+      <div className="min-h-screen bg-app-background pt-[77px] text-app-text">
+        <div className="fixed inset-x-0 top-0 z-20 border-b border-app-border bg-app-surface/95">
+          <nav className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-md bg-white">
+                <Image
+                  src="/kisinet-logo.png"
+                  alt=""
+                  width={40}
+                  height={40}
+                  className="h-full w-full object-contain"
+                  priority
+                />
+              </span>
+              <span className="text-lg font-bold text-app-text">Kisinet</span>
+            </div>
+          </nav>
+        </div>
+        <main className="min-h-screen bg-app-background pt-[77px] text-app-text">
+          {children}
+        </main>
+        <SiteFooter />
+        <div className="fixed bottom-4 left-4 z-40">
+          <ThemeSwitcher />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-app-background pt-[77px] text-app-text">
+      <PublicNavbar activePharmacy={activePharmacy} userMenu={userMenu} onMenuToggle={() => setIsMenuOpen((current) => !current)} />
+
+      {children}
+
+      <SiteFooter />
+
+      <div className="fixed bottom-4 left-4 z-40">
+        <ThemeSwitcher />
+      </div>
+    </div>
+  );
+}
+
+type PublicNavbarProps = {
+  activePharmacy?: PharmacySummary | null;
+  userMenu: { isLoggedIn: boolean; contextPharmacy: PharmacySummary | null };
+  onMenuToggle: () => void;
+};
+
+function PublicNavbar({ activePharmacy, userMenu, onMenuToggle }: PublicNavbarProps) {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function closeMenuOnOutsideClick(event: MouseEvent) {
+      if (!menuRef.current || menuRef.current.contains(event.target as Node)) {
+        return;
+      }
       setIsMenuOpen(false);
     }
 
@@ -171,13 +230,7 @@ type UserMenuProps = {
   onClose: () => void;
 };
 
-function UserMenu({
-  contextPharmacy,
-  isOpen,
-  menuRef,
-  onToggle,
-  onClose,
-}: UserMenuProps) {
+function UserMenu({ contextPharmacy, isOpen, menuRef, onToggle, onClose }: UserMenuProps) {
   const dashboardHref = contextPharmacy
     ? "/app/pharmacies/" + contextPharmacy.id + "/dashboard"
     : "";
@@ -229,12 +282,6 @@ function UserMenu({
           <MenuLink href="/app/compte" onClose={onClose}>
             Mon compte
           </MenuLink>
-          {/* <MenuLink href="/app/subscription" onClose={onClose}>
-            Mon abonnement
-          </MenuLink> */}
-          <MenuLink href="/app/settings" onClose={onClose}>
-            Paramètres
-          </MenuLink>
           <MenuLink href="/help" onClose={onClose}>
             Aide
           </MenuLink>
@@ -270,25 +317,5 @@ function MenuLink({
     >
       {children}
     </a>
-  );
-}
-
-type FooterLinksProps = {
-  title: string;
-  links: { label: string; href: string }[];
-};
-
-function FooterLinks({ title, links }: FooterLinksProps) {
-  return (
-    <div>
-      <p className="font-semibold text-app-text">{title}</p>
-      <div className="mt-3 grid gap-2 text-sm text-app-muted">
-        {links.map((link) => (
-          <a key={link.label} href={link.href} className="hover:text-primary-700">
-            {link.label}
-          </a>
-        ))}
-      </div>
-    </div>
   );
 }

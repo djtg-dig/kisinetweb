@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { getPharmacyPermissions, type PharmacyPermissions } from "@/lib/api";
 import { clearActivePharmacyId, logout, setActivePharmacyId } from "@/lib/auth";
@@ -10,16 +10,14 @@ import { clearActivePharmacyId, logout, setActivePharmacyId } from "@/lib/auth";
 type AppLayoutProps = {
   children: React.ReactNode;
   pharmacyId: string;
+  permissions?: PharmacyPermissions;
 };
 
-// Chaque objet décrit un onglet de la navbar. `permission` est optionnel :
-// sans permission, l'onglet reste toujours cliquable.
 const appNavItems = [
   { label: "Dashboard", path: "/dashboard" },
   { label: "Produits", path: "/products", permission: "product_view" },
   { label: "Stock", path: "/stock", permission: "stock_view" },
   { label: "Ventes", path: "/sales", permission: "sale_view" },
-  // Les factures restent rattachées au domaine des ventes tant qu'il n'existe pas de permission dédiée.
   { label: "Facture", path: "/invoices", permission: "sale_view" },
   { label: "Rapports", path: "/reports" },
   { label: "Notification", path: "/notifications", icon: "bell", permission: "join_request_view" },
@@ -31,33 +29,29 @@ const appNavItems = [
   permission?: keyof PharmacyPermissions;
 }[];
 
-const disabledNavTitle =
-  "Vous n'avez pas la permission d'accéder à cette section dans cette pharmacie.";
+const disabledNavTitle = "Vous n'avez pas la permission d'accéder à cette section dans cette pharmacie.";
 
-export function AppLayout({ children, pharmacyId }: AppLayoutProps) {
+export function AppLayout({ children, pharmacyId, permissions: initialPermissions }: AppLayoutProps) {
+  const [permissions, setPermissions] = useState<PharmacyPermissions>(initialPermissions ?? {});
+  const [isMounted, setIsMounted] = useState(false);
+  const [shouldRedirect, setShouldRedirect] = useState(false);
+  const router = useRouter();
+
   useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!pharmacyId) return;
     setActivePharmacyId(pharmacyId);
   }, [pharmacyId]);
-
-  return (
-    <div className="min-h-screen overflow-x-hidden bg-app-background pt-16 text-app-text lg:pt-[72px]">
-      <AppNavbar pharmacyId={pharmacyId} />
-      <div className="relative z-0 flex min-h-[calc(100vh-4rem)] flex-col lg:min-h-[calc(100vh-4.5rem)]">
-        <div className="flex-1">{children}</div>
-        <SiteFooter />
-      </div>
-    </div>
-  );
-}
-
-function AppNavbar({ pharmacyId }: { pharmacyId: string }) {
-  const basePath = "/app/pharmacies/" + pharmacyId;
-  const [permissions, setPermissions] = useState<PharmacyPermissions>({});
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadPermissions() {
+      if (!pharmacyId) return;
+      
       try {
         const currentPermissions = await getPharmacyPermissions(pharmacyId);
         if (isMounted) {
@@ -77,6 +71,51 @@ function AppNavbar({ pharmacyId }: { pharmacyId: string }) {
     };
   }, [pharmacyId]);
 
+  if (!isMounted) {
+    return (
+      <div className="min-h-screen overflow-x-hidden bg-app-background pt-16 text-app-text lg:pt-[72px]">
+        <div className="flex h-16 w-full items-center justify-center border-b border-app-border bg-app-surface lg:h-[72px]">
+          <div className="text-app-muted">Chargement...</div>
+        </div>
+        <div className="flex min-h-[calc(100vh-4rem)] flex-col lg:min-h-[calc(100vh-4.5rem)]">
+          <div className="flex-1">{children}</div>
+          <SiteFooter />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen overflow-x-hidden bg-app-background pt-16 text-app-text lg:pt-[72px]">
+      <AppNavbar pharmacyId={pharmacyId} permissions={permissions} />
+      <div className="relative z-0 flex min-h-[calc(100vh-4rem)] flex-col lg:min-h-[calc(100vh-4.5rem)]">
+        <div className="flex-1">{children}</div>
+        <SiteFooter />
+      </div>
+    </div>
+  );
+}
+
+function AppNavbar({ pharmacyId, permissions }: { pharmacyId: string; permissions: PharmacyPermissions }) {
+  const basePath = "/app/pharmacies/" + pharmacyId;
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
+
+  useEffect(() => {
+    function closeMenuOnOutsideClick(event: MouseEvent) {
+      if (!menuRef.current || menuRef.current.contains(event.target as Node)) {
+        return;
+      }
+      setIsUserMenuOpen(false);
+    }
+
+    document.addEventListener("mousedown", closeMenuOnOutsideClick);
+    return () => {
+      document.removeEventListener("mousedown", closeMenuOnOutsideClick);
+    };
+  }, []);
+
   return (
     <header className="fixed left-0 right-0 top-0 z-[1000] h-16 w-full border-b border-app-border bg-app-surface shadow-sm lg:h-[72px]">
       <nav className="mx-auto flex h-full max-w-7xl items-center justify-between gap-3 px-3 pr-24 sm:px-6 sm:pr-28 lg:px-8">
@@ -94,21 +133,14 @@ function AppNavbar({ pharmacyId }: { pharmacyId: string }) {
           <span className="truncate text-base font-bold text-app-text sm:text-lg">Kisinet</span>
         </a>
 
-        <DesktopNav basePath={basePath} permissions={permissions} />
-        <MobileNav basePath={basePath} permissions={permissions} />
+        <DesktopNav basePath={basePath} permissions={permissions} pathname={pathname} />
+        <MobileNav basePath={basePath} permissions={permissions} pathname={pathname} />
       </nav>
     </header>
   );
 }
 
-function DesktopNav({
-  basePath,
-  permissions,
-}: {
-  basePath: string;
-  permissions: PharmacyPermissions;
-}) {
-  const pathname = usePathname();
+function DesktopNav({ basePath, permissions, pathname }: { basePath: string; permissions: PharmacyPermissions; pathname: string }) {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -117,7 +149,6 @@ function DesktopNav({
       if (!menuRef.current || menuRef.current.contains(event.target as Node)) {
         return;
       }
-
       setIsUserMenuOpen(false);
     }
 
@@ -171,13 +202,7 @@ function DesktopNav({
   );
 }
 
-function MobileNav({
-  basePath,
-  permissions,
-}: {
-  basePath: string;
-  permissions: PharmacyPermissions;
-}) {
+function MobileNav({ basePath, permissions, pathname }: { basePath: string; permissions: PharmacyPermissions; pathname: string }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -186,7 +211,6 @@ function MobileNav({
       if (!menuRef.current || menuRef.current.contains(event.target as Node)) {
         return;
       }
-
       setIsMenuOpen(false);
     }
 
@@ -274,9 +298,6 @@ function MenuPanel({
       <MenuLink href="/app/select-pharmacy" onClose={onClose}>
         Mes pharmacies
       </MenuLink>
-      {/* <MenuLink href="/app/subscription" onClose={onClose}>
-        Mon abonnement
-      </MenuLink> */}
       <MenuLink href="/help" onClose={onClose}>
         Aide
       </MenuLink>
