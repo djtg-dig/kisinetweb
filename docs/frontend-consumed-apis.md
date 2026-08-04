@@ -70,6 +70,8 @@ Endpoints consommés:
 | Liste abonnements admin | `GET /api/admin/subscriptions/?search=...&reference=...&plan_code=...&status=...&page=...` | Oui, admin `is_staff` |
 | Liste retraits parrainage admin | `GET /api/admin/referral-withdrawals/?search=...&status=...&currency=...&page=...` | Oui, admin `is_staff` |
 | Liste fournisseurs paiement admin | `GET /api/admin/payment-providers/` | Oui, admin `is_staff` |
+| Mise à jour fournisseur paiement admin | `PATCH /api/admin/payment-providers/{id}/` | Oui, admin `is_staff` |
+| Suppression fournisseur paiement admin | `DELETE /api/admin/payment-providers/{id}/` | Oui, admin `is_staff` |
 | Action retrait parrainage admin | `POST /api/admin/referral-withdrawals/{reference}/{action}/` | Oui, admin `is_staff` |
 
 Le frontend utilise des clés de stockage séparées pour les tokens admin. La

@@ -159,6 +159,7 @@ export type AdminPaymentProvider = {
   code?: string;
   slug?: string;
   display_name?: string;
+  country?: string | null;
   is_active?: boolean;
   is_default?: boolean;
   created_at?: string;
@@ -186,6 +187,24 @@ export async function getAdminPaymentProviders(): Promise<AdminPaymentProvider[]
   }
 
   return Array.isArray(data.results) ? data.results : [];
+}
+
+// Met à jour partiellement un fournisseur de paiement via l'API admin.
+export async function patchAdminPaymentProvider(
+  id: number,
+  payload: Partial<AdminPaymentProvider>,
+): Promise<AdminPaymentProvider> {
+  return fetchAdminJson<AdminPaymentProvider>(`/api/admin/payment-providers/${id}/`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+// Supprime un fournisseur de paiement depuis l'interface admin.
+export async function deleteAdminPaymentProvider(id: number): Promise<void> {
+  await fetchAdminJson<void>(`/api/admin/payment-providers/${id}/`, {
+    method: "DELETE",
+  });
 }
 
 export async function loginAdmin(email: string, password: string): Promise<AdminLoginResponse> {
