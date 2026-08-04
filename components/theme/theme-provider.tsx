@@ -42,9 +42,18 @@ function readStoredTheme(): Theme {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>(readStoredTheme);
+  const [theme, setTheme] = useState<Theme>("system");
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    const storedTheme = readStoredTheme();
+    setTheme(storedTheme);
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+
     const root = document.documentElement;
     const resolved = resolveTheme(theme);
     root.classList.remove("dark");
@@ -52,9 +61,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       root.classList.add("dark");
     }
     window.localStorage.setItem(THEME_KEY, theme);
-  }, [theme]);
+  }, [theme, mounted]);
 
   useEffect(() => {
+    if (!mounted) return;
+
     const media = window.matchMedia("(prefers-color-scheme: dark)");
     function handleSystemChange() {
       if (theme === "system") {
@@ -67,7 +78,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
     media.addEventListener("change", handleSystemChange);
     return () => media.removeEventListener("change", handleSystemChange);
-  }, [theme]);
+  }, [theme, mounted]);
+
+  // Éviter le flash de thème en attendant le montage
+  if (!mounted) {
+    return (
+      <ThemeContext.Provider value={{ theme: "system", setTheme }}>
+        <div style={{ visibility: "hidden" }}>{children}</div>
+      </ThemeContext.Provider>
+    );
+  }
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme }}>
