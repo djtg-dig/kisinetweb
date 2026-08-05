@@ -348,32 +348,6 @@ export default function AdminUserPaymentAccountsManagementPage() {
     }
   }
 
-  // Raccourci pour désactiver/activer sans recharger toute la liste.
-  async function toggleActiveField(account: AdminUserPaymentAccount) {
-    setSaving(true);
-    setFeedback(null);
-    try {
-      const updated = await patchAdminUserPaymentAccount(account.id, {
-        is_active: !account.is_active,
-      });
-      setAccounts((current) =>
-        current.map((item) => (item.id === updated.id ? updated : item)),
-      );
-      setFeedback({
-        tone: "success",
-        text: updated.is_active ? "Compte activé." : "Compte désactivé.",
-      });
-    } catch (error) {
-      setFeedback({
-        tone: "error",
-        text: error instanceof Error ? error.message : "Le changement de statut a échoué.",
-      });
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  const isFormModal = modalMode === "create" || modalMode === "edit";
   const providerNameByForm = form.provider
     ? resolveProviderLabel(Number(form.provider), providers)
     : "-";
