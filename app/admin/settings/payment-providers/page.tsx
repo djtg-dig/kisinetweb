@@ -24,7 +24,14 @@ import {
 
 type PageState = "loading" | "ready" | "error";
 type ModalMode = "details" | "create" | "edit" | null;
-type FeedbackState = { tone: "success" | "error"; text: string } | null;
+// Un toast transitoire (succès / erreur / avertissement). La clé permet de
+// forcer le réaffichage et le redémarrage du chrono d'auto-fermeture même si le
+// texte est identique à un message précédent.
+type ToastState = {
+  tone: "success" | "error" | "warning";
+  text: string;
+  key: number;
+} | null;
 
 type ProviderFormState = {
   country: string;
@@ -79,7 +86,6 @@ export default function AdminPaymentProvidersPage() {
   const [providers, setProviders] = useState<AdminPaymentProvider[]>([]);
   const [state, setState] = useState<PageState>("loading");
   const [message, setMessage] = useState("");
-  const [feedback, setFeedback] = useState<FeedbackState>(null);
   const [refreshIndex, setRefreshIndex] = useState(0);
 
   const [categories, setCategories] = useState<AdminPaymentCategory[]>([]);
@@ -90,6 +96,13 @@ export default function AdminPaymentProvidersPage() {
   const [editingProvider, setEditingProvider] = useState<AdminPaymentProvider | null>(null);
   const [form, setForm] = useState<ProviderFormState>(emptyForm());
   const [saving, setSaving] = useState(false);
+  // Toast global (succès / erreur / avertissement) affiché automatiquement et
+  // disparaissant sans clic via le composant ToastMessage.
+  const [toast, setToast] = useState<ToastState>(null);
+
+  function showToast(tone: "success" | "error" | "warning", text: string) {
+    setToast({ tone, text, key: Date.now() });
+  }
 
   const [providerToDelete, setProviderToDelete] = useState<AdminPaymentProvider | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -178,14 +191,12 @@ export default function AdminPaymentProvidersPage() {
   function openCreate() {
     setEditingProvider(null);
     setForm(emptyForm());
-    setFeedback(null);
     setModalMode("create");
   }
 
   function openEdit(provider: AdminPaymentProvider) {
     setEditingProvider(provider);
     setForm(formFromProvider(provider));
-    setFeedback(null);
     setModalMode("edit");
   }
 
@@ -195,6 +206,10 @@ export default function AdminPaymentProvidersPage() {
   }
 
   function closeModal() {
+    // La fermeture est refusée pendant la sauvegarde (gérée aussi côté Modal).
+    if (saving) {
+      return;
+    }
     setModalMode(null);
     setEditingProvider(null);
     setForm(emptyForm());
@@ -206,10 +221,7 @@ export default function AdminPaymentProvidersPage() {
     const code = form.code.trim();
 
     if (!form.country || !form.currency || !form.category || !name || !code) {
-      setFeedback({
-        tone: "error",
-        text: "Pays, devise, catégorie, nom et code sont obligatoires.",
-      });
+      showToast("error", "Pays, devise, catégorie, nom et code sont obligatoires.");
       return null;
     }
 
@@ -217,10 +229,7 @@ export default function AdminPaymentProvidersPage() {
     if (form.display_order.trim() !== "") {
       const parsed = Number(form.display_order);
       if (!Number.isInteger(parsed) || parsed < 0) {
-        setFeedback({
-          tone: "error",
-          text: "L’ordre doit être un nombre entier positif.",
-        });
+        showToast("error", "L’ordre doit être un nombre entier positif.");
         return null;
       }
       displayOrder = parsed;
@@ -247,7 +256,6 @@ export default function AdminPaymentProvidersPage() {
     }
 
     setSaving(true);
-    setFeedback(null);
 
     try {
       if (editingProvider) {
@@ -255,27 +263,29 @@ export default function AdminPaymentProvidersPage() {
         setProviders((current) =>
           current.map((provider) => (provider.id === updated.id ? updated : provider)),
         );
-        setFeedback({ tone: "success", text: "Fournisseur mis à jour." });
+        showToast("success", "Fournisseur mis à jour.");
       } else {
         const created = await createAdminPaymentProvider(payload);
         setProviders((current) => [...current, created]);
-        setFeedback({ tone: "success", text: "Fournisseur créé." });
+        showToast("success", "Fournisseur créé.");
       }
       closeModal();
     } catch (error) {
-      setFeedback({
-        tone: "error",
-        text: error instanceof Error ? error.message : "L’enregistrement a échoué.",
-      });
+      showToast(
+        "error",
+        error instanceof Error ? error.message : "L’enregistrement a échoué.",
+      );
     } finally {
       setSaving(false);
     }
   }
 
   // Bascule du statut actif/inactif via une mise à jour partielle (PATCH).
+  // La désactivation utilise un ton « avertissement » pour signaler clairement
+  // la perte de disponibilité du fournisseur ; la réactivation confirme en
+  // succès.
   async function toggleActive(provider: AdminPaymentProvider) {
     setSaving(true);
-    setFeedback(null);
 
     try {
       const updated = await patchAdminPaymentProvider(provider.id, {
@@ -284,15 +294,15 @@ export default function AdminPaymentProvidersPage() {
       setProviders((current) =>
         current.map((item) => (item.id === updated.id ? updated : item)),
       );
-      setFeedback({
-        tone: "success",
-        text: updated.is_active ? "Fournisseur activé." : "Fournisseur désactivé.",
-      });
+      showToast(
+        updated.is_active ? "success" : "warning",
+        updated.is_active ? "Fournisseur activé." : "Fournisseur désactivé.",
+      );
     } catch (error) {
-      setFeedback({
-        tone: "error",
-        text: error instanceof Error ? error.message : "Le changement de statut a échoué.",
-      });
+      showToast(
+        "error",
+        error instanceof Error ? error.message : "Le changement de statut a échoué.",
+      );
     } finally {
       setSaving(false);
     }
@@ -305,20 +315,19 @@ export default function AdminPaymentProvidersPage() {
     }
 
     setDeleting(true);
-    setFeedback(null);
 
     try {
       await deleteAdminPaymentProvider(providerToDelete.id);
       setProviders((current) =>
         current.filter((provider) => provider.id !== providerToDelete.id),
       );
-      setFeedback({ tone: "success", text: "Fournisseur supprimé." });
+      showToast("success", "Fournisseur supprimé.");
       setProviderToDelete(null);
     } catch (error) {
-      setFeedback({
-        tone: "error",
-        text: error instanceof Error ? error.message : "La suppression a échoué.",
-      });
+      showToast(
+        "error",
+        error instanceof Error ? error.message : "La suppression a échoué.",
+      );
     } finally {
       setDeleting(false);
     }
@@ -343,9 +352,13 @@ export default function AdminPaymentProvidersPage() {
         </div>
       </div>
 
-      {feedback && (
-        <ToastMessage tone={feedback.tone} onClose={() => setFeedback(null)}>
-          {feedback.text}
+      {toast && (
+        <ToastMessage
+          key={toast.key}
+          tone={toast.tone}
+          onClose={() => setToast(null)}
+        >
+          {toast.text}
         </ToastMessage>
       )}
 
@@ -497,6 +510,7 @@ export default function AdminPaymentProvidersPage() {
               : "Nouveau fournisseur"
         }
         onClose={closeModal}
+        saving={saving}
       >
         {modalMode === "details" && editingProvider ? (
           <div className="space-y-3 text-sm text-app-muted">
@@ -520,6 +534,7 @@ export default function AdminPaymentProvidersPage() {
               </label>
               <select
                 id="provider-country"
+                name="country"
                 value={form.country}
                 onChange={(event) =>
                   setForm((current) => ({ ...current, country: event.target.value }))
@@ -541,6 +556,7 @@ export default function AdminPaymentProvidersPage() {
               </label>
               <select
                 id="provider-currency"
+                name="currency"
                 value={form.currency}
                 onChange={(event) =>
                   setForm((current) => ({ ...current, currency: event.target.value }))
@@ -562,6 +578,7 @@ export default function AdminPaymentProvidersPage() {
               </label>
               <select
                 id="provider-category"
+                name="category"
                 value={form.category}
                 onChange={(event) =>
                   setForm((current) => ({ ...current, category: event.target.value }))
@@ -583,6 +600,7 @@ export default function AdminPaymentProvidersPage() {
               </label>
               <input
                 id="provider-name"
+                name="name"
                 value={form.name}
                 onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
                 className="w-full rounded-md border border-app-border bg-app-surface px-3 py-2 text-sm text-app-text outline-none focus:border-primary-500"
@@ -596,6 +614,7 @@ export default function AdminPaymentProvidersPage() {
               </label>
               <input
                 id="provider-code"
+                name="code"
                 value={form.code}
                 onChange={(event) => setForm((current) => ({ ...current, code: event.target.value }))}
                 className="w-full rounded-md border border-app-border bg-app-surface px-3 py-2 text-sm text-app-text outline-none focus:border-primary-500"
@@ -609,6 +628,7 @@ export default function AdminPaymentProvidersPage() {
               </label>
               <textarea
                 id="provider-description"
+                name="description"
                 value={form.description}
                 onChange={(event) =>
                   setForm((current) => ({ ...current, description: event.target.value }))
@@ -637,8 +657,13 @@ export default function AdminPaymentProvidersPage() {
               />
             </div>
 
-            <label className="flex items-center gap-2 text-sm font-medium text-app-text">
+            <label
+              htmlFor="provider-is-active"
+              className="flex items-center gap-2 text-sm font-medium text-app-text"
+            >
               <input
+                id="provider-is-active"
+                name="is_active"
                 type="checkbox"
                 checked={form.is_active}
                 onChange={(event) =>
