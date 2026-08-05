@@ -393,12 +393,15 @@ export async function deleteAdminPaymentCategory(id: number): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Comptes de paiement utilisateurs (admin) — CONSULTATION UNIQUEMENT
-// Base des routes : /api/admin/user-payment-accounts/
-// Le backend expose des routes d'écriture séparées
-// (/api/admin/user-payment-accounts-management/). Elles ne sont volontairement
-// pas implémentées ici : la section frontend est en lecture seule.
-// N'ajoutez aucune fonction POST / PUT / PATCH / DELETE dans ce bloc.
+// Comptes de paiement utilisateurs (admin)
+//
+// Deux bases de routes sont utilisées :
+// - /api/admin/user-payment-accounts/            -> lecture seule (liste filtrable + détail)
+// - /api/admin/user-payment-accounts-management/ -> gestion complète (CRUD, activate/deactivate)
+//
+// Les fonctions de cette section couvrent les DEUX aspects. La page détail est
+// en lecture seule stricte ; la page de gestion ajoute création, modification,
+// activation/désactivation et suppression.
 // ---------------------------------------------------------------------------
 
 // Compte de paiement d'un utilisateur tel que retourné par l'API admin.
@@ -420,9 +423,18 @@ export type AdminUserPaymentAccount = {
   updated_at: string;
 };
 
-const adminUserPaymentAccountsPath = "/api/admin/user-payment-accounts/";
+// Données transmises à l'API pour créer ou mettre à jour un compte.
+// `user` = UUID de l'utilisateur, `provider` = id du fournisseur.
+export type AdminUserPaymentAccountInput = {
+  user: string;
+  provider: number;
+  account_identifier: string;
+  account_name?: string;
+  is_active?: boolean;
+  is_default?: boolean;
+};
 
-// Charge les comptes de paiement de tous les utilisateurs.
+// Charge les comptes de paiement de tous les utilisateurs (lecture seule).
 // - `search` est envoyé au backend qui cherche dans le numéro de compte
 //   (`account_identifier`) et le titulaire (`account_name`) ;
 // - `isActive` vaut "true", "false" ou "" (aucun filtre).
@@ -447,7 +459,7 @@ export async function getAdminUserPaymentAccounts({
   const query = params.toString();
   const data = await fetchAdminJson<
     AdminUserPaymentAccount[] | { results?: AdminUserPaymentAccount[] }
-  >(adminUserPaymentAccountsPath + (query ? "?" + query : ""));
+  >("/api/admin/user-payment-accounts/" + (query ? "?" + query : ""));
 
   if (Array.isArray(data)) {
     return data;
@@ -461,7 +473,102 @@ export async function getAdminUserPaymentAccount(
   id: string,
 ): Promise<AdminUserPaymentAccount> {
   return fetchAdminJson<AdminUserPaymentAccount>(
-    adminUserPaymentAccountsPath + encodeURIComponent(id) + "/",
+    "/api/admin/user-payment-accounts/" + encodeURIComponent(id) + "/",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Gestion des comptes de paiement (admin) — routes /user-payment-accounts-management/
+// ---------------------------------------------------------------------------
+
+const adminUserPaymentAccountsManagementPath = "/api/admin/user-payment-accounts-management/";
+
+// Normalise la réponse (tableau simple ou objet paginé { results: [...] }).
+function normalizeAccountsPayload(
+  data: AdminUserPaymentAccount[] | { results?: AdminUserPaymentAccount[] },
+): AdminUserPaymentAccount[] {
+  if (Array.isArray(data)) {
+    return data;
+  }
+  return Array.isArray(data.results) ? data.results : [];
+}
+
+// Liste complète des comptes (gestion). Renvoie tous les comptes, actifs et
+// inactifs, car cette page permet aussi l'activation/désactivation.
+export async function getAdminUserPaymentAccountsManagement(): Promise<AdminUserPaymentAccount[]> {
+  const data = await fetchAdminJson<
+    AdminUserPaymentAccount[] | { results?: AdminUserPaymentAccount[] }
+  >(adminUserPaymentAccountsManagementPath);
+  return normalizeAccountsPayload(data);
+}
+
+// Crée un compte de paiement (POST).
+export async function createAdminUserPaymentAccount(
+  payload: AdminUserPaymentAccountInput,
+): Promise<AdminUserPaymentAccount> {
+  return fetchAdminJson<AdminUserPaymentAccount>(adminUserPaymentAccountsManagementPath, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+// Met à jour intégralement un compte (PUT).
+export async function updateAdminUserPaymentAccount(
+  id: number,
+  payload: AdminUserPaymentAccountInput,
+): Promise<AdminUserPaymentAccount> {
+  return fetchAdminJson<AdminUserPaymentAccount>(
+    adminUserPaymentAccountsManagementPath + encodeURIComponent(String(id)) + "/",
+    {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+// Met à jour partiellement un compte (PATCH).
+export async function patchAdminUserPaymentAccount(
+  id: number,
+  payload: Partial<AdminUserPaymentAccountInput>,
+): Promise<AdminUserPaymentAccount> {
+  return fetchAdminJson<AdminUserPaymentAccount>(
+    adminUserPaymentAccountsManagementPath + encodeURIComponent(String(id)) + "/",
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+// Supprime un compte (DELETE).
+export async function deleteAdminUserPaymentAccount(id: number): Promise<void> {
+  await fetchAdminJson<void>(
+    adminUserPaymentAccountsManagementPath + encodeURIComponent(String(id)) + "/",
+    { method: "DELETE" },
+  );
+}
+
+// Active un compte via l'action dédiée du backend.
+export async function activateAdminUserPaymentAccount(id: number): Promise<AdminUserPaymentAccount> {
+  return fetchAdminJson<AdminUserPaymentAccount>(
+    adminUserPaymentAccountsManagementPath +
+      encodeURIComponent(String(id)) +
+      "/activate/",
+    { method: "POST" },
+  );
+}
+
+// Désactive un compte via l'action dédiée du backend.
+// Le backend refuse la désactivation d'un compte défini comme principal :
+// l'erreur renvoyée est affichée telle quelle dans le toast.
+export async function deactivateAdminUserPaymentAccount(
+  id: number,
+): Promise<AdminUserPaymentAccount> {
+  return fetchAdminJson<AdminUserPaymentAccount>(
+    adminUserPaymentAccountsManagementPath +
+      encodeURIComponent(String(id)) +
+      "/deactivate/",
+    { method: "POST" },
   );
 }
 

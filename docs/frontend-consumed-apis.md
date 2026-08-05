@@ -79,6 +79,14 @@ Endpoints consommés:
 | Liste pays | `GET /api/pharmacies/countries/` | Oui, authentifié |
 | Liste comptes de paiement utilisateurs admin | `GET /api/admin/user-payment-accounts/?search=...&is_active=...` | Oui, admin `is_staff` |
 | Détail compte de paiement utilisateur admin | `GET /api/admin/user-payment-accounts/{id}/` | Oui, admin `is_staff` |
+| Liste gestion comptes de paiement admin | `GET /api/admin/user-payment-accounts-management/` | Oui, admin `is_staff` |
+| Création compte de paiement admin | `POST /api/admin/user-payment-accounts-management/` | Oui, admin `is_staff` |
+| Détail gestion compte de paiement admin | `GET /api/admin/user-payment-accounts-management/{id}/` | Oui, admin `is_staff` |
+| Mise à jour compte de paiement admin | `PUT /api/admin/user-payment-accounts-management/{id}/` | Oui, admin `is_staff` |
+| Mise à jour partielle compte de paiement admin | `PATCH /api/admin/user-payment-accounts-management/{id}/` | Oui, admin `is_staff` |
+| Suppression compte de paiement admin | `DELETE /api/admin/user-payment-accounts-management/{id}/` | Oui, admin `is_staff` |
+| Activation compte de paiement admin | `POST /api/admin/user-payment-accounts-management/{id}/activate/` | Oui, admin `is_staff` |
+| Désactivation compte de paiement admin | `POST /api/admin/user-payment-accounts-management/{id}/deactivate/` | Oui, admin `is_staff` |
 | Liste catégories paiement admin | `GET /api/paiements/admin/payment-categories/` | Oui, admin `is_staff` |
 | Création catégorie paiement admin | `POST /api/paiements/admin/payment-categories/` | Oui, admin `is_staff` |
 | Détail catégorie paiement admin | `GET /api/paiements/admin/payment-categories/{id}/` | Oui, admin `is_staff` |
@@ -200,6 +208,31 @@ tableau, seuls les libellés retombent sur les identifiants bruts. La page déta
 les informations utilisateur, les informations de paiement et un bloc « Historique »
 limité à `created_at` et `updated_at`, l'API ne fournissant aucun journal d'événements
 pour un compte de paiement.
+
+La page `/admin/settings/user-payment-accounts` (tableau de gestion) consomme
+`GET /api/admin/user-payment-accounts-management/` (liste), `POST /api/admin/user-payment-accounts-management/`
+(création), `PUT /api/admin/user-payment-accounts-management/{id}/` (mise à jour
+intégrale), `PATCH /api/admin/user-payment-accounts-management/{id}/` (mise à jour
+partielle), `DELETE /api/admin/user-payment-accounts-management/{id}/` (suppression),
+`POST /api/admin/user-payment-accounts-management/{id}/activate/` (activation) et
+`POST /api/admin/user-payment-accounts-management/{id}/deactivate/` (désactivation). Les
+fonctions utilisées sont `getAdminUserPaymentAccountsManagement`,
+`createAdminUserPaymentAccount`, `updateAdminUserPaymentAccount`,
+`patchAdminUserPaymentAccount`, `deleteAdminUserPaymentAccount`,
+`activateAdminUserPaymentAccount` et `deactivateAdminUserPaymentAccount` dans
+`lib/api/admin.ts`. Le corps d'écriture (`AdminUserPaymentAccountInput`) contient : `user`
+(UUID de l'utilisateur, obligatoire), `provider` (id du fournisseur, obligatoire),
+`account_identifier` (numéro, obligatoire), `account_name` (titulaire, obligatoire),
+`is_active` et `is_default`. La validation frontend refuse un compte inactif défini comme
+principal (`is_default=true` avec `is_active=false`), règle déjà imposée par le backend. La
+liste utilisateurs (`getAdminUsersDirectory`), fournisseurs (`getAdminPaymentProviders`) et
+pays (`getAdminCountries`) peuple les menus et les libellés : aucune valeur n'est codée en
+dur. La création et l'édition s'effectuent dans une fenêtre modale ; l'activation/désactivation
+et la suppression nécessitent une confirmation explicite (`ConfirmDialog`). Les protections
+suivantes sont en place : le bouton d'envoi est désactivé et un état `saving`/`toggling`/
+`deleting` empêche le double clic pendant la requête, un indicateur de chargement est affiché,
+et les erreurs API (y compris le refus backend de désactiver un compte principal) sont
+affichées dans un toast automatique sans jamais afficher de donnée technique brute.
 
 
 La page `/admin/payments` consomme `GET /api/admin/referral-withdrawals/` pour
