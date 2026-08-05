@@ -899,8 +899,15 @@ export async function getPharmacyActivity(pharmacyId: string): Promise<PharmacyA
 }
 
 export async function getCountries(): Promise<CountryOption[]> {
-  const data = await fetchApiJson<unknown>("/api/pharmacies/countries/", "Impossible de charger les pays.");
-  const rows = Array.isArray(data) ? data : [];
+  const data = await fetchApiJson<unknown[] | { results?: unknown[] }>(
+    "/api/pharmacies/countries/",
+    "Impossible de charger les pays.",
+  );
+  const rows: unknown[] = Array.isArray(data)
+    ? data
+    : Array.isArray((data as { results?: unknown[] }).results)
+      ? (data as { results?: unknown[] }).results!
+      : [];
 
   return rows
     .filter((item: unknown): item is UnknownRecord => Boolean(item) && typeof item === "object")

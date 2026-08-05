@@ -267,12 +267,47 @@ export type AdminCountryOption = {
   phoneCode: string;
 };
 
-// Charge la liste des pays depuis l'API. Aucun pays n'est codé en dur.
-export async function getAdminCountries(): Promise<AdminCountryOption[]> {
-  const data = await fetchAdminJson<unknown>("/api/pharmacies/countries/");
-  const rows: unknown[] = Array.isArray(data) ? data : [];
+// Convertit une URL (absolue ou relative) renvoyée par la pagination en chemin
+// d'API relatif à apiBaseUrl, utilisable par fetchAdminJson.
+function countryPagePath(url: string): string {
+  try {
+    const parsed = new URL(url, apiBaseUrl);
+    return parsed.pathname + parsed.search;
+  } catch {
+    return url;
+  }
+}
 
-  return rows
+// Charge la liste des pays depuis l'API. Aucun pays n'est codé en dur.
+// L'endpoint peut renvoyer un tableau simple ou un objet paginé
+// ({ count, next, previous, results }). On suit le lien `next` pour charger
+// la liste complète même si le backend utilise une pagination serveur.
+export async function getAdminCountries(): Promise<AdminCountryOption[]> {
+  const collected: unknown[] = [];
+  let path: string | null = "/api/pharmacies/countries/";
+
+  while (path) {
+    const data = await fetchAdminJson<unknown>(path);
+
+    if (Array.isArray(data)) {
+      collected.push(...data);
+      break;
+    }
+
+    if (data && typeof data === "object") {
+      const record = data as Record<string, unknown>;
+      if (Array.isArray(record.results)) {
+        collected.push(...record.results);
+        const next = typeof record.next === "string" ? record.next : null;
+        path = next ? countryPagePath(next) : null;
+        continue;
+      }
+    }
+
+    break;
+  }
+
+  return collected
     .filter(
       (item): item is Record<string, unknown> =>
         Boolean(item) && typeof item === "object",

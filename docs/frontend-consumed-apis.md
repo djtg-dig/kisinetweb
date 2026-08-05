@@ -150,7 +150,10 @@ fonctions utilisées sont `getAdminPaymentProviders`, `createAdminPaymentProvide
 tableau affiche les colonnes Pays, Devise, Catégorie, Nom fournisseur, Actif, Ordre et
 Actions. Les listes Pays (`GET /api/pharmacies/countries/`), Devise
 (`GET /api/paiements/currencies/`, public) et Catégorie (`GET /api/paiements/admin/payment-categories/`)
-peuplent les menus déroulants du formulaire : aucune valeur n'est codée en dur. Le formulaire
+peuplent les menus déroulants du formulaire : aucune valeur n'est codée en dur. Le champ
+Pays utilise `getAdminCountries` qui accepte la réponse de
+`GET /api/pharmacies/countries/` qu'elle soit un tableau simple ou un objet paginé
+`{ count, next, previous, results }`. Le formulaire
 modal valide les champs obligatoires (pays, devise, catégorie, nom, code) et l'ordre
 (entier positif). La suppression nécessite une confirmation explicite. Les retours
 succès/erreur utilisent un toast automatique. Hypothèse de schéma d'écriture (backend non
