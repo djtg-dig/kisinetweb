@@ -70,8 +70,13 @@ Endpoints consommés:
 | Liste abonnements admin | `GET /api/admin/subscriptions/?search=...&reference=...&plan_code=...&status=...&page=...` | Oui, admin `is_staff` |
 | Liste retraits parrainage admin | `GET /api/admin/referral-withdrawals/?search=...&status=...&currency=...&page=...` | Oui, admin `is_staff` |
 | Liste fournisseurs paiement admin | `GET /api/admin/payment-providers/` | Oui, admin `is_staff` |
-| Mise à jour fournisseur paiement admin | `PATCH /api/admin/payment-providers/{id}/` | Oui, admin `is_staff` |
+| Création fournisseur paiement admin | `POST /api/admin/payment-providers/` | Oui, admin `is_staff` |
+| Détail fournisseur paiement admin | `GET /api/admin/payment-providers/{id}/` | Oui, admin `is_staff` |
+| Mise à jour fournisseur paiement admin | `PUT /api/admin/payment-providers/{id}/` | Oui, admin `is_staff` |
+| Mise à jour partielle fournisseur paiement admin | `PATCH /api/admin/payment-providers/{id}/` | Oui, admin `is_staff` |
 | Suppression fournisseur paiement admin | `DELETE /api/admin/payment-providers/{id}/` | Oui, admin `is_staff` |
+| Liste devises | `GET /api/paiements/currencies/` | Non (public) |
+| Liste pays | `GET /api/pharmacies/countries/` | Oui, authentifié |
 | Liste catégories paiement admin | `GET /api/paiements/admin/payment-categories/` | Oui, admin `is_staff` |
 | Création catégorie paiement admin | `POST /api/paiements/admin/payment-categories/` | Oui, admin `is_staff` |
 | Détail catégorie paiement admin | `GET /api/paiements/admin/payment-categories/{id}/` | Oui, admin `is_staff` |
@@ -135,7 +140,23 @@ s'effectuent dans une fenêtre modale avec validation frontend (nom et code
 obligatoires, ordre d'affichage entier positif). La suppression n'a lieu qu'après
 confirmation explicite de l'utilisateur et ne supprime que la catégorie concernée,
 sans toucher aux données associées. Les retours succès/erreur sont affichés via un
-toast automatique.
+ toast automatique.
+
+La page `/admin/settings/payment-providers` consomme `GET /api/admin/payment-providers/`
+(liste), `POST /api/admin/payment-providers/` (création), `PATCH /api/admin/payment-providers/{id}/`
+(mise à jour partielle) et `DELETE /api/admin/payment-providers/{id}/` (suppression). Les
+fonctions utilisées sont `getAdminPaymentProviders`, `createAdminPaymentProvider`,
+`updateAdminPaymentProvider` et `deleteAdminPaymentProvider` dans `lib/api/admin.ts`. Le
+tableau affiche les colonnes Pays, Devise, Catégorie, Nom fournisseur, Actif, Ordre et
+Actions. Les listes Pays (`GET /api/pharmacies/countries/`), Devise
+(`GET /api/paiements/currencies/`, public) et Catégorie (`GET /api/paiements/admin/payment-categories/`)
+peuplent les menus déroulants du formulaire : aucune valeur n'est codée en dur. Le formulaire
+modal valide les champs obligatoires (pays, devise, catégorie, nom, code) et l'ordre
+(entier positif). La suppression nécessite une confirmation explicite. Les retours
+succès/erreur utilisent un toast automatique. Hypothèse de schéma d'écriture (backend non
+présent dans le dépôt) : `country` = code ISO2, `currency` = code devise, `category` = id
+de catégorie ; à confirmer contre le sérialiseur Django si le comportement diffère.
+
 
 La page `/admin/payments` consomme `GET /api/admin/referral-withdrawals/` pour
 traiter manuellement les demandes de retrait de commission: passage en

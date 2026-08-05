@@ -160,11 +160,30 @@ export type AdminPaymentProvider = {
   slug?: string;
   display_name?: string;
   country?: string | null;
+  currency?: string | null;
+  category?: number | { id: number; name?: string; code?: string } | null;
+  description?: string | null;
   is_active?: boolean;
   is_default?: boolean;
+  display_order?: number | null;
   created_at?: string;
   updated_at?: string;
   [key: string]: unknown;
+};
+
+// Données transmises à l'API pour créer ou mettre à jour un fournisseur.
+// Hypothèse de schéma (backend non présent dans le repo) : country = code ISO2,
+// currency = code de devise, category = id de catégorie. À confirmer contre le
+// sérialiseur Django si le comportement diffère.
+export type AdminPaymentProviderInput = {
+  country: string;
+  currency: string;
+  category: number;
+  name: string;
+  code: string;
+  description?: string;
+  is_active: boolean;
+  display_order?: number | null;
 };
 
 export type AdminPaymentProvidersResponse =
@@ -192,10 +211,20 @@ export async function getAdminPaymentProviders(): Promise<AdminPaymentProvider[]
 // Met à jour partiellement un fournisseur de paiement via l'API admin.
 export async function patchAdminPaymentProvider(
   id: number,
-  payload: Partial<AdminPaymentProvider>,
+  payload: Partial<AdminPaymentProviderInput>,
 ): Promise<AdminPaymentProvider> {
   return fetchAdminJson<AdminPaymentProvider>(`/api/admin/payment-providers/${id}/`, {
     method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+// Crée un nouveau fournisseur de paiement via l'API admin (POST).
+export async function createAdminPaymentProvider(
+  payload: AdminPaymentProviderInput,
+): Promise<AdminPaymentProvider> {
+  return fetchAdminJson<AdminPaymentProvider>("/api/admin/payment-providers/", {
+    method: "POST",
     body: JSON.stringify(payload),
   });
 }
@@ -205,6 +234,56 @@ export async function deleteAdminPaymentProvider(id: number): Promise<void> {
   await fetchAdminJson<void>(`/api/admin/payment-providers/${id}/`, {
     method: "DELETE",
   });
+}
+
+// Devise telle que retournée par l'API publique des devises.
+export type AdminPaymentCurrency = {
+  id: number;
+  code: string;
+  name: string;
+  symbol?: string;
+  decimal_places?: number;
+  is_active?: boolean;
+};
+
+// Charge la liste des devises (endpoint public). Aucune devise n'est codée en dur.
+export async function getAdminPaymentCurrencies(): Promise<AdminPaymentCurrency[]> {
+  const data = await fetchAdminJson<
+    AdminPaymentCurrency[] | { results?: AdminPaymentCurrency[] }
+  >("/api/paiements/currencies/");
+
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  return Array.isArray(data.results) ? data.results : [];
+}
+
+// Option de pays issue de l'API des pays (utilisée pour le champ "pays").
+export type AdminCountryOption = {
+  id: number;
+  name: string;
+  iso2: string;
+  phoneCode: string;
+};
+
+// Charge la liste des pays depuis l'API. Aucun pays n'est codé en dur.
+export async function getAdminCountries(): Promise<AdminCountryOption[]> {
+  const data = await fetchAdminJson<unknown>("/api/pharmacies/countries/");
+  const rows: unknown[] = Array.isArray(data) ? data : [];
+
+  return rows
+    .filter(
+      (item): item is Record<string, unknown> =>
+        Boolean(item) && typeof item === "object",
+    )
+    .map((item) => ({
+      id: Number(item.id),
+      name: String(item.name || ""),
+      iso2: String(item.iso2 || ""),
+      phoneCode: String(item.phone_code || ""),
+    }))
+    .filter((country) => country.id && country.name);
 }
 
 // ---------------------------------------------------------------------------
