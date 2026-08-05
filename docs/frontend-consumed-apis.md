@@ -72,6 +72,12 @@ Endpoints consommés:
 | Liste fournisseurs paiement admin | `GET /api/admin/payment-providers/` | Oui, admin `is_staff` |
 | Mise à jour fournisseur paiement admin | `PATCH /api/admin/payment-providers/{id}/` | Oui, admin `is_staff` |
 | Suppression fournisseur paiement admin | `DELETE /api/admin/payment-providers/{id}/` | Oui, admin `is_staff` |
+| Liste catégories paiement admin | `GET /api/paiements/admin/payment-categories/` | Oui, admin `is_staff` |
+| Création catégorie paiement admin | `POST /api/paiements/admin/payment-categories/` | Oui, admin `is_staff` |
+| Détail catégorie paiement admin | `GET /api/paiements/admin/payment-categories/{id}/` | Oui, admin `is_staff` |
+| Mise à jour catégorie paiement admin | `PUT /api/paiements/admin/payment-categories/{id}/` | Oui, admin `is_staff` |
+| Mise à jour partielle catégorie paiement admin | `PATCH /api/paiements/admin/payment-categories/{id}/` | Oui, admin `is_staff` |
+| Suppression catégorie paiement admin | `DELETE /api/paiements/admin/payment-categories/{id}/` | Oui, admin `is_staff` |
 | Action retrait parrainage admin | `POST /api/admin/referral-withdrawals/{reference}/{action}/` | Oui, admin `is_staff` |
 
 Le frontend utilise des clés de stockage séparées pour les tokens admin. La
@@ -115,6 +121,21 @@ recherche globale. La réponse backend est paginée (`count`, `next`, `previous`
 `payments_count`, `last_payment_reference`, `last_payment_status`,
 `last_payment_amount`, `last_payment_currency`, `last_payment_paid_at`,
 `created_at` et `updated_at`.
+
+La page `/admin/settings/payment-categories` consomme les endpoints
+`GET /api/paiements/admin/payment-categories/` (liste),
+`POST /api/paiements/admin/payment-categories/` (création),
+`PATCH /api/paiements/admin/payment-categories/{id}/` (mise à jour partielle) et
+`DELETE /api/paiements/admin/payment-categories/{id}/` (suppression). Le frontend
+n'appelle jamais les URLs en dur : il utilise les fonctions `getAdminPaymentCategories`,
+`createAdminPaymentCategory`, `updateAdminPaymentCategory` et `deleteAdminPaymentCategory`
+définies dans `lib/api/admin.ts`. Le tableau affiche les colonnes Nom, Code,
+Description, Statut, Ordre d'affichage et Actions. La création et l'édition
+s'effectuent dans une fenêtre modale avec validation frontend (nom et code
+obligatoires, ordre d'affichage entier positif). La suppression n'a lieu qu'après
+confirmation explicite de l'utilisateur et ne supprime que la catégorie concernée,
+sans toucher aux données associées. Les retours succès/erreur sont affichés via un
+toast automatique.
 
 La page `/admin/payments` consomme `GET /api/admin/referral-withdrawals/` pour
 traiter manuellement les demandes de retrait de commission: passage en

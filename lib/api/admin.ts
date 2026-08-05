@@ -207,6 +207,77 @@ export async function deleteAdminPaymentProvider(id: number): Promise<void> {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Catégories de paiement (admin)
+// Base des routes : /api/paiements/admin/payment-categories/
+// Aucune URL n'est codée en dur dans les composants : ils appellent ces
+// fonctions pour déclencher les requêtes HTTP.
+// ---------------------------------------------------------------------------
+
+// Catégorie de paiement telle que retournée par l'API admin.
+export type AdminPaymentCategory = {
+  id: number;
+  name: string;
+  code: string;
+  description?: string | null;
+  is_active?: boolean;
+  display_order?: number | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+// Données transmises à l'API pour créer ou mettre à jour une catégorie.
+export type AdminPaymentCategoryInput = {
+  name: string;
+  code: string;
+  description?: string;
+  is_active: boolean;
+  display_order?: number | null;
+};
+
+const adminPaymentCategoriesPath = "/api/paiements/admin/payment-categories/";
+
+// Charge la liste des catégories (supporte un tableau ou une réponse paginée).
+export async function getAdminPaymentCategories(): Promise<AdminPaymentCategory[]> {
+  const data = await fetchAdminJson<
+    AdminPaymentCategory[] | { results?: AdminPaymentCategory[] }
+  >(adminPaymentCategoriesPath);
+
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  return Array.isArray(data.results) ? data.results : [];
+}
+
+// Crée une nouvelle catégorie de paiement (POST).
+export async function createAdminPaymentCategory(
+  payload: AdminPaymentCategoryInput,
+): Promise<AdminPaymentCategory> {
+  return fetchAdminJson<AdminPaymentCategory>(adminPaymentCategoriesPath, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+// Met à jour une catégorie (PATCH partiel) depuis l'interface admin.
+export async function updateAdminPaymentCategory(
+  id: number,
+  payload: Partial<AdminPaymentCategoryInput>,
+): Promise<AdminPaymentCategory> {
+  return fetchAdminJson<AdminPaymentCategory>(`${adminPaymentCategoriesPath}${id}/`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+// Supprime une catégorie. Aucune donnée associée n'est supprimée automatiquement.
+export async function deleteAdminPaymentCategory(id: number): Promise<void> {
+  await fetchAdminJson<void>(`${adminPaymentCategoriesPath}${id}/`, {
+    method: "DELETE",
+  });
+}
+
 export async function loginAdmin(email: string, password: string): Promise<AdminLoginResponse> {
   const data = await fetchAdminJson<AdminLoginResponse>("/api/admin/auth/login/", {
     method: "POST",
