@@ -99,6 +99,20 @@ Le frontend utilise des clés de stockage séparées pour les tokens admin. La
 protection réelle reste côté backend: chaque endpoint admin vérifie que
 l'utilisateur est actif et `is_staff`.
 
+Gestion centralisée des erreurs d'authentification (implémentée une seule fois
+dans la couche API commune `fetchAdminJson`, `lib/api/admin.ts`, sans
+duplication par page) : si le backend répond `401` ou `403` à une requête
+authentifiée possédant un token, le frontend (1) supprime proprement les tokens
+admin expirés, (2) tente un rafraîchissement via `POST /api/admin/auth/refresh/`
+avec le refresh token stocké, (3) en cas d'échec du refresh, vide la session et
+redirige vers `{adminLoginPath}?session_expired=1`, et (4) remonte le message
+« Votre session a expiré. Veuillez vous reconnecter. ». Si le refresh réussit, la
+requête initiale est relancée avec le nouveau token. Un verrou global empêche
+plusieurs rafraîchissements simultanés et les boucles. Les autres codes HTTP
+conserveront leur comportement habituel (message d'erreur métier affiché via
+toast). Les endpoints sans authentification (ex. `POST /api/admin/auth/login/`)
+ne déclenchent pas cette logique.
+
 La page `/admin/users` consomme `GET /api/admin/users/` et affiche les
 utilisateurs dans un tableau paginé à 20 lignes maximum. Les sections Swagger des
 APIs admin doivent garder un préfixe `Admin-`, par exemple

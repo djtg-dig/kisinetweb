@@ -4,7 +4,12 @@ import {
   getAdminRefreshToken,
   saveAdminTokens,
 } from "@/lib/admin/auth";
+import { adminLoginPath } from "@/lib/admin/config";
 import { apiBaseUrl } from "@/lib/carri-account";
+
+// Verrou global empêchant plusieurs appels de rafraîchissement simultanés
+// lorsque plusieurs requêtes admin échouent en même temps (401/403).
+let isRefreshingAdminToken = false;
 
 export type AdminProfile = {
   id: string;
@@ -781,6 +786,55 @@ export async function logoutAdmin() {
   }
 }
 
+// Tente de renouveler la session admin via le refresh token.
+// Retourne `true` si un nouveau token a été obtenu, `false` sinon (pas de
+// refresh token, ou le refresh a échoué). En cas d'échec, les tokens sont
+// supprimés proprement pour ne laisser aucune session expirée côté frontend.
+async function refreshAdminToken(): Promise<boolean> {
+  const refreshToken = getAdminRefreshToken();
+  // Aucun refresh token : impossible de renouveler la session.
+  if (!refreshToken) {
+    return false;
+  }
+
+  try {
+    const response = await fetch(apiBaseUrl.replace(/\/$/, "") + "/api/admin/auth/refresh/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh: refreshToken }),
+    });
+
+    if (!response.ok) {
+      // Le refresh token est invalide ou expiré : on nettoie la session.
+      clearAdminTokens();
+      return false;
+    }
+
+    const data = parseJson(await response.text()) as { access?: string; refresh?: string } | null;
+    if (!data || typeof data.access !== "string") {
+      clearAdminTokens();
+      return false;
+    }
+
+    // Le backend renvoie un nouveau refresh token ; on le conserve aussi.
+    saveAdminTokens(data.access, data.refresh ?? refreshToken);
+    return true;
+  } catch {
+    // Erreur réseau lors du refresh : on ne garde pas de session incohérente.
+    clearAdminTokens();
+    return false;
+  }
+}
+
+// Redirige vers la page de connexion admin après avoir vidé la session.
+// N'intervient qu'une seule fois grâce au verrou `isRefreshingAdminToken`.
+function redirectAdminToLogin() {
+  clearAdminTokens();
+  if (typeof window !== "undefined") {
+    window.location.assign(adminLoginPath + "?session_expired=1");
+  }
+}
+
 async function fetchAdminJson<T>(
   path: string,
   options: RequestInit & { includeAuth?: boolean } = {},
@@ -809,6 +863,29 @@ async function fetchAdminJson<T>(
   });
   const responseText = await response.text();
   const data = parseJson(responseText);
+
+  // Gestion centralisée des erreurs d'authentification (401/403) :
+  // on ne la déclenche que pour les requêtes authentifiées ayant un token,
+  // afin de ne pas perturber les endpoints publics (ex. login).
+  if (!response.ok && (response.status === 401 || response.status === 403) && includeAuth && accessToken) {
+    // Une seule tentative de refresh à la fois pour éviter les boucles.
+    if (!isRefreshingAdminToken) {
+      isRefreshingAdminToken = true;
+      const refreshed = await refreshAdminToken();
+      isRefreshingAdminToken = false;
+
+      if (refreshed) {
+        // Le refresh a réussi : on relance la requête initiale avec le
+        // nouveau token, sans toucher au comportement des autres erreurs.
+        return fetchAdminJson<T>(path, options);
+      }
+
+      // Le refresh a échoué : fin de session, redirection vers la connexion.
+      redirectAdminToLogin();
+    }
+    // Échec d'auth : on remonte un message clair (et non la réponse brute).
+    throw new Error("Votre session a expiré. Veuillez vous reconnecter.");
+  }
 
   if (!response.ok) {
     throw new Error(getApiErrorMessage(data, "Action administrateur impossible."));
