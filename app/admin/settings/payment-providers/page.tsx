@@ -1,6 +1,7 @@
 "use client";
 
 import { type FormEvent, useEffect, useState } from "react";
+import { PaymentSettingsLayout } from "@/components/admin/payment-settings-layout";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
 import {
@@ -211,15 +212,7 @@ export default function AdminPaymentProvidersPage() {
   }
 
   return (
-    <section className="space-y-4">
-      <div className="rounded-lg border border-app-border bg-app-card p-6 shadow-sm">
-        <p className="text-sm font-semibold text-primary-700">Administration</p>
-        <h2 className="mt-2 text-2xl font-bold text-app-text">Systèmes de paiements</h2>
-        <p className="mt-2 text-sm text-app-muted">
-          Liste des fournisseurs de paiement disponibles et accessibles depuis l’API admin.
-        </p>
-      </div>
-
+    <PaymentSettingsLayout>
       {message && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {message}
@@ -482,6 +475,6 @@ export default function AdminPaymentProvidersPage() {
         onConfirm={confirmDelete}
         onCancel={() => setProviderToDelete(null)}
       />
-    </section>
+    </PaymentSettingsLayout>
   );
 }
