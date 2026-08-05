@@ -392,6 +392,79 @@ export async function deleteAdminPaymentCategory(id: number): Promise<void> {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Comptes de paiement utilisateurs (admin) — CONSULTATION UNIQUEMENT
+// Base des routes : /api/admin/user-payment-accounts/
+// Le backend expose des routes d'écriture séparées
+// (/api/admin/user-payment-accounts-management/). Elles ne sont volontairement
+// pas implémentées ici : la section frontend est en lecture seule.
+// N'ajoutez aucune fonction POST / PUT / PATCH / DELETE dans ce bloc.
+// ---------------------------------------------------------------------------
+
+// Compte de paiement d'un utilisateur tel que retourné par l'API admin.
+// `user` est l'UUID du propriétaire, `provider` l'identifiant du fournisseur.
+// Les champs `currency*` sont dérivés du fournisseur par le backend.
+export type AdminUserPaymentAccount = {
+  id: number;
+  user: string;
+  provider: number;
+  currency: number | null;
+  currency_code: string | null;
+  currency_name: string | null;
+  account_identifier: string;
+  account_name: string;
+  is_default: boolean;
+  is_verified: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+const adminUserPaymentAccountsPath = "/api/admin/user-payment-accounts/";
+
+// Charge les comptes de paiement de tous les utilisateurs.
+// - `search` est envoyé au backend qui cherche dans le numéro de compte
+//   (`account_identifier`) et le titulaire (`account_name`) ;
+// - `isActive` vaut "true", "false" ou "" (aucun filtre).
+// L'endpoint renvoie aujourd'hui un tableau simple ; le format paginé
+// ({ results: [...] }) est également accepté pour rester compatible si le
+// backend active la pagination plus tard.
+export async function getAdminUserPaymentAccounts({
+  search = "",
+  isActive = "",
+}: {
+  search?: string;
+  isActive?: string;
+} = {}): Promise<AdminUserPaymentAccount[]> {
+  const params = new URLSearchParams();
+  if (search.trim()) {
+    params.set("search", search.trim());
+  }
+  if (isActive.trim()) {
+    params.set("is_active", isActive.trim());
+  }
+
+  const query = params.toString();
+  const data = await fetchAdminJson<
+    AdminUserPaymentAccount[] | { results?: AdminUserPaymentAccount[] }
+  >(adminUserPaymentAccountsPath + (query ? "?" + query : ""));
+
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  return Array.isArray(data.results) ? data.results : [];
+}
+
+// Charge le détail d'un compte de paiement utilisateur (lecture seule).
+export async function getAdminUserPaymentAccount(
+  id: string,
+): Promise<AdminUserPaymentAccount> {
+  return fetchAdminJson<AdminUserPaymentAccount>(
+    adminUserPaymentAccountsPath + encodeURIComponent(id) + "/",
+  );
+}
+
 export async function loginAdmin(email: string, password: string): Promise<AdminLoginResponse> {
   const data = await fetchAdminJson<AdminLoginResponse>("/api/admin/auth/login/", {
     method: "POST",
@@ -423,6 +496,29 @@ export async function getAdminUsers({
   return fetchAdminJson<AdminUsersPage>(
     "/api/admin/users/" + (params.toString() ? "?" + params.toString() : ""),
   );
+}
+
+// Charge l'annuaire complet des utilisateurs en suivant la pagination admin
+// (20 utilisateurs par page côté backend).
+// Objectif : afficher un email lisible à la place de l'UUID `user` renvoyé par
+// certaines API admin. Le nombre de pages est plafonné pour éviter une boucle
+// d'appels illimitée si le backend renvoie toujours un lien `next`.
+export async function getAdminUsersDirectory(maxPages = 25): Promise<AdminProfile[]> {
+  const users: AdminProfile[] = [];
+  let page = 1;
+
+  while (page <= maxPages) {
+    const data = await getAdminUsers({ page });
+    users.push(...data.results);
+
+    if (!data.next) {
+      break;
+    }
+
+    page += 1;
+  }
+
+  return users;
 }
 
 export async function getAdminPharmacies({

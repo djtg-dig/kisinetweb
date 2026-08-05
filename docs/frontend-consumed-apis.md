@@ -77,6 +77,8 @@ Endpoints consommés:
 | Suppression fournisseur paiement admin | `DELETE /api/admin/payment-providers/{id}/` | Oui, admin `is_staff` |
 | Liste devises | `GET /api/paiements/currencies/` | Non (public) |
 | Liste pays | `GET /api/pharmacies/countries/` | Oui, authentifié |
+| Liste comptes de paiement utilisateurs admin | `GET /api/admin/user-payment-accounts/?search=...&is_active=...` | Oui, admin `is_staff` |
+| Détail compte de paiement utilisateur admin | `GET /api/admin/user-payment-accounts/{id}/` | Oui, admin `is_staff` |
 | Liste catégories paiement admin | `GET /api/paiements/admin/payment-categories/` | Oui, admin `is_staff` |
 | Création catégorie paiement admin | `POST /api/paiements/admin/payment-categories/` | Oui, admin `is_staff` |
 | Détail catégorie paiement admin | `GET /api/paiements/admin/payment-categories/{id}/` | Oui, admin `is_staff` |
@@ -151,14 +153,53 @@ tableau affiche les colonnes Pays, Devise, Catégorie, Nom fournisseur, Actif, O
 Actions. Les listes Pays (`GET /api/pharmacies/countries/`), Devise
 (`GET /api/paiements/currencies/`, public) et Catégorie (`GET /api/paiements/admin/payment-categories/`)
 peuplent les menus déroulants du formulaire : aucune valeur n'est codée en dur. Le champ
-Pays utilise `getAdminCountries` qui accepte la réponse de
-`GET /api/pharmacies/countries/` qu'elle soit un tableau simple ou un objet paginé
-`{ count, next, previous, results }`. Le formulaire
+Pays utilise `getAdminCountries` qui consomme `GET /api/pharmacies/countries/`
+(qu'elle renvoie un tableau simple ou un objet paginé `{ count, next, previous, results }`) ;
+les pages successives sont chargées en suivant le lien `next` afin d'afficher la liste
+complète. Le formulaire
 modal valide les champs obligatoires (pays, devise, catégorie, nom, code) et l'ordre
 (entier positif). La suppression nécessite une confirmation explicite. Les retours
 succès/erreur utilisent un toast automatique. Hypothèse de schéma d'écriture (backend non
 présent dans le dépôt) : `country` = code ISO2, `currency` = code devise, `category` = id
 de catégorie ; à confirmer contre le sérialiseur Django si le comportement diffère.
+
+La page `/admin/settings/user-payment-accounts` consomme uniquement
+`GET /api/admin/user-payment-accounts/` (liste) et la page détail
+`/admin/settings/user-payment-accounts/{id}` consomme uniquement
+`GET /api/admin/user-payment-accounts/{id}/`. Cette section est en **lecture seule** :
+`lib/api/admin.ts` n'expose volontairement que `getAdminUserPaymentAccounts` et
+`getAdminUserPaymentAccount`. Les routes d'écriture du backend
+(`/api/admin/user-payment-accounts-management/`, `POST`, `PUT`, `PATCH`, `DELETE`,
+`activate`, `deactivate`) ne sont pas appelées par le frontend et aucun bouton de
+modification n'est affiché.
+
+Paramètres de requête envoyés à la liste :
+
+- `search` : recherche backend sur `account_identifier` (numéro) et `account_name`
+  (titulaire), envoyée après un debounce de 450 ms ;
+- `is_active` : `true` ou `false` pour le filtre Actif/Inactif, omis pour « Tous les
+  comptes ».
+
+Champs utilisés dans la réponse (sérialiseur admin) : `id`, `user` (UUID du
+propriétaire), `provider` (id du fournisseur), `currency`, `currency_code`,
+`currency_name`, `account_identifier`, `account_name`, `is_default`, `is_verified`,
+`is_active`, `created_at` et `updated_at`. L'endpoint renvoie actuellement un tableau
+simple (pas de pagination backend) ; le format `{ results: [...] }` est également
+accepté par le service frontend. La pagination du tableau (10 lignes par page) est donc
+réalisée côté frontend sur les résultats déjà filtrés par l'API.
+
+Comme l'API des comptes ne renvoie que des identifiants, les libellés affichés
+(utilisateur, fournisseur, pays) sont résolus à partir d'appels existants :
+`GET /api/admin/users/` via `getAdminUsersDirectory` (annuaire chargé page par page en
+suivant le lien `next`, 25 pages maximum), `GET /api/admin/payment-providers/` via
+`getAdminPaymentProviders` et `GET /api/pharmacies/countries/` via `getAdminCountries`.
+Le pays provient du fournisseur associé au compte (le sérialiseur admin renvoie l'id du
+pays ; un code ISO2 est aussi accepté), et la devise provient de `currency_code`. Ces
+trois appels sont isolés (`Promise.allSettled`) : leur échec n'empêche pas l'affichage du
+tableau, seuls les libellés retombent sur les identifiants bruts. La page détail affiche
+les informations utilisateur, les informations de paiement et un bloc « Historique »
+limité à `created_at` et `updated_at`, l'API ne fournissant aucun journal d'événements
+pour un compte de paiement.
 
 
 La page `/admin/payments` consomme `GET /api/admin/referral-withdrawals/` pour
