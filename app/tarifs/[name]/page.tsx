@@ -9,6 +9,10 @@ import { LoadingBubble } from "@/components/ui/loading-bubble";
 import { CurrentSubscriptionCard } from "@/components/pricing/current-subscription-card";
 import { PlanElements } from "@/components/pricing/plan-elements";
 import {
+  SubscriptionConfirmation,
+  type ConfirmationTotals,
+} from "@/components/pricing/subscription-confirmation";
+import {
   getPharmacySubscriptionPayment,
   getPharmacyPlan,
   getUserPharmacies,
@@ -29,6 +33,8 @@ import {
 type PageState = "loading" | "error" | "ready";
 type PharmacyState = "idle" | "unauthenticated" | "loading" | "error" | "empty" | "ready";
 type PaymentState = "idle" | "starting" | "opening" | "paying" | "confirming" | "validated" | "error";
+// Etape du parcours : selection des options puis confirmation avant paiement.
+type CheckoutStep = "selection" | "confirmation";
 
 type CommitmentOption = {
   months: number;
@@ -65,6 +71,7 @@ export default function PlanDetailPage() {
 
   // Nombre d'utilisateurs actifs a inclure dans l'abonnement (modele seat-based).
   const [userCountInput, setUserCountInput] = useState("1");
+  const [step, setStep] = useState<CheckoutStep>("selection");
 
   useEffect(() => {
     let isMounted = true;
@@ -176,6 +183,63 @@ export default function PlanDetailPage() {
   const userCountError = isUserCountValid
     ? ""
     : "Saisissez un nombre d'utilisateurs valide (au moins 1).";
+
+  // Verifications bloquantes avant la confirmation de la commande.
+  const validationErrors = useMemo(() => {
+    const errors: string[] = [];
+
+    if (!plan) {
+      errors.push("Aucun plan n'est sélectionné.");
+    }
+
+    if (!isUserCountValid) {
+      errors.push("Le nombre d'utilisateurs est invalide : saisissez un entier supérieur ou égal à 1.");
+    }
+
+    if (!selectedCommitment || selectedCommitment.months < 1) {
+      errors.push("Aucune durée d'engagement n'est sélectionnée.");
+    }
+
+    if (!selectedPharmacy) {
+      errors.push("Aucune pharmacie n'est sélectionnée pour cet abonnement.");
+    } else if (!selectedPharmacy.reference && !selectedPharmacy.id) {
+      errors.push("La référence de la pharmacie sélectionnée est introuvable.");
+    }
+
+    return errors;
+  }, [isUserCountValid, plan, selectedCommitment, selectedPharmacy]);
+
+  const canConfirm = validationErrors.length === 0;
+  const isPaymentBusy =
+    paymentState === "starting" ||
+    paymentState === "opening" ||
+    paymentState === "paying" ||
+    paymentState === "confirming";
+
+  // Le recapitulatif reprend les montants deja calcules : aucune nouvelle
+  // logique metier n'est introduite ici.
+  const confirmationTotals = useMemo<ConfirmationTotals>(() => {
+    const userCount = isUserCountValid ? parsedUserCount : 0;
+    const unitPrice = parseAmount(plan?.pricePerUserMonth ?? plan?.priceMonthly);
+    const aiCreditsPerUser = plan?.includedAiCreditPerUserMonth
+      ? plan.includedAiCreditPerUserMonth
+      : plan?.analysisCredits?.enabled
+        ? plan.analysisCredits.perUserMonthlyAnalysisCredits
+        : 0;
+
+    return {
+      unitPrice,
+      userCount,
+      monthlyAmount: unitPrice * userCount,
+      durationMonths: selectedCommitment?.months ?? 0,
+      subtotal: orderSummary.subtotal,
+      discountPercentage: selectedCommitment?.discountPercentage ?? 0,
+      discountAmount: orderSummary.discountAmount,
+      totalAmount: orderSummary.totalAmount,
+      aiCreditsPerUser,
+      aiCreditsTotal: aiCreditsPerUser * userCount,
+    };
+  }, [isUserCountValid, orderSummary, parsedUserCount, plan, selectedCommitment]);
   const currentPlanPath = planName ? "/tarifs/" + encodeURIComponent(planName) : "/tarifs";
   const createPharmacyHref =
     "/app/pharmacies/create?return_to=" + encodeURIComponent(currentPlanPath);
@@ -257,8 +321,31 @@ export default function PlanDetailPage() {
     }
   }
 
+  function goToConfirmation() {
+    if (!canConfirm) {
+      return;
+    }
+
+    setPaymentMessage("");
+    if (paymentState === "error") {
+      setPaymentState("idle");
+    }
+    setStep("confirmation");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function backToSelection() {
+    setStep("selection");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   async function handleStartPayment() {
     if (!plan || !selectedPharmacy) {
+      return;
+    }
+
+    // Garde-fou : on ne declenche jamais le paiement sur une commande invalide.
+    if (!canConfirm) {
       return;
     }
 
@@ -314,7 +401,30 @@ export default function PlanDetailPage() {
               </div>
             )}
 
-            {state === "ready" && plan && (
+            {state === "ready" && plan && step === "confirmation" && (
+              <SubscriptionConfirmation
+                currency={plan.currency}
+                disabled={!canConfirm || isPaymentBusy || paymentState === "validated"}
+                isSubmitting={isPaymentBusy}
+                paymentMessage={paymentMessage}
+                paymentTone={
+                  paymentState === "error"
+                    ? "error"
+                    : paymentState === "validated"
+                      ? "success"
+                      : "neutral"
+                }
+                plan={plan}
+                selectedPharmacy={selectedPharmacy}
+                submitLabel={buildPaymentButtonLabel(paymentState)}
+                totals={confirmationTotals}
+                validationErrors={validationErrors}
+                onBack={backToSelection}
+                onConfirm={handleStartPayment}
+              />
+            )}
+
+            {state === "ready" && plan && step === "selection" && (
               <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
                 <div className="grid gap-6">
                   <PlanDetailsCard plan={plan} />
@@ -359,16 +469,8 @@ export default function PlanDetailPage() {
                     planName={plan.name}
                     selectedPharmacy={selectedPharmacy}
                     userCountError={userCountError}
-                    onContinue={handleStartPayment}
-                    disabled={
-                      pharmacyState !== "ready" ||
-                      !selectedPharmacy ||
-                      !isUserCountValid ||
-                      paymentState === "starting" ||
-                      paymentState === "opening" ||
-                      paymentState === "paying" ||
-                      paymentState === "confirming"
-                    }
+                    onContinue={goToConfirmation}
+                    disabled={!canConfirm || isPaymentBusy}
                     paymentMessage={paymentMessage}
                     paymentState={paymentState}
                     totalAmount={orderSummary.totalAmount}
@@ -750,14 +852,11 @@ function OrderSummary({
   totalAmount: number;
   userCountError?: string;
 }) {
+  // A cette etape on ne declenche plus le paiement : on ouvre le recapitulatif.
   const buttonLabel =
-    paymentState === "starting" || paymentState === "opening"
-      ? "Ouverture du paiement..."
-      : paymentState === "paying"
-        ? "Paiement en cours..."
-        : paymentState === "confirming"
-          ? "Confirmation serveur..."
-          : "Continuer vers le paiement";
+    paymentState === "idle" || paymentState === "error"
+      ? "Vérifier ma commande"
+      : buildPaymentButtonLabel(paymentState);
 
   return (
     <section className="rounded-lg border border-app-border bg-app-card p-5 shadow-soft">
@@ -880,6 +979,26 @@ function SummaryRow({
       </span>
     </div>
   );
+}
+
+function buildPaymentButtonLabel(paymentState: PaymentState) {
+  if (paymentState === "starting" || paymentState === "opening") {
+    return "Ouverture du paiement...";
+  }
+
+  if (paymentState === "paying") {
+    return "Paiement en cours...";
+  }
+
+  if (paymentState === "confirming") {
+    return "Confirmation serveur...";
+  }
+
+  if (paymentState === "validated") {
+    return "Paiement confirmé";
+  }
+
+  return "Confirmer et continuer vers le paiement";
 }
 
 function buildOrderSummary(plan: PharmacyPlan | null, commitment: CommitmentOption) {
