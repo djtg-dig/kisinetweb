@@ -51,19 +51,82 @@ function emptyForm(): ProviderFormState {
   };
 }
 
-// Pré-remplit le formulaire à partir d'un fournisseur existant (édition).
-function formFromProvider(provider: AdminPaymentProvider): ProviderFormState {
-  const categoryValue =
-    typeof provider.category === "object" && provider.category
-      ? provider.category.id
-      : typeof provider.category === "number"
-        ? provider.category
-        : "";
+// Résout la valeur d'un champ de sélection à partir de la forme renvoyée par le
+// backend vers la `value` exacte utilisée par les <option> du formulaire.
+// Le sérialiseur Django peut renvoyer ces champs sous plusieurs formes (code
+// ISO2 / code devise / clé primaire numérique, ou objet imbriqué). Sans
+// résolution, la <select> contrôlé ne trouve aucune <option> correspondante et
+// affiche le placeholder (d'où la nécessité de resélectionner à chaque édition).
+// Priorité : correspondance directe (insensible à la casse), puis recherche
+// par clé primaire, puis extraction depuis un objet imbriqué. Renvoie "" si
+// rien ne correspond (comportement inchangé hors pré-sélection).
+function resolveSelectValue(
+  raw: unknown,
+  items: { id: number; [key: string]: unknown }[],
+  keyField: string,
+): string {
+  if (raw === null || raw === undefined || raw === "") {
+    return "";
+  }
 
+  // Correspondance directe : la chaîne renvoyée est déjà la clé utilisée en
+  // `value` des options (ex. code ISO2 ou code devise).
+  if (typeof raw === "string") {
+    const needle = raw.toLowerCase();
+    const found = items.find(
+      (item) => String(item[keyField]).toLowerCase() === needle,
+    );
+    if (found) {
+      return String(found[keyField]);
+    }
+  }
+
+  // Clé primaire numérique, ou chaîne la représentant.
+  const id =
+    typeof raw === "number"
+      ? raw
+      : typeof raw === "string" && /^\d+$/.test(raw)
+        ? Number(raw)
+        : undefined;
+  if (id !== undefined) {
+    const found = items.find((item) => item.id === id);
+    if (found && found[keyField] !== undefined && found[keyField] !== null) {
+      return String(found[keyField]);
+    }
+  }
+
+  // Objet imbriqué renvoyé par un sérialiseur Django (related field imbriqué).
+  if (typeof raw === "object") {
+    const obj = raw as { id?: unknown; [key: string]: unknown };
+    const direct = obj[keyField];
+    if (typeof direct === "string") {
+      return direct;
+    }
+    if (typeof obj.id === "number") {
+      const found = items.find((item) => item.id === obj.id);
+      if (found && found[keyField] !== undefined && found[keyField] !== null) {
+        return String(found[keyField]);
+      }
+    }
+  }
+
+  return "";
+}
+
+// Pré-remplit le formulaire à partir d'un fournisseur existant (édition).
+// Les champs pays/devise/catégorie sont résolus vers la `value` exacte des
+// <option> (à partir des listes chargées) afin que le modal présélectionne
+// correctement l'élément existant.
+function formFromProvider(
+  provider: AdminPaymentProvider,
+  countries: AdminCountryOption[],
+  currencies: AdminPaymentCurrency[],
+  categories: AdminPaymentCategory[],
+): ProviderFormState {
   return {
-    country: provider.country ?? "",
-    currency: provider.currency ?? "",
-    category: categoryValue === "" ? "" : String(categoryValue),
+    country: resolveSelectValue(provider.country, countries, "iso2"),
+    currency: resolveSelectValue(provider.currency, currencies, "code"),
+    category: resolveSelectValue(provider.category, categories, "id"),
     name: provider.name ?? "",
     code: provider.code ?? "",
     description: provider.description ?? "",
@@ -189,7 +252,7 @@ export default function AdminPaymentProvidersPage() {
 
   function openEdit(provider: AdminPaymentProvider) {
     setEditingProvider(provider);
-    setForm(formFromProvider(provider));
+    setForm(formFromProvider(provider, countries, currencies, categories));
     setModalMode("edit");
   }
 
