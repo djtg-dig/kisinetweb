@@ -5,20 +5,26 @@ export type PlanElement = { label: string; value: string };
 export function buildPlanElements(plan: PharmacyPlan): PlanElement[] {
   const elements: PlanElement[] = [];
 
-  if (plan.unlimitedUsers) {
-    elements.push({ label: "Utilisateurs", value: "Illimité" });
-  } else if (plan.maxUsers && plan.maxUsers !== 0) {
-    elements.push({ label: "Utilisateurs", value: String(plan.maxUsers) });
-  }
+  // Modele seat-based : tous les plans permettent d'ajouter autant
+  // d'utilisateurs que necessaire, la facturation suivant le nombre
+  // d'utilisateurs actifs.
+  elements.push({ label: "Utilisateurs", value: "Illimité" });
 
   if (plan.unlimitedProducts) {
     elements.push({ label: "Produits", value: "Illimité" });
   }
 
-  if (plan.analysisCredits?.enabled) {
+  // Credits IA inclus par utilisateur et par mois (priorite au champ
+  // seat-based, repli sur l'ancien champ analysisCredits).
+  const aiCreditsPerUser = plan.includedAiCreditPerUserMonth
+    ? plan.includedAiCreditPerUserMonth
+    : plan.analysisCredits?.enabled
+      ? plan.analysisCredits.perUserMonthlyAnalysisCredits
+      : 0;
+  if (aiCreditsPerUser > 0) {
     elements.push({
-      label: plan.analysisCredits.label || "Crédits d'analyse",
-      value: formatCredits(plan.analysisCredits.perUserMonthlyAnalysisCredits) + " / utilisateur / mois",
+      label: "Crédits IA inclus",
+      value: formatCredits(aiCreditsPerUser) + " / utilisateur / mois",
     });
   }
 

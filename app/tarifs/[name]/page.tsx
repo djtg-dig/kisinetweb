@@ -383,8 +383,13 @@ function PlanDetailsCard({ plan }: { plan: PharmacyPlan }) {
         </span>
         <div>
           <h1 className="text-2xl font-bold text-app-text sm:text-3xl">{plan.name}</h1>
-          <p className="text-xs font-medium uppercase tracking-wide text-app-muted">
-            {plan.code}
+          <p className="flex flex-wrap items-center gap-2 text-xs font-medium uppercase tracking-wide text-app-muted">
+            <span>{plan.code}</span>
+            {typeof plan.version === "number" && (
+              <span className="rounded-full bg-app-background px-2 py-0.5 text-[0.65rem] font-semibold text-app-muted ring-1 ring-app-border">
+                v{plan.version}
+              </span>
+            )}
           </p>
         </div>
       </div>
@@ -395,13 +400,16 @@ function PlanDetailsCard({ plan }: { plan: PharmacyPlan }) {
 
       <div className="mt-6 border-t border-app-border pt-6">
         <p className="flex flex-wrap items-baseline gap-1 text-4xl font-bold text-app-text">
-          {plan.priceMonthly ? (
+          {plan.pricePerUserMonth || plan.priceMonthly ? (
             <>
-              {formatAmount(parseAmount(plan.priceMonthly))}
+              {formatAmount(parseAmount(plan.pricePerUserMonth || plan.priceMonthly))}
               {plan.currency ? (
                 <span className="text-lg font-medium text-app-muted">{plan.currency}</span>
               ) : null}
-              <span className="text-base font-medium text-app-muted"> / mois</span>
+              <span className="text-base font-medium text-app-muted">
+                {" "}
+                / utilisateur / mois
+              </span>
             </>
           ) : (
             "Prix à définir"

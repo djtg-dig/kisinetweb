@@ -48,9 +48,20 @@ export default function TarifsPage() {
                 Des plans préparés pour chaque étape
               </h1>
               <p className="mt-4 text-sm leading-6 text-app-muted sm:text-base">
-                Choisissez l'offre qui correspond à la taille et aux besoins de votre
-                pharmacie.
+                Tous nos plans permettent d'ajouter autant d'utilisateurs que
+                nécessaire. La facturation dépend du nombre d'utilisateurs actifs,
+                et les crédits d'analyse IA inclus augmentent avec le nombre
+                d'utilisateurs.
               </p>
+
+              <div className="mt-6 rounded-2xl border border-primary-200 bg-primary-50/60 p-5 text-left text-sm sm:mx-auto sm:max-w-2xl">
+                <p className="font-semibold text-primary-700">Exemple</p>
+                <ul className="mt-2 space-y-1 text-app-muted">
+                  <li>10 utilisateurs actifs</li>
+                  <li>Prix mensuel = 10 × prix par utilisateur</li>
+                  <li>Crédits IA = 10 × crédits inclus par utilisateur</li>
+                </ul>
+              </div>
             </div>
 
             <div className="mt-12">
@@ -107,8 +118,13 @@ export default function TarifsPage() {
                         </span>
                         <div>
                           <h2 className="text-xl font-bold text-app-text">{plan.name}</h2>
-                          <p className="text-xs font-medium uppercase tracking-wide text-app-muted">
-                            {plan.code}
+                          <p className="flex flex-wrap items-center gap-2 text-xs font-medium uppercase tracking-wide text-app-muted">
+                            <span>{plan.code}</span>
+                            {typeof plan.version === "number" && (
+                              <span className="rounded-full bg-app-background px-2 py-0.5 text-[0.65rem] font-semibold text-app-muted ring-1 ring-app-border">
+                                v{plan.version}
+                              </span>
+                            )}
                           </p>
                         </div>
                       </div>
@@ -118,10 +134,10 @@ export default function TarifsPage() {
                       </p>
 
                       <div className="mt-4 border-t border-app-border pt-4">
-                        <p className="flex items-baseline gap-1 text-3xl font-bold text-app-text">
-                          {plan.priceMonthly ? (
+                        <p className="flex flex-wrap items-baseline gap-1 text-3xl font-bold text-app-text">
+                          {plan.pricePerUserMonth || plan.priceMonthly ? (
                             <>
-                              {plan.priceMonthly}
+                              {plan.pricePerUserMonth || plan.priceMonthly}
                               {plan.currency ? (
                                 <span className="text-base font-medium text-app-muted">
                                   {plan.currency}
@@ -129,7 +145,7 @@ export default function TarifsPage() {
                               ) : null}
                               <span className="text-sm font-medium text-app-muted">
                                 {" "}
-                                / mois
+                                / utilisateur / mois
                               </span>
                             </>
                           ) : (
