@@ -63,6 +63,9 @@ export default function PlanDetailPage() {
   const [checkoutUrl, setCheckoutUrl] = useState("");
   const [activePayment, setActivePayment] = useState<PharmacySubscriptionPayment | null>(null);
 
+  // Nombre d'utilisateurs actifs a inclure dans l'abonnement (modele seat-based).
+  const [userCountInput, setUserCountInput] = useState("1");
+
   useEffect(() => {
     let isMounted = true;
 
@@ -164,6 +167,15 @@ export default function PlanDetailPage() {
     () => buildOrderSummary(plan, selectedCommitment),
     [plan, selectedCommitment],
   );
+  const parsedUserCount = Number(userCountInput);
+  const isUserCountValid =
+    userCountInput.trim() !== "" &&
+    Number.isFinite(parsedUserCount) &&
+    Number.isInteger(parsedUserCount) &&
+    parsedUserCount >= 1;
+  const userCountError = isUserCountValid
+    ? ""
+    : "Saisissez un nombre d'utilisateurs valide (au moins 1).";
   const currentPlanPath = planName ? "/tarifs/" + encodeURIComponent(planName) : "/tarifs";
   const createPharmacyHref =
     "/app/pharmacies/create?return_to=" + encodeURIComponent(currentPlanPath);
@@ -306,6 +318,13 @@ export default function PlanDetailPage() {
               <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
                 <div className="grid gap-6">
                   <PlanDetailsCard plan={plan} />
+                  <UserCountSection
+                    currency={plan.currency}
+                    error={userCountError}
+                    plan={plan}
+                    userCountInput={userCountInput}
+                    onUserCountChange={setUserCountInput}
+                  />
                   <CommitmentSelector
                     currency={plan.currency}
                     options={commitmentOptions}
@@ -339,11 +358,12 @@ export default function PlanDetailPage() {
                     discountPercentage={selectedCommitment.discountPercentage}
                     planName={plan.name}
                     selectedPharmacy={selectedPharmacy}
-                    totalAmount={orderSummary.totalAmount}
+                    userCountError={userCountError}
                     onContinue={handleStartPayment}
                     disabled={
                       pharmacyState !== "ready" ||
                       !selectedPharmacy ||
+                      !isUserCountValid ||
                       paymentState === "starting" ||
                       paymentState === "opening" ||
                       paymentState === "paying" ||
@@ -351,6 +371,7 @@ export default function PlanDetailPage() {
                     }
                     paymentMessage={paymentMessage}
                     paymentState={paymentState}
+                    totalAmount={orderSummary.totalAmount}
                   />
                 </aside>
               </div>
@@ -583,6 +604,121 @@ function PharmacySubscriptionSection({
   );
 }
 
+function UserCountSection({
+  currency,
+  error,
+  plan,
+  userCountInput,
+  onUserCountChange,
+}: {
+  currency?: string;
+  error: string;
+  plan: PharmacyPlan;
+  userCountInput: string;
+  onUserCountChange: (value: string) => void;
+}) {
+  const parsed = Number(userCountInput);
+  const valid = userCountInput.trim() !== "" && Number.isInteger(parsed) && parsed >= 1;
+  const unitPrice = parseAmount(plan.pricePerUserMonth ?? plan.priceMonthly);
+  const monthlyTotal = valid ? unitPrice * parsed : 0;
+  const aiPerUser = plan.includedAiCreditPerUserMonth
+    ? plan.includedAiCreditPerUserMonth
+    : plan.analysisCredits?.enabled
+      ? plan.analysisCredits.perUserMonthlyAnalysisCredits
+      : 0;
+  const aiTotal = valid ? aiPerUser * parsed : 0;
+
+  function change(value: string) {
+    // On refuse tout caractere non numerique : pas de signe, ni de decimales.
+    onUserCountChange(value.replace(/[^\d]/g, ""));
+  }
+
+  function step(delta: number) {
+    const current = Number(userCountInput) || 0;
+    onUserCountChange(String(Math.max(1, current + delta)));
+  }
+
+  return (
+    <section className="rounded-lg border border-app-border bg-app-card p-5 shadow-sm sm:p-7">
+      <p className="text-sm font-semibold uppercase tracking-wide text-app-muted">
+        Utilisateurs
+      </p>
+      <h2 className="mt-2 text-xl font-bold text-app-text">
+        Combien d'utilisateurs actifs ?
+      </h2>
+
+      <div className="mt-5 flex flex-wrap items-end gap-4">
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="user-count" className="text-sm font-medium text-app-text">
+            Nombre d'utilisateurs
+          </label>
+          <div className="flex items-stretch gap-2">
+            <button
+              type="button"
+              onClick={() => step(-1)}
+              disabled={!valid || parsed <= 1}
+              aria-label="Diminuer le nombre d'utilisateurs"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-app-border bg-app-surface text-xl font-bold text-app-text transition hover:bg-primary-50 focus:outline-none focus:ring-4 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              −
+            </button>
+            <input
+              id="user-count"
+              type="text"
+              inputMode="numeric"
+              value={userCountInput}
+              onChange={(event) => change(event.target.value)}
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? "user-count-error" : undefined}
+              className={`h-11 w-24 rounded-md border bg-app-surface px-3 text-center text-sm font-semibold text-app-text outline-none transition focus:ring-4 focus:ring-primary-100 ${
+                error
+                  ? "border-red-300 focus:border-red-400"
+                  : "border-app-border focus:border-primary-500"
+              }`}
+            />
+            <button
+              type="button"
+              onClick={() => step(1)}
+              aria-label="Augmenter le nombre d'utilisateurs"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-app-border bg-app-surface text-xl font-bold text-app-text transition hover:bg-primary-50 focus:outline-none focus:ring-4 focus:ring-primary-100"
+            >
+              +
+            </button>
+          </div>
+        </div>
+        <p className="max-w-xs text-sm leading-5 text-app-muted">
+          Tous les plans permettent d'ajouter autant d'utilisateurs que nécessaire.
+          La facturation dépend du nombre d'utilisateurs actifs.
+        </p>
+      </div>
+
+      {error ? (
+        <p
+          id="user-count-error"
+          className="mt-3 rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700"
+        >
+          {error}
+        </p>
+      ) : null}
+
+      <div className="mt-5 grid gap-3 border-t border-app-border pt-5 text-sm">
+        <SummaryRow label="Plan" value={plan.name} />
+        <SummaryRow label="Utilisateurs" value={valid ? formatAmount(parsed) : "—"} />
+        <SummaryRow label="Prix par utilisateur" value={formatMoney(unitPrice, currency)} />
+        <SummaryRow
+          label="Total mensuel"
+          value={valid ? formatMoney(monthlyTotal, currency) : "—"}
+          strong
+        />
+        <SummaryRow
+          label="Crédits IA inclus"
+          value={valid ? formatAnalysisCredits(aiTotal) + " / mois" : "—"}
+        />
+      </div>
+    </section>
+  );
+}
+
 function OrderSummary({
   analysisCredits,
   currency,
@@ -597,6 +733,7 @@ function OrderSummary({
   planName,
   selectedPharmacy,
   totalAmount,
+  userCountError,
 }: {
   analysisCredits?: PharmacyPlan["analysisCredits"];
   currency?: string;
@@ -611,6 +748,7 @@ function OrderSummary({
   planName: string;
   selectedPharmacy: PharmacySummary | null;
   totalAmount: number;
+  userCountError?: string;
 }) {
   const buttonLabel =
     paymentState === "starting" || paymentState === "opening"
@@ -661,6 +799,12 @@ function OrderSummary({
           />
         </div>
       </div>
+      {userCountError ? (
+        <p className="mt-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium leading-6 text-red-700">
+          {userCountError}
+        </p>
+      ) : null}
+
       {paymentMessage && (
         <p
           className={`mt-5 rounded-md border px-4 py-3 text-sm leading-6 ${
