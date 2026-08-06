@@ -1141,7 +1141,11 @@ Endpoints consommés:
 Flux agrégateur:
 
 1. `/tarifs/[name]` appelle l'endpoint de checkout avec `pharmacy_reference`,
-   `plan_code`, `duration_months` et `currency`.
+   `plan_code`, `plan_id`, `user_count`, `duration_months` et `currency`.
+   `plan_id` et `user_count` (facturation par utilisateur) ne sont envoyés que
+   lorsqu'ils sont connus, afin de rester compatibles avec l'ancien contrat.
+   Le frontend ne transmet jamais de montant : le backend reste la seule source
+   de vérité pour le montant, les remises et les crédits IA inclus.
 2. Le backend crée un paiement `PENDING` et renvoie `checkout_url`.
 3. Le frontend ouvre `checkout_url` dans une iframe agrégateur.
 4. Le message frontend `agregateur-success` affiche une confirmation en cours mais ne

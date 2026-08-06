@@ -1182,26 +1182,80 @@ export async function getSeatBasedPlan(code: string): Promise<PharmacyPlan> {
   return normalizePharmacyPlan(data);
 }
 
+/**
+ * Initialise le paiement d'un abonnement (facturation par siege).
+ *
+ * Le frontend ne transmet que les informations de la commande : identifiant du
+ * plan, nombre d'utilisateurs, duree et devise. Le backend reste la seule
+ * source de verite pour le montant, les remises et les credits IA inclus :
+ * aucun montant n'est envoye ni recalcule ici.
+ */
 export async function initiateAgregateurSubscriptionCheckout(payload: {
   pharmacyReference: string;
   planCode: string;
   durationMonths: number;
   currency: string;
+  /** Identifiant numerique du plan seat-based, quand il est connu. */
+  planId?: number;
+  /** Nombre d'utilisateurs actifs factures (modele seat-based). */
+  userCount?: number;
 }): Promise<AgregateurSubscriptionCheckout> {
+  const pharmacyReference = payload.pharmacyReference.trim();
+  if (!pharmacyReference) {
+    throw new Error("La référence de la pharmacie est requise pour lancer le paiement.");
+  }
+
+  if (!payload.planCode && !Number.isFinite(payload.planId)) {
+    throw new Error("Le plan sélectionné est introuvable.");
+  }
+
+  if (!Number.isInteger(payload.durationMonths) || payload.durationMonths < 1) {
+    throw new Error("La durée d'abonnement sélectionnée est invalide.");
+  }
+
+  if (
+    payload.userCount !== undefined &&
+    (!Number.isInteger(payload.userCount) || payload.userCount < 1)
+  ) {
+    throw new Error("Le nombre d'utilisateurs doit être un entier supérieur ou égal à 1.");
+  }
+
+  const body: UnknownRecord = {
+    pharmacy_reference: pharmacyReference,
+    plan_code: payload.planCode,
+    duration_months: payload.durationMonths,
+    currency: payload.currency,
+  };
+
+  // Champs seat-based : envoyes uniquement quand ils sont connus, afin de
+  // rester compatible avec l'ancien contrat de l'endpoint.
+  if (Number.isFinite(payload.planId) && Number(payload.planId) > 0) {
+    body.plan_id = Number(payload.planId);
+  }
+
+  if (payload.userCount !== undefined) {
+    body.user_count = payload.userCount;
+  }
+
   const data = await postJson<UnknownRecord>(
     "/api/paiements/pharmacy-subscriptions/agregateur/checkout/",
     "Impossible d'initialiser le paiement.",
-    {
-      pharmacy_reference: payload.pharmacyReference,
-      plan_code: payload.planCode,
-      duration_months: payload.durationMonths,
-      currency: payload.currency,
-    },
+    body,
   );
 
   const payment = normalizeSubscriptionPayment((data.payment || {}) as UnknownRecord);
+  const checkoutUrl = String(data.checkout_url || "");
+
+  // Le backend a repondu 2xx mais sans URL de paiement : on evite d'ouvrir un
+  // ecran de paiement vide et on remonte une erreur explicite.
+  if (!checkoutUrl) {
+    throw new Error(
+      "Le serveur n'a pas renvoyé d'URL de paiement. Réessayez dans quelques instants.",
+    );
+  }
+
   return {
-    checkoutUrl: String(data.checkout_url || ""),
+    checkoutUrl,
     payment,
     subscription: data.subscription,
   };

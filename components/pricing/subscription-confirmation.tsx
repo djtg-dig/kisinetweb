@@ -262,9 +262,16 @@ export function SubscriptionConfirmation({
               type="button"
               onClick={onConfirm}
               disabled={disabled}
+              aria-busy={isSubmitting}
               aria-describedby={hasErrors ? "confirmation-blocked" : undefined}
-              className="sm:w-auto"
+              className="gap-2 sm:w-auto"
             >
+              {isSubmitting && (
+                <span
+                  aria-hidden="true"
+                  className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-white/40 border-t-white"
+                />
+              )}
               {submitLabel}
             </Button>
           </div>

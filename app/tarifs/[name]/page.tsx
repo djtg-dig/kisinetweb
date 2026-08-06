@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { PublicLayout } from "@/components/layout/public-layout";
 import { Button } from "@/components/ui/button";
@@ -72,6 +72,9 @@ export default function PlanDetailPage() {
   // Nombre d'utilisateurs actifs a inclure dans l'abonnement (modele seat-based).
   const [userCountInput, setUserCountInput] = useState("1");
   const [step, setStep] = useState<CheckoutStep>("selection");
+  // Verrou synchrone contre les doubles clics sur le bouton de paiement :
+  // le state React est asynchrone et laisse passer deux clics rapproches.
+  const isStartingPaymentRef = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -349,13 +352,27 @@ export default function PlanDetailPage() {
       return;
     }
 
+    // Anti double-clic : une initiation deja en cours (ou un paiement confirme)
+    // ne doit jamais creer un second paiement cote backend. La ref est lue et
+    // ecrite de facon synchrone, contrairement au state React qui laisse
+    // passer deux clics rapproches sur le meme rendu.
+    if (isStartingPaymentRef.current || isPaymentBusy || paymentState === "validated") {
+      return;
+    }
+
+    isStartingPaymentRef.current = true;
     setPaymentState("starting");
     setPaymentMessage("");
 
+    // Le frontend n'envoie que les informations de la commande ; le backend
+    // reste la seule source de verite pour le montant, les remises et les
+    // credits IA inclus. Aucun montant n'est calcule ici.
     try {
       const checkout = await initiateAgregateurSubscriptionCheckout({
         pharmacyReference: selectedPharmacy.reference || selectedPharmacy.id,
         planCode: plan.code,
+        planId: plan.id,
+        userCount: isUserCountValid ? parsedUserCount : undefined,
         durationMonths: selectedCommitment.months,
         currency: plan.currency || "USD",
       });
@@ -364,10 +381,13 @@ export default function PlanDetailPage() {
       setPaymentState("opening");
       setPaymentMessage("Ouverture du paiement sécurisé...");
     } catch (error) {
+      // On affiche le message metier renvoye par le backend et on ne retombe
+      // sur un message generique que s'il n'y en a aucun.
+      const backendMessage = error instanceof Error ? error.message.trim() : "";
       setPaymentState("error");
-      setPaymentMessage(
-        error instanceof Error ? error.message : "Impossible de démarrer le paiement.",
-      );
+      setPaymentMessage(backendMessage || "Impossible de démarrer le paiement.");
+    } finally {
+      isStartingPaymentRef.current = false;
     }
   }
 
