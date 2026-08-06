@@ -383,6 +383,18 @@ function getRecord(value: unknown): UnknownRecord | null {
   return value && typeof value === "object" ? (value as UnknownRecord) : null;
 }
 
+/**
+ * Normalise une reponse de liste. Le backend renvoie soit un tableau brut,
+ * soit une enveloppe paginee `{count, next, previous, results}` selon
+ * l'endpoint : on accepte les deux formes.
+ */
+function toRecordList(value: unknown): UnknownRecord[] {
+  const record = getRecord(value);
+  const rows = Array.isArray(value) ? value : Array.isArray(record?.results) ? record.results : [];
+
+  return rows.filter((item: unknown): item is UnknownRecord => Boolean(item) && typeof item === "object");
+}
+
 function normalizePharmacy(item: UnknownRecord): PharmacySummary {
   const id = item.reference ?? item.id ?? item.pk;
   const databaseId = item.id ?? item.pk;
@@ -959,6 +971,19 @@ export type PharmacyPlan = {
   durations: PharmacyPlanDuration[];
   analysisCredits?: PharmacyPlanAnalysisCredits;
   highlighted?: boolean;
+  // --- Champs facturation par siege (seat-based) ---
+  // Renvoyes par la nouvelle API `/api/paiements/plans/`. Ils restent optionnels
+  // pour ne pas casser l'ancienne API `/api/paiements/pharmacy-plans/` qui ne
+  // les expose pas.
+  version?: number;
+  pricePerUserMonth?: string;
+  includedAiCreditPerUserMonth?: number;
+  minBillableUsers?: number;
+  currencyId?: number;
+  isActive?: boolean;
+  featuresMap?: Record<string, boolean>;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type PharmacySubscriptionPayment = {
@@ -982,6 +1007,19 @@ export type AgregateurSubscriptionCheckout = {
   subscription?: unknown;
 };
 
+/**
+ * Champs seat-based ajoutes sur l'abonnement par le backend.
+ * Tous optionnels : l'ancienne reponse d'abonnement reste valide.
+ */
+export type PharmacySubscriptionSeatBilling = {
+  pricingPlan?: number | null;
+  planSnapshot?: Record<string, unknown>;
+  currentUserCount?: number;
+  unitPriceSnapshot?: string;
+  monthlyAmount?: string;
+  billingCycleAnchor?: string | null;
+};
+
 function normalizeSubscriptionPayment(item: UnknownRecord): PharmacySubscriptionPayment {
   return {
     id: Number(item.id),
@@ -1000,16 +1038,24 @@ function normalizeSubscriptionPayment(item: UnknownRecord): PharmacySubscription
 }
 
 function normalizePharmacyPlan(item: UnknownRecord): PharmacyPlan {
+  // La nouvelle API seat-based renvoie `features` sous forme d'objet
+  // ({"can_export_pdf": true}) alors que l'ancienne renvoie un tableau
+  // ({label, enabled}). On alimente les deux representations.
+  const featuresMap = normalizePlanFeaturesMap(item.features);
+
   return {
     id: Number(item.id),
     code: String(item.code || ""),
     name: String(item.name || item.label || ""),
     description: String(item.description || item.tagline || ""),
-    priceMonthly: getText(item.price_monthly ?? item.price ?? item.monthly_price),
-    currency: String(item.currency || ""),
-    maxUsers: item.max_users === null ? null : Number(item.max_users),
-    maxBranches: item.max_branches === null ? null : Number(item.max_branches),
-    unlimitedUsers: Boolean(item.unlimited_users),
+    priceMonthly: getText(
+      item.price_monthly ?? item.price ?? item.monthly_price ?? item.price_per_user_month,
+    ),
+    currency: typeof item.currency === "string" ? item.currency : "",
+    maxUsers: item.max_users === null || item.max_users === undefined ? null : Number(item.max_users),
+    maxBranches: item.max_branches === null || item.max_branches === undefined ? null : Number(item.max_branches),
+    unlimitedUsers:
+      item.unlimited_users === undefined ? item.max_users === null : Boolean(item.unlimited_users),
     unlimitedProducts: Boolean(item.unlimited_products),
     unlimitedBranches: Boolean(item.unlimited_branches),
     features: Array.isArray(item.features)
@@ -1020,7 +1066,9 @@ function normalizePharmacyPlan(item: UnknownRecord): PharmacyPlan {
             enabled: Boolean(featureRecord.enabled),
           };
         })
-      : [],
+      : featuresMap
+        ? Object.entries(featuresMap).map(([label, enabled]) => ({ label, enabled }))
+        : [],
     durations: Array.isArray(item.durations)
       ? item.durations.map((duration: unknown) => {
           const durationRecord = duration as UnknownRecord;
@@ -1037,7 +1085,29 @@ function normalizePharmacyPlan(item: UnknownRecord): PharmacyPlan {
         ? normalizePharmacyPlanAnalysisCredits(item.analysis_credits as UnknownRecord)
         : undefined,
     highlighted: Boolean(item.highlighted ?? item.is_popular ?? item.popular),
+    version: item.version === undefined ? undefined : Number(item.version),
+    pricePerUserMonth: getText(item.price_per_user_month),
+    includedAiCreditPerUserMonth:
+      item.included_ai_credit_per_user_month === undefined
+        ? undefined
+        : Number(item.included_ai_credit_per_user_month),
+    minBillableUsers: item.min_billable_users === undefined ? undefined : Number(item.min_billable_users),
+    currencyId: typeof item.currency === "number" ? item.currency : undefined,
+    isActive: item.is_active === undefined ? undefined : Boolean(item.is_active),
+    featuresMap,
+    createdAt: getText(item.created_at),
+    updatedAt: getText(item.updated_at),
   };
+}
+
+function normalizePlanFeaturesMap(value: unknown): Record<string, boolean> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value as UnknownRecord).map(([key, entry]) => [key, Boolean(entry)]),
+  );
 }
 
 function normalizePharmacyPlanAnalysisCredits(item: UnknownRecord): PharmacyPlanAnalysisCredits {
@@ -1074,6 +1144,39 @@ export async function getPharmacyPlan(name: string): Promise<PharmacyPlan> {
   const data = await fetchPublicApiJson<UnknownRecord>(
     "/api/paiements/pharmacy-plans/" + encodeURIComponent(name) + "/",
     "Impossible de charger le plan pharmacie.",
+  );
+
+  return normalizePharmacyPlan(data);
+}
+
+/**
+ * Plans de la facturation par siege (`GET /api/paiements/plans/`).
+ *
+ * Endpoint distinct de `getPharmacyPlans()` qui, lui, consomme toujours
+ * l'ancien catalogue `/api/paiements/pharmacy-plans/`. Les deux sources
+ * coexistent cote backend et n'exposent pas les memes champs.
+ */
+export async function getSeatBasedPlans(
+  filters: { code?: string; search?: string; ordering?: string } = {},
+): Promise<PharmacyPlan[]> {
+  const params = new URLSearchParams();
+  appendFilter(params, "code", filters.code);
+  appendFilter(params, "search", filters.search);
+  appendFilter(params, "ordering", filters.ordering);
+
+  const path = "/api/paiements/plans/" + (params.size ? "?" + params.toString() : "");
+  const data = await fetchPublicApiJson<unknown>(path, "Impossible de charger les plans.");
+
+  return toRecordList(data)
+    .map((item) => normalizePharmacyPlan(item))
+    .filter((plan) => Boolean(plan.id) || Boolean(plan.code));
+}
+
+/** Detail d'un plan seat-based par code (`GET /api/paiements/plans/{code}/`). */
+export async function getSeatBasedPlan(code: string): Promise<PharmacyPlan> {
+  const data = await fetchPublicApiJson<UnknownRecord>(
+    "/api/paiements/plans/" + encodeURIComponent(code) + "/",
+    "Impossible de charger le plan.",
   );
 
   return normalizePharmacyPlan(data);

@@ -43,9 +43,13 @@ export function AdminAuthGuard({ children }: { children: React.ReactNode }) {
   }, []);
 
   if (state === "loading") {
+    // Écran de vérification de session : spinner existant centré verticalement
+    // et horizontalement. Le fond utilise la variable de thème (bg-app-background)
+    // qui suit la classe .dark posée sur <html> avant le premier paint, afin que
+    // l'écran respecte le thème actuel (clair/sombre) et n'affiche pas un flash blanc.
     return (
-      <main className="min-h-screen bg-app-background px-4 py-16">
-        <LoadingBubble label="Vérification de la session" className="min-h-[320px]" />
+      <main className="flex min-h-screen items-center justify-center bg-app-background">
+        <LoadingBubble label="Vérification de la session" />
       </main>
     );
   }
