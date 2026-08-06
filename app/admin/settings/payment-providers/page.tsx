@@ -7,6 +7,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
 import { Modal } from "@/components/ui/modal";
 import { ToastMessage } from "@/components/ui/toast";
+import { type ToastFeedback, type ToastFeedbackTone } from "@/lib/admin/toast-feedback";
 import {
   createAdminPaymentProvider,
   deleteAdminPaymentProvider,
@@ -24,14 +25,6 @@ import {
 
 type PageState = "loading" | "ready" | "error";
 type ModalMode = "details" | "create" | "edit" | null;
-// Un toast transitoire (succès / erreur / avertissement). La clé permet de
-// forcer le réaffichage et le redémarrage du chrono d'auto-fermeture même si le
-// texte est identique à un message précédent.
-type ToastState = {
-  tone: "success" | "error" | "warning";
-  text: string;
-  key: number;
-} | null;
 
 type ProviderFormState = {
   country: string;
@@ -98,9 +91,9 @@ export default function AdminPaymentProvidersPage() {
   const [saving, setSaving] = useState(false);
   // Toast global (succès / erreur / avertissement) affiché automatiquement et
   // disparaissant sans clic via le composant ToastMessage.
-  const [toast, setToast] = useState<ToastState>(null);
+  const [toast, setToast] = useState<ToastFeedback>(null);
 
-  function showToast(tone: "success" | "error" | "warning", text: string) {
+  function showToast(tone: ToastFeedbackTone, text: string) {
     setToast({ tone, text, key: Date.now() });
   }
 

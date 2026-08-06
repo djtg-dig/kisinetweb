@@ -11,6 +11,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
 import { Modal } from "@/components/ui/modal";
 import { ToastMessage } from "@/components/ui/toast";
+import { type ToastFeedback } from "@/lib/admin/toast-feedback";
 import {
   findAccountProvider,
   formatDateTime,
@@ -37,7 +38,6 @@ import {
 
 type PageState = "loading" | "ready" | "error";
 type ModalMode = "details" | "create" | "edit" | null;
-type FeedbackState = { tone: "success" | "error"; text: string } | null;
 
 // Formulaire de création/édition d'un compte de paiement.
 // `user` et `provider` sont stockés en chaîne (valeurs des <select>).
@@ -82,7 +82,7 @@ export default function AdminUserPaymentAccountsManagementPage() {
   const [accounts, setAccounts] = useState<AdminUserPaymentAccount[]>([]);
   const [state, setState] = useState<PageState>("loading");
   const [message, setMessage] = useState("");
-  const [feedback, setFeedback] = useState<FeedbackState>(null);
+  const [feedback, setFeedback] = useState<ToastFeedback>(null);
   const [refreshIndex, setRefreshIndex] = useState(0);
 
   const [search, setSearch] = useState("");
