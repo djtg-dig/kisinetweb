@@ -174,8 +174,8 @@ export default function PlanDetailPage() {
     commitmentOptions.find((option) => option.months === 12) ||
     commitmentOptions[0];
   const orderSummary = useMemo(
-    () => buildOrderSummary(plan, selectedCommitment),
-    [plan, selectedCommitment],
+    () => buildOrderSummary(plan, selectedCommitment, Number(userCountInput)),
+    [plan, selectedCommitment, userCountInput],
   );
   const parsedUserCount = Number(userCountInput);
   const isUserCountValid =
@@ -223,6 +223,9 @@ export default function PlanDetailPage() {
   // logique metier n'est introduite ici.
   const confirmationTotals = useMemo<ConfirmationTotals>(() => {
     const userCount = isUserCountValid ? parsedUserCount : 0;
+    // Source unique de verite : le prix unitaire par utilisateur. Le montant
+    // mensuel et le sous-total proviennent tous deux de `orderSummary`, deja
+    // calcule avec le nombre d'utilisateurs, afin d'eviter toute divergence.
     const unitPrice = parseAmount(plan?.pricePerUserMonth ?? plan?.priceMonthly);
     const aiCreditsPerUser = plan?.includedAiCreditPerUserMonth
       ? plan.includedAiCreditPerUserMonth
@@ -233,7 +236,7 @@ export default function PlanDetailPage() {
     return {
       unitPrice,
       userCount,
-      monthlyAmount: unitPrice * userCount,
+      monthlyAmount: orderSummary.monthlyPrice,
       durationMonths: selectedCommitment?.months ?? 0,
       subtotal: orderSummary.subtotal,
       discountPercentage: selectedCommitment?.discountPercentage ?? 0,
@@ -460,6 +463,7 @@ export default function PlanDetailPage() {
                     options={commitmentOptions}
                     plan={plan}
                     selectedMonths={selectedDurationMonths}
+                    userCount={parsedUserCount}
                     onSelect={setSelectedDurationMonths}
                   />
                   <PharmacySubscriptionSection
@@ -570,12 +574,14 @@ function CommitmentSelector({
   options,
   plan,
   selectedMonths,
+  userCount,
   onSelect,
 }: {
   currency?: string;
   options: CommitmentOption[];
   plan: PharmacyPlan;
   selectedMonths: number;
+  userCount: number;
   onSelect: (months: number) => void;
 }) {
   return (
@@ -591,7 +597,7 @@ function CommitmentSelector({
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {options.map((option) => {
-          const summary = buildOrderSummary(plan, option);
+          const summary = buildOrderSummary(plan, option, userCount);
           const isSelected = option.months === selectedMonths;
 
           return (
@@ -1021,10 +1027,18 @@ function buildPaymentButtonLabel(paymentState: PaymentState) {
   return "Confirmer et continuer vers le paiement";
 }
 
-function buildOrderSummary(plan: PharmacyPlan | null, commitment: CommitmentOption) {
-  const monthlyPrice = parseAmount(plan?.priceMonthly);
+function buildOrderSummary(
+  plan: PharmacyPlan | null,
+  commitment: CommitmentOption,
+  userCount = 1,
+) {
+  // Prix catalogue par utilisateur et par mois. Seul le backend fixe le
+  // montant final, mais l'estimation d'ecran doit appliquer le meme facteur
+  // utilisateurs que partout ailleurs (prix_par_utilisateur x utilisateurs).
+  const perUserPrice = parseAmount(plan?.pricePerUserMonth ?? plan?.priceMonthly);
+  const monthlyPrice = perUserPrice * userCount;
   const subtotal = monthlyPrice * commitment.months;
-  const apiTotalAmount = parseAmount(commitment.totalAmount);
+  const apiTotalAmount = parseAmount(commitment.totalAmount) * userCount;
   const totalAmount =
     apiTotalAmount > 0
       ? apiTotalAmount
