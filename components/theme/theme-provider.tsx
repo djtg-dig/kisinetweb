@@ -10,6 +10,10 @@ import {
 type Theme = "light" | "dark" | "system";
 
 const THEME_KEY = "kisinet:theme";
+// Cookie de thème lu par le serveur (SSR) afin de rendre le HTML avec la bonne
+// classe dès le premier octet. Il est en miroir de localStorage pour rester
+// synchronisé avec la logique côté client existante.
+const THEME_COOKIE = "kisinet-theme";
 
 type ThemeContextValue = {
   theme: Theme;
@@ -116,7 +120,14 @@ function setTheme(next: Theme) {
     return;
   }
   currentTheme = next;
+  // Miroir dans localStorage : conserve le comportement client existant
+  // (réactivité, synchronisation inter-onglets via l'événement "storage").
   window.localStorage.setItem(THEME_KEY, next);
+  // Miroir dans un cookie : permet au serveur (SSR) de connaître le thème
+  // choisi et de rendre le HTML avec la bonne classe dès le premier rendu,
+  // ce qui supprime le flash de thème. Le cookie est non sensible (thème
+  // uniquement), accessible en lecture côté serveur et en écriture côté client.
+  document.cookie = `${THEME_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax`;
   applyTheme(next);
   emit();
 }
