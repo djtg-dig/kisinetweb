@@ -349,6 +349,79 @@ Accept: application/json
   gérer un abonnement, puis présélectionne la dernière pharmacie utilisée quand
   elle est encore disponible.
 
+### POST /api/pharmacies/
+
+- **Objectif** : créer une pharmacie et l'adhésion de son propriétaire.
+- **Méthode HTTP** : `POST`
+- **URL** : `/api/pharmacies/`
+- **Page frontend** : `/app/pharmacies/create`
+- **Service frontend** : `createPharmacy(input)` dans `lib/api`
+- **Authentification** : requise avec `Authorization: Bearer <access_token>`.
+- **Après succès** : la pharmacie créée devient la pharmacie active, puis le
+  frontend redirige vers son tableau de bord ou vers le `return_to` de
+  souscription (`/tarifs/...`) lorsqu'il est présent.
+
+#### Payload envoyé (JSON)
+
+| Champ          | Type   | Obligatoire | Remarque |
+| -------------- | ------ | ----------- | -------- |
+| `name`         | string | oui         | Nom de la pharmacie. |
+| `email`        | string | non         | Omis lorsqu'il est vide. |
+| `phone_number` | string | non         | Omis lorsqu'il est vide. |
+| `devise`       | string | non         | Code ISO 4217 (`USD` ou `CDF`). Défaut frontend : `USD`. |
+| `invited_by`   | string | non         | Code de parrainage : référence publique `USXXXXXXXX` du parrain. Omis lorsqu'il est vide. |
+| `adresse`      | objet  | oui         | `country` (indicatif téléphonique), `city_or_province` (id), `street`, `neighborhood`. |
+
+> Remarque importante : `invited_by` attend la **référence publique de
+> l'utilisateur parrain** (`USXXXXXXXX`, soit `US` suivi de 8 caractères
+> alphanumériques majuscules), et non un identifiant ni un UUID. Le backend
+> résout lui-même ce code vers le compte correspondant. Le champ est
+> `write_only` : il n'est pas renvoyé dans la réponse, qui expose
+> `invited_by_reference` à la place. Il est également immuable : il ne peut plus
+> être modifié après la création de la pharmacie.
+
+#### Comportement frontend
+
+- Le champ « Code de parrainage » est facultatif et limité à 10 caractères ; la
+  saisie est automatiquement passée en majuscules.
+- Le format `USXXXXXXXX` est vérifié côté client avant l'envoi afin d'éviter un
+  aller-retour inutile vers le backend.
+- Lorsqu'aucun code n'est saisi, la clé `invited_by` n'est pas envoyée.
+
+#### Réponse attendue (201 Created)
+
+Pharmacie créée, avec notamment `id`, `reference`, `name`, `slug`, `email`,
+`phone_number`, `devise`, `adresse` et `created_at`.
+
+#### Erreurs possibles
+
+- `400 Bad Request` : données invalides, code de parrainage au mauvais format,
+  code de parrainage ne correspondant à aucun utilisateur, ou propriétaire
+  utilisant son propre code de parrainage.
+- `401 Unauthorized` : token d'accès absent ou invalide.
+
+#### Exemple de requête
+
+```http
+POST /api/pharmacies/
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+  "name": "Pharmacie Centrale",
+  "email": "contact@pharmacie.cd",
+  "phone_number": "+243900000000",
+  "devise": "USD",
+  "invited_by": "USA7K9M2Q1",
+  "adresse": {
+    "country": "+243",
+    "city_or_province": "3",
+    "street": "Avenue du Commerce 12",
+    "neighborhood": "Gombe"
+  }
+}
+```
+
 ### POST /api/pharmacies/join-requests/
 
 - **Objectif** : créer une demande d'adhésion/d'intégration à une pharmacie.

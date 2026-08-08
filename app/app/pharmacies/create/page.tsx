@@ -22,6 +22,7 @@ type FormState = {
   cityOrProvinceId: string;
   street: string;
   neighborhood: string;
+  invitedBy: string;
 };
 
 const initialFormState: FormState = {
@@ -33,7 +34,13 @@ const initialFormState: FormState = {
   cityOrProvinceId: "",
   street: "",
   neighborhood: "",
+  invitedBy: "",
 };
+
+// Le backend n'accepte que la référence publique du parrain au format
+// USXXXXXXXX : on la contrôle côté client pour éviter un aller-retour inutile.
+const referralCodePattern = /^US[A-Z0-9]{8}$/;
+const referralCodeLength = 10;
 
 const currencyOptions = [
   { label: "USD", value: "USD" },
@@ -154,6 +161,15 @@ export default function CreatePharmacyPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setErrorMessage("");
+
+    const invitedBy = form.invitedBy.trim().toUpperCase();
+    if (invitedBy && !referralCodePattern.test(invitedBy)) {
+      setErrorMessage(
+        "Le code de parrainage doit respecter le format USXXXXXXXX (10 caractères).",
+      );
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -166,6 +182,7 @@ export default function CreatePharmacyPage() {
         cityOrProvince: form.cityOrProvinceId,
         street: form.street.trim(),
         neighborhood: form.neighborhood.trim(),
+        invitedBy,
       });
 
       setActivePharmacyId(pharmacy.id);
@@ -256,6 +273,16 @@ export default function CreatePharmacyPage() {
                 onChange={(value) => updateField("devise", value)}
                 options={currencyOptions}
                 required
+              />
+
+              <TextField
+                id="invitedBy"
+                label="Code de parrainage (facultatif)"
+                value={form.invitedBy}
+                onChange={(value) => updateField("invitedBy", value.toUpperCase())}
+                placeholder="Ex. USA7K9M2Q1"
+                maxLength={referralCodeLength}
+                hint="Référence publique de la personne qui vous a invité, au format USXXXXXXXX. Laissez vide si vous n'avez pas de parrain."
               />
 
               <div className="border-t border-app-border pt-5">
@@ -352,6 +379,8 @@ function TextField({
   type = "text",
   required = false,
   placeholder,
+  maxLength,
+  hint,
 }: {
   id: string;
   label: string;
@@ -360,6 +389,8 @@ function TextField({
   type?: string;
   required?: boolean;
   placeholder?: string;
+  maxLength?: number;
+  hint?: string;
 }) {
   return (
     <label htmlFor={id} className="block">
@@ -374,8 +405,10 @@ function TextField({
         onChange={(event) => onChange(event.target.value)}
         required={required}
         placeholder={placeholder}
+        maxLength={maxLength}
         className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 py-2 text-sm text-app-text outline-none transition placeholder:text-app-muted focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
       />
+      {hint && <span className="mt-2 block text-xs leading-5 text-app-muted">{hint}</span>}
     </label>
   );
 }

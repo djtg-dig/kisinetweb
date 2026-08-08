@@ -109,6 +109,9 @@ export type CreatePharmacyInput = {
   cityOrProvince?: string;
   street?: string;
   neighborhood?: string;
+  // Code de parrainage facultatif : référence publique USXXXXXXXX du parrain,
+  // et non son identifiant. Le champ est immuable après la création.
+  invitedBy?: string;
 };
 
 export type CreatePharmacyJoinRequestInput = {
@@ -1614,11 +1617,16 @@ export async function createPharmacy(input: CreatePharmacyInput): Promise<Pharma
     neighborhood: input.neighborhood,
   };
 
+  const invitedBy = (input.invitedBy || "").trim().toUpperCase();
+
   const payload = {
     name: input.name,
     email: input.email || undefined,
     phone_number: input.phoneNumber || undefined,
     devise: input.devise || "USD",
+    // Le backend résout lui-même la référence publique du parrain vers le
+    // compte correspondant : on omet la clé quand aucun code n'est saisi.
+    invited_by: invitedBy || undefined,
     adresse,
   };
 
