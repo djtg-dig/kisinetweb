@@ -68,6 +68,7 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [aiCreditsRemaining, setAiCreditsRemaining] = useState<number | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const aiUserReferenceRef = useRef("");
 
   useEffect(() => {
     let isCurrent = true;
@@ -100,6 +101,7 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
       try {
         const profile = await getAccountProfile();
         const userReference = profile.reference || "";
+        aiUserReferenceRef.current = userReference;
         const [dashboard, cashier, aiCredits] = await Promise.all([
           getPharmacyDashboard(pharmacyId),
           getCurrentCashierName(),
@@ -842,6 +844,17 @@ function AiScannerModal({
     return new File([bytes], "prescription.jpg", { type: "image/jpeg" });
   }
 
+  async function refreshAiCredits() {
+    const userReference = aiUserReferenceRef.current;
+    if (!userReference) {
+      return;
+    }
+    const credits = await getUserAiCredits(pharmacyId, userReference).catch(() => null);
+    if (credits) {
+      setAiCreditsRemaining(credits.remaining);
+    }
+  }
+
   async function runAnalysis() {
     if (!preview) {
       return;
@@ -862,6 +875,8 @@ function AiScannerModal({
           : "Échec de l'analyse de l'ordonnance.",
       );
       setStage("review");
+    } finally {
+      refreshAiCredits();
     }
   }
 

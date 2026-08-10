@@ -1,4 +1,5 @@
 import { getAccessToken } from "@/lib/auth";
+import { authenticatedFetch } from "@/lib/api";
 import { apiBaseUrl } from "@/lib/carri-account";
 
 /**
@@ -688,16 +689,18 @@ async function fetchBillingJson<T>(
     throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
   }
 
-  const response = await fetch(apiBaseUrl.replace(/\/$/, "") + path, {
-    cache: "no-store",
-    ...init,
-    headers: {
-      Authorization: "Bearer " + accessToken,
-      Accept: "application/json",
-      ...(init.body ? { "Content-Type": "application/json" } : {}),
-      ...init.headers,
+  const response = await authenticatedFetch(
+    apiBaseUrl.replace(/\/$/, "") + path,
+    {
+      cache: "no-store",
+      ...init,
+      headers: {
+        Accept: "application/json",
+        ...(init.body ? { "Content-Type": "application/json" } : {}),
+        ...init.headers,
+      },
     },
-  });
+  );
 
   const responseText = await response.text();
   const data = parseJsonResponse(responseText);
@@ -862,6 +865,60 @@ export async function getUserAiCredits(
     planCode: toText(plan.code),
     periodStart: toNullableText(period.start) ?? undefined,
     periodEnd: toNullableText(period.end) ?? undefined,
+    included: toInteger(credits.included),
+    used: toInteger(credits.used),
+    remaining: toInteger(credits.remaining),
+    usagePercent: toInteger(credits.usage_percent),
+  };
+}
+
+// --------------------------------------------------------------------------- //
+// Crédits IA restants d'une pharmacie (quotas inclus + consommation)
+// --------------------------------------------------------------------------- //
+
+/**
+ * Réponse de l'endpoint
+ * `GET /api/paiements/pharmacies/{pharmacy_id}/ai-credits/`.
+ *
+ * Renvoie le quota de crédits d'analyse IA inclus pour la période courante,
+ * les crédits consommés, restants et le pourcentage d'utilisation.
+ */
+export type PharmacyAiCredits = {
+  pharmacyReference: string;
+  planCode: string;
+  planName: string;
+  periodStart?: string;
+  periodEnd?: string;
+  billableUsers: number;
+  included: number;
+  used: number;
+  remaining: number;
+  usagePercent: number;
+};
+
+/**
+ * Crédits IA restants d'une pharmacie pour la période courante. Source de
+ * vérité : le système de périodes/crédits du backend.
+ */
+export async function getPharmacyAiCredits(pharmacyId: string): Promise<PharmacyAiCredits> {
+  const data = await fetchBillingJson<UnknownRecord>(
+    "/api/paiements/pharmacies/" + encodeURIComponent(pharmacyId) + "/ai-credits/",
+    "Impossible de charger les crédits IA de la pharmacie.",
+  );
+
+  const pharmacy = toRecord(data.pharmacy);
+  const plan = toRecord(data.plan);
+  const period = toRecord(data.period);
+  const billing = toRecord(data.billing);
+  const credits = toRecord(data.credits);
+
+  return {
+    pharmacyReference: toText(pharmacy.reference),
+    planCode: toText(plan.code),
+    planName: toText(plan.name),
+    periodStart: toNullableText(period.start) ?? undefined,
+    periodEnd: toNullableText(period.end) ?? undefined,
+    billableUsers: toInteger(billing.billable_users),
     included: toInteger(credits.included),
     used: toInteger(credits.used),
     remaining: toInteger(credits.remaining),

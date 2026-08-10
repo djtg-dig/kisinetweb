@@ -21,6 +21,12 @@ const settingsCards = [
       "Configurer les préférences de fonctionnement de l’espace pharmacie.",
     path: "/settings/application",
   },
+  {
+    title: "Informations sur l’IA",
+    description:
+      "Consulter les crédits d’analyse IA de la pharmacie, la période en cours et la consommation.",
+    path: "/settings/ai",
+  },
 ];
 
 export default async function PharmacySettingsPage({ params }: PharmacySettingsPageProps) {
@@ -37,7 +43,7 @@ export default async function PharmacySettingsPage({ params }: PharmacySettingsP
         </p>
       </header>
 
-      <section className="mt-8 grid gap-4 md:grid-cols-3">
+      <section className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {settingsCards.map((card) => (
           <a
             key={card.path}

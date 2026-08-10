@@ -1244,28 +1244,40 @@ Statuts paiement consommés: `PENDING`, `VALIDATED`, `CANCELED`, `REFUNDED`.
 
 ## Crédits IA (scan d'ordonnance)
 
-- **Page frontend** : `/app/pharmacies/[pharmacyId]/sales/create`
-- **Service frontend** : `lib/api/billing.ts` (fonction `getUserAiCredits`)
+- **Pages frontend** :
+  - `/app/pharmacies/[pharmacyId]/sales/create` (solde utilisateur)
+  - `/app/pharmacies/[pharmacyId]/settings/ai` (solde pharmacie)
+- **Service frontend** : `lib/api/billing.ts` (fonctions `getUserAiCredits` et `getPharmacyAiCredits`)
 - **Authentification** : requise avec `Authorization: Bearer <access_token>`.
-- **Règle importante** : le solde est fourni par le compteur par utilisateur du
-  backend (`PharmacyUserAnalysisCreditPeriod`). Le frontend ne calcule jamais le
-  solde restant, il l'affiche tel quel dans le bloc « Scanner avec l'IA ».
+- **Règle importante** : les soldes sont fournis par le backend (`PharmacyUserAnalysisCreditPeriod`
+  pour l'utilisateur, système de périodes/crédits pour la pharmacie). Le frontend ne calcule jamais
+  les soldes, il les affiche tels quels.
 
 Endpoints consommés:
 
 | Usage frontend | Méthode et URL |
 | --- | --- |
 | Crédits IA restants d'un utilisateur | `GET /api/paiements/pharmacies/{pharmacy_id}/users/{user_reference}/ai-credits/` |
+| Crédits IA restants d'une pharmacie | `GET /api/paiements/pharmacies/{pharmacy_id}/ai-credits/` |
 
 Paramètres de chemin:
 
 - `pharmacy_id` : référence de la pharmacie active (depuis l'URL).
-- `user_reference` : référence de l'utilisateur connecté (`GET /api/accounts/me/`).
+- `user_reference` (endpoint utilisateur) : référence de l'utilisateur connecté (`GET /api/accounts/me/`).
 
 Réponse attendue (extrait pertinent):
 
 ```json
 {
+  "pharmacy": { "id": 1, "reference": "PHXXXXXXXX" },
+  "plan": {
+    "code": "standard",
+    "name": "Standard",
+    "price_per_user_month": "0.00",
+    "included_ai_credit_per_user_month": 30000
+  },
+  "period": { "start": "2026-08-01T00:00:00Z", "end": "2026-08-31T23:59:59Z" },
+  "billing": { "billable_users": 3 },
   "credits": {
     "included": 30000,
     "used": 0,
@@ -1275,7 +1287,11 @@ Réponse attendue (extrait pertinent):
 }
 ```
 
-Le frontend utilise uniquement `credits.remaining` pour afficher
+Le frontend de la page `settings/ai` utilise `credits.included`, `credits.used`, `credits.remaining`
+et `credits.usage_percent`, ainsi que `plan.name`, `period.start/end` et `billing.billable_users`.
+En cas d'erreur (401/403/404), la page affiche un message d'erreur sans blocage.
+
+Le frontend de la page de vente utilise uniquement `credits.remaining` pour afficher
 `(X crédits IA restants)`. En cas d'erreur (401/403/404), l'appel est ignoré
 `.catch(() => null)` et le solde n'est pas affiché, sans bloquer la page de vente.
 

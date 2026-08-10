@@ -345,7 +345,7 @@ async function refreshAccessTokenIfNeeded(): Promise<boolean> {
   return refreshPromise;
 }
 
-async function authenticatedFetch(
+export async function authenticatedFetch(
   input: RequestInfo,
   init?: RequestInit,
 ): Promise<Response> {
