@@ -5,6 +5,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { LinkButton } from "@/components/ui/link-button";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
 import {
+  analyzePrescription,
   clearSaleDraft,
   createSale,
   getCurrentCashierName,
@@ -12,6 +13,7 @@ import {
   saveSaleDraft,
   searchSaleProducts,
   type CreateSalePayload,
+  type DetectedMedication,
   type DiscountType,
   type SaleDraftItem,
   type SaleDraftStorage,
@@ -26,7 +28,6 @@ type CreateSalePageProps = {
 };
 
 type PageState = "loading" | "ready" | "error";
-type SaleMode = "manual" | "ai";
 
 type CustomerForm = {
   name: string;
@@ -57,7 +58,6 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
   const [cashierName, setCashierName] = useState("Non renseigné");
   const [pageState, setPageState] = useState<PageState>("loading");
   const [pageError, setPageError] = useState("");
-  const [mode, setMode] = useState<SaleMode>("manual");
   const [items, setItems] = useState<SaleDraftItem[]>([]);
   const [customer, setCustomer] = useState<CustomerForm>(defaultCustomer);
   const [discount, setDiscount] = useState<DiscountForm>(defaultDiscount);
@@ -67,6 +67,7 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
   const [submitting, setSubmitting] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [aiCreditsRemaining, setAiCreditsRemaining] = useState<number | null>(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   useEffect(() => {
     let isCurrent = true;
@@ -191,17 +192,19 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
     });
   }
 
-  function addProduct(product: SaleProduct) {
+  function addProduct(product: SaleProduct, quantity = 1) {
     setFeedback(null);
     if (product.availableStock <= 0) {
       setFeedback({ tone: "error", message: "Stock insuffisant pour ce produit." });
       return;
     }
 
+    const requestedQuantity = Math.max(1, Math.min(Math.floor(quantity) || 1, product.availableStock));
+
     setItems((currentItems) => {
       const existing = currentItems.find((item) => item.product.reference === product.reference);
       if (!existing) {
-        return [...currentItems, { product, quantity: 1 }];
+        return [...currentItems, { product, quantity: requestedQuantity }];
       }
 
       if (existing.quantity + 1 > existing.product.availableStock) {
@@ -218,6 +221,60 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
           : item,
       );
     });
+  }
+
+  async function handleScanComplete(medications: DetectedMedication[]) {
+    const candidates = medications.filter((med) => med.rawName.trim());
+    if (!candidates.length) {
+      setFeedback({
+        tone: "info",
+        message: "Aucun produit n'a été détecté sur l'ordonnance.",
+      });
+      return;
+    }
+
+    let addedCount = 0;
+    const unmatched: string[] = [];
+
+    for (const med of candidates) {
+      try {
+        const matches = await searchSaleProducts(pharmacyId, med.rawName.trim());
+        const product = matches[0];
+        if (!product) {
+          unmatched.push(med.rawName);
+          continue;
+        }
+
+        addProduct(product, parsePrescribedQuantity(med.prescribedQuantity));
+        addedCount += 1;
+      } catch {
+        unmatched.push(med.rawName);
+      }
+    }
+
+    if (addedCount > 0) {
+      setFeedback({
+        tone: "success",
+        message:
+          addedCount +
+          " produit(s) ajouté(s) au brouillon depuis l'ordonnance." +
+          (unmatched.length ? " " + unmatched.length + " introuvable(s) dans le stock." : ""),
+      });
+    } else {
+      setFeedback({
+        tone: "info",
+        message: "Aucun produit détecté n'a pu être associé au stock de la pharmacie.",
+      });
+    }
+  }
+
+  function parsePrescribedQuantity(value: string | null): number {
+    if (!value) {
+      return 1;
+    }
+
+    const digits = value.match(/\d+/);
+    return digits ? Number(digits[0]) : 1;
   }
 
   function updateQuantity(reference: string, quantity: number) {
@@ -306,7 +363,6 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
       setItems([]);
       setCustomer(defaultCustomer);
       setDiscount(defaultDiscount);
-      setMode("manual");
       clearSaleDraft(pharmacyId);
       setFeedback({ tone: "success", message: "Facture créée avec succès. Le paiement sera enregistré par le caissier." });
     } catch (error) {
@@ -375,11 +431,11 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
           <section className="grid gap-4 md:grid-cols-2">
             <ProductSearch pharmacyId={pharmacyId} onAdd={addProduct} currency={activeCurrency} />
             <ModeCard
-              active={mode === "ai"}
+              active={scannerOpen}
               title="Scanner avec l'IA"
               description="Importez ou prenez une photo d'une ordonnance pour détecter les produits."
-              buttonLabel="Préparer un scan"
-              onClick={() => setMode("ai")}
+              buttonLabel="Scanner maintenant"
+              onClick={() => setScannerOpen(true)}
             >
               {aiCreditsRemaining !== null && (
                 <p className="mt-3 text-xs font-semibold text-primary-700">
@@ -391,7 +447,12 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
               </p>
             </ModeCard>
           </section>
-          {mode === "ai" && <AiScannerPlaceholder />}
+          <AiScannerModal
+            open={scannerOpen}
+            pharmacyId={pharmacyId}
+            onClose={() => setScannerOpen(false)}
+            onComplete={handleScanComplete}
+          />
           <SaleDraft
             items={items}
             currency={activeCurrency}
@@ -663,19 +724,297 @@ function ProductResultCard({
   );
 }
 
-function AiScannerPlaceholder() {
+function AiScannerModal({
+  open,
+  pharmacyId,
+  onClose,
+  onComplete,
+}: {
+  open: boolean;
+  pharmacyId: string;
+  onClose: () => void;
+  onComplete: (medications: DetectedMedication[]) => void;
+}) {
+  const [stage, setStage] = useState<"camera" | "review" | "analyzing">("camera");
+  const [preview, setPreview] = useState<string | null>(null);
+  const [cameraError, setCameraError] = useState("");
+  const [error, setError] = useState("");
+  const [seconds, setSeconds] = useState(0);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      setStage("camera");
+      setPreview(null);
+      setCameraError("");
+      setError("");
+      setSeconds(0);
+      startCamera();
+    } else {
+      stopCamera();
+    }
+
+    return () => stopCamera();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  useEffect(() => {
+    if (stage !== "analyzing") {
+      return;
+    }
+
+    const timer = window.setInterval(() => setSeconds((value) => value + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [stage]);
+
+  function stopCamera() {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+  }
+
+  async function startCamera() {
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      setCameraError("La caméra n'est pas disponible sur cet appareil.");
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play().catch(() => undefined);
+      }
+    } catch {
+      setCameraError(
+        "Impossible d'accéder à la caméra. Utilisez le stockage local pour importer une photo.",
+      );
+    }
+  }
+
+  function capturePhoto() {
+    const video = videoRef.current;
+    if (!video || !video.videoWidth) {
+      return;
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      return;
+    }
+
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    stopCamera();
+    setPreview(canvas.toDataURL("image/jpeg"));
+    setStage("review");
+  }
+
+  function onFilePicked(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) {
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setPreview(reader.result as string);
+      setStage("review");
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function dataUrlToBlob(dataUrl: string): File {
+    const base64 = dataUrl.split(",")[1] ?? "";
+    const byteString = atob(base64);
+    const bytes = new Uint8Array(byteString.length);
+    for (let index = 0; index < byteString.length; index += 1) {
+      bytes[index] = byteString.charCodeAt(index);
+    }
+
+    return new File([bytes], "prescription.jpg", { type: "image/jpeg" });
+  }
+
+  async function runAnalysis() {
+    if (!preview) {
+      return;
+    }
+
+    setStage("analyzing");
+    setSeconds(0);
+    setError("");
+
+    try {
+      const medications = await analyzePrescription(pharmacyId, dataUrlToBlob(preview));
+      onComplete(medications);
+      onClose();
+    } catch (analysisError) {
+      setError(
+        analysisError instanceof Error
+          ? analysisError.message
+          : "Échec de l'analyse de l'ordonnance.",
+      );
+      setStage("review");
+    }
+  }
+
+  if (!open) {
+    return null;
+  }
+
+  const analyzing = stage === "analyzing";
+
   return (
-    <section className="rounded-lg border border-dashed border-cyan-200 bg-cyan-50 p-6">
-      <h2 className="text-lg font-bold text-app-text">Scanner avec l'IA</h2>
-      <p className="mt-2 text-sm leading-6 text-app-muted">
-        L'import d'image d'ordonnance sera connecté plus tard. Pour le moment, cette zone prépare
-        seulement l'expérience de scan sans lancer d'analyse automatique.
-      </p>
-      <label className="mt-5 flex min-h-[180px] cursor-not-allowed items-center justify-center rounded-lg border border-cyan-200 bg-white px-4 text-center text-sm font-semibold text-cyan-700">
-        Import d'image indisponible pour le moment
-        <input type="file" accept="image/*" className="hidden" disabled />
-      </label>
-    </section>
+    <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" aria-hidden="true" />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ai-scanner-title"
+        className="relative flex w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-app-border bg-app-card shadow-soft"
+      >
+        <header className="flex items-center justify-between gap-4 border-b border-app-border px-5 py-4">
+          <h2 id="ai-scanner-title" className="text-lg font-bold text-app-text">
+            Scanner avec l'IA
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={analyzing}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-app-muted transition hover:bg-app-surface disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label="Fermer"
+          >
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </header>
+
+        {stage !== "camera" && (
+          <p className="mx-5 mt-4 rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-700">
+            Les résultats proposés par l'IA doivent être vérifiés avant validation.
+          </p>
+        )}
+
+        <div className="p-5">
+          {stage === "camera" && (
+            <div className="relative overflow-hidden rounded-lg border border-app-border bg-black">
+              <video
+                ref={videoRef}
+                playsInline
+                muted
+                className="aspect-[4/3] w-full bg-black object-cover"
+              />
+              {cameraError && (
+                <div className="absolute inset-0 flex items-center justify-center p-4 text-center text-sm font-semibold text-white">
+                  {cameraError}
+                </div>
+              )}
+
+              {/* Contrôle bas-gauche : ouvrir le stockage local pour importer une photo */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="absolute bottom-3 left-3 inline-flex items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-sm font-semibold text-app-text shadow transition hover:bg-white"
+              >
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M4 6h16v12H4z" />
+                </svg>
+                Stockage local
+              </button>
+
+              <button
+                type="button"
+                onClick={capturePhoto}
+                disabled={Boolean(cameraError)}
+                className="absolute bottom-3 right-3 inline-flex h-14 w-14 items-center justify-center rounded-full bg-primary-600 shadow-lg transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:bg-app-border"
+                aria-label="Capturer la photo"
+              >
+                <svg viewBox="0 0 24 24" className="h-7 w-7 text-white" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 8a2 2 0 012-2h2l1.5-2h7L19 6h0a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
+                  <circle cx="12" cy="13" r="3.5" />
+                </svg>
+              </button>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={onFilePicked}
+              />
+            </div>
+          )}
+
+          {stage === "review" && preview && (
+            <div className="grid gap-4">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={preview}
+                alt="Ordonnance capturée"
+                className="max-h-[55vh] w-full rounded-lg border border-app-border object-contain"
+              />
+              {error && (
+                <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
+                  {error}
+                </p>
+              )}
+              <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPreview(null);
+                    setError("");
+                    setStage("camera");
+                    startCamera();
+                  }}
+                  className="inline-flex min-h-11 items-center justify-center rounded-md border border-app-border bg-app-surface px-5 py-2.5 text-sm font-semibold text-app-text transition hover:bg-primary-50"
+                >
+                  Reprendre
+                </button>
+                <button
+                  type="button"
+                  onClick={runAnalysis}
+                  className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-700"
+                >
+                  Scanner
+                </button>
+              </div>
+            </div>
+          )}
+
+          {analyzing && (
+            <div className="grid gap-4">
+              {preview && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={preview}
+                  alt="Ordonnance analysée"
+                  className="max-h-[45vh] w-full rounded-lg border border-app-border object-contain opacity-80"
+                />
+              )}
+              <div className="flex flex-col items-center justify-center gap-3 py-4">
+                <span
+                  aria-label="Analyse en cours"
+                  role="status"
+                  className="h-10 w-10 animate-spin rounded-full border-4 border-primary-100 border-t-primary-600"
+                />
+                <p className="text-sm font-semibold text-primary-700">
+                  Analyse en cours... {seconds}s
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 

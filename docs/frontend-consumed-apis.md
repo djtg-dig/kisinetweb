@@ -929,6 +929,7 @@ Content-Type: application/json
 
 - `POST /api/sales/`
 - `GET /api/sales/?pharmacy_reference={pharmacy_id}`
+- `POST /api/sales/vision/` (analyse d'ordonnance, multipart `pharmacy_reference` + `image`)
 
 ### Page `/app/pharmacies/{pharmacy_id}/sales/create`
 
@@ -954,8 +955,22 @@ Content-Type: application/json
   automatiquement dans `localStorage`, avec une clé par pharmacie. Le brouillon est
   restauré après actualisation de la page et supprimé lorsqu'il ne contient plus de
   produit ou lorsque l'utilisateur confirme l'action `Annuler`.
-- **Scanner IA** : placeholder visuel uniquement. Aucun fichier n'est envoyé et
-  aucune analyse IA n'est simulée.
+- **Scanner IA** : analyse réelle d'une ordonnance via la caméra ou un fichier
+  importé depuis le stockage local. Le flux est géré par le composant
+  `AiScannerModal` (ouvert depuis la carte « Scanner avec l'IA ») :
+  1. ouverture de la caméra (`getUserMedia`) avec un bouton en bas à gauche pour
+     importer une image depuis le stockage local ;
+  2. capture ou import de la photo, affichée avec le rappel
+     « Les résultats proposés par l'IA doivent être vérifiés avant validation. » ;
+  3. appel `POST /api/sales/vision/` (multipart : `pharmacy_reference` + `image`)
+     via `analyzePrescription(pharmacyId, file)` pendant l'affichage d'un spinner et
+     d'un compteur de secondes ;
+  4. pour chaque médicament détecté (`medications[].raw_name`), le frontend recherche
+     le produit correspondant via `searchSaleProducts` et l'ajoute au brouillon
+     (`addProduct`). Les médicaments sans correspondance dans le stock sont signalés.
+- **Crédits IA** : la carte « Scanner avec l'IA » appelle
+  `GET /api/paiements/pharmacies/{pharmacy_id}/users/{user_reference}/ai-credits/`
+  (voir section « Crédits IA ») pour afficher `(X crédits IA restants)`.
 - **Données temporaires** : aucune donnée produit temporaire n'est utilisée pour la
   recherche manuelle ; les produits viennent de l'API existante. Le champ affiché
   `dosage` est alimenté par `strength`. Les champs non exposés par l'API actuelle
@@ -964,7 +979,6 @@ Content-Type: application/json
   - `POST /api/sales/drafts/` ou équivalent si les brouillons doivent être persistés côté serveur.
   - Endpoint d'annulation de facture si l'action `Annuler` doit être activée.
   - Endpoint de facture/reçu si `Imprimer le reçu` doit être activé.
-  - Endpoint d'import/analyse d'ordonnance si le scanner IA devient réel.
 
 ### GET /api/sales/
 

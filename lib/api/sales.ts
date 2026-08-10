@@ -54,6 +54,19 @@ export type SaleDraftStorage = {
   items: SaleDraftItem[];
 };
 
+export type DetectedMedication = {
+  rawName: string;
+  strength: string | null;
+  prescribedQuantity: string | null;
+  readingScore: number;
+};
+
+export type PrescriptionAnalysis = {
+  imageReadingScore: number;
+  prescriptionReadingScore: number;
+  medications: DetectedMedication[];
+};
+
 const SALE_DRAFT_KEY_PREFIX = "kisinet_sale_draft:";
 
 export async function searchSaleProducts(
@@ -100,6 +113,50 @@ export type CreatedSale = {
   }[];
   created_at?: string;
 };
+
+export async function analyzePrescription(
+  pharmacyId: string,
+  image: Blob,
+): Promise<DetectedMedication[]> {
+  const accessToken = getAccessToken();
+  if (!accessToken) {
+    throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
+  }
+
+  const form = new FormData();
+  form.append("pharmacy_reference", pharmacyId);
+  form.append("image", image);
+
+  const response = await fetch(apiBaseUrl.replace(/\/$/, "") + "/api/sales/vision/", {
+    method: "POST",
+    cache: "no-store",
+    headers: {
+      Authorization: "Bearer " + accessToken,
+      Accept: "application/json",
+    },
+    body: form,
+  });
+
+  const responseText = await response.text();
+  const data = parseJsonResponse(responseText);
+
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(data, "Impossible d'analyser l'ordonnance."));
+  }
+
+  const record = (data && typeof data === "object" ? data : {}) as Record<string, unknown>;
+  const medications = Array.isArray(record.medications) ? record.medications : [];
+
+  return medications
+    .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
+    .map((item) => ({
+      rawName: typeof item.raw_name === "string" ? item.raw_name : "",
+      strength: typeof item.strength === "string" ? item.strength : null,
+      prescribedQuantity:
+        typeof item.prescribed_quantity === "string" ? item.prescribed_quantity : null,
+      readingScore: typeof item.reading_score === "number" ? item.reading_score : 0,
+    }));
+}
 
 export async function createSale(payload: CreateSalePayload): Promise<CreatedSale> {
   const accessToken = getAccessToken();
