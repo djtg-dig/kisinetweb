@@ -17,6 +17,8 @@ import {
   type SaleDraftStorage,
   type SaleProduct,
 } from "@/lib/api/sales";
+import { getAccountProfile } from "@/lib/api";
+import { getUserAiCredits } from "@/lib/api/billing";
 import { getPharmacyDashboard } from "@/lib/dashboard-api";
 
 type CreateSalePageProps = {
@@ -64,6 +66,7 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
   );
   const [submitting, setSubmitting] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [aiCreditsRemaining, setAiCreditsRemaining] = useState<number | null>(null);
 
   useEffect(() => {
     let isCurrent = true;
@@ -94,9 +97,14 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
       setPageError("");
 
       try {
-        const [dashboard, cashier] = await Promise.all([
+        const profile = await getAccountProfile();
+        const userReference = profile.reference || "";
+        const [dashboard, cashier, aiCredits] = await Promise.all([
           getPharmacyDashboard(pharmacyId),
           getCurrentCashierName(),
+          userReference
+            ? getUserAiCredits(pharmacyId, userReference).catch(() => null)
+            : Promise.resolve(null),
         ]);
         const savedDraft = getSavedSaleDraft(pharmacyId);
         if (!isCurrent) {
@@ -105,6 +113,7 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
         setPharmacyName(dashboard.pharmacy.name);
         setCurrency(dashboard.pharmacy.devise || "");
         setCashierName(cashier);
+        setAiCreditsRemaining(aiCredits ? aiCredits.remaining : null);
         if (savedDraft) {
           restoreDraft(savedDraft);
           setFeedback({ tone: "info", message: "Un brouillon local a été restauré." });
@@ -372,6 +381,11 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
               buttonLabel="Préparer un scan"
               onClick={() => setMode("ai")}
             >
+              {aiCreditsRemaining !== null && (
+                <p className="mt-3 text-xs font-semibold text-primary-700">
+                  ({aiCreditsRemaining.toLocaleString("fr-FR")} crédits IA restants)
+                </p>
+              )}
               <p className="mt-3 rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-700">
                 Les résultats proposés par l'IA doivent être vérifiés avant validation.
               </p>

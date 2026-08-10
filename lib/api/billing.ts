@@ -36,11 +36,20 @@ export type SeatRole = "OWNER" | "MANAGER" | "PHARMACIST" | "EMPLOYEE";
 // --------------------------------------------------------------------------- //
 
 /**
- * Plan de la facturation par siege (`GET /api/paiements/plans/`).
+ * Plan de la facturation par siege (`GET /api/paiements/plans/`, endpoint
+ * legacy conserve pour compatibilite ; le contrat public officiel des plans
+ * reste `GET /api/paiements/pharmacy-plans/`, expose par `lib/api.ts`).
  *
  * Attention : `currency` est ici un identifiant numerique (cle etrangere vers
  * `/api/paiements/currencies/`), et non un code ISO comme dans l'ancienne API.
  * `features` est un objet de booleens, et non un tableau `{label, enabled}`.
+ *
+ * Prix : `pricePerUserMonth` est le prix par utilisateur et par mois (seule
+ * donnee tarifaire d'un plan). Le montant reel d'un abonnement n'est PAS une
+ * propriete du plan : il vaut `monthlyAmount` cote abonnement
+ * (`PharmacySubscriptionSeatBilling` dans `lib/api.ts`). Le champ deprecie
+ * `monthlyPrice` (`pricePerUserMonth * minBillableUsers`, simple prix plancher)
+ * a ete retire pour eviter de l'afficher comme un montant facture.
  */
 export type PharmacyPlan = {
   id: number;
@@ -54,8 +63,6 @@ export type PharmacyPlan = {
   minBillableUsers: number;
   features: Record<string, boolean>;
   isActive: boolean;
-  /** @deprecated Calcule `pricePerUserMonth * minBillableUsers`, ce n'est pas le total facture. */
-  monthlyPrice: string;
   /** @deprecated Informatif : `null` signifie illimite. */
   maxUsers: number | null;
   /** @deprecated Derive de `maxUsers === null`. */
@@ -521,7 +528,6 @@ function normalizePlan(item: UnknownRecord): PharmacyPlan {
     minBillableUsers: toInteger(item.min_billable_users),
     features: toBooleanMap(item.features),
     isActive: Boolean(item.is_active),
-    monthlyPrice: toDecimal(item.monthly_price),
     maxUsers: toNullableInteger(item.max_users),
     unlimitedUsers:
       item.unlimited_users === undefined
@@ -802,4 +808,63 @@ function toBooleanMap(value: unknown): Record<string, boolean> {
   return Object.fromEntries(
     Object.entries(value as UnknownRecord).map(([key, entry]) => [key, Boolean(entry)]),
   );
+}
+
+// --------------------------------------------------------------------------- //
+// Crédits IA restants d'un utilisateur dans une pharmacie
+// --------------------------------------------------------------------------- //
+
+/**
+ * Réponse de l'endpoint
+ * `GET /api/paiements/pharmacies/{pharmacy_id}/users/{user_reference}/ai-credits/`.
+ *
+ * Seul le solde `remaining` nous intéresse pour l'affichage dans l'interface
+ * de vente, mais le type reflète la structure renvoyée par le backend.
+ */
+export type UserAiCredits = {
+  pharmacyReference: string;
+  userReference: string;
+  planCode: string;
+  periodStart?: string;
+  periodEnd?: string;
+  included: number;
+  used: number;
+  remaining: number;
+  usagePercent: number;
+};
+
+/**
+ * Crédits IA restants d'un utilisateur au sein d'une pharmacie pour la période
+ * courante. Source de vérité : le compteur par utilisateur du backend.
+ */
+export async function getUserAiCredits(
+  pharmacyId: string,
+  userReference: string,
+): Promise<UserAiCredits> {
+  const data = await fetchBillingJson<UnknownRecord>(
+    "/api/paiements/pharmacies/" +
+      encodeURIComponent(pharmacyId) +
+      "/users/" +
+      encodeURIComponent(userReference) +
+      "/ai-credits/",
+    "Impossible de charger les crédits IA restants.",
+  );
+
+  const pharmacy = toRecord(data.pharmacy);
+  const user = toRecord(data.user);
+  const plan = toRecord(data.plan);
+  const period = toRecord(data.period);
+  const credits = toRecord(data.credits);
+
+  return {
+    pharmacyReference: toText(pharmacy.reference),
+    userReference: toText(user.reference),
+    planCode: toText(plan.code),
+    periodStart: toNullableText(period.start) ?? undefined,
+    periodEnd: toNullableText(period.end) ?? undefined,
+    included: toInteger(credits.included),
+    used: toInteger(credits.used),
+    remaining: toInteger(credits.remaining),
+    usagePercent: toInteger(credits.usage_percent),
+  };
 }

@@ -1228,6 +1228,43 @@ Flux agrégateur:
 
 Statuts paiement consommés: `PENDING`, `VALIDATED`, `CANCELED`, `REFUNDED`.
 
+## Crédits IA (scan d'ordonnance)
+
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/sales/create`
+- **Service frontend** : `lib/api/billing.ts` (fonction `getUserAiCredits`)
+- **Authentification** : requise avec `Authorization: Bearer <access_token>`.
+- **Règle importante** : le solde est fourni par le compteur par utilisateur du
+  backend (`PharmacyUserAnalysisCreditPeriod`). Le frontend ne calcule jamais le
+  solde restant, il l'affiche tel quel dans le bloc « Scanner avec l'IA ».
+
+Endpoints consommés:
+
+| Usage frontend | Méthode et URL |
+| --- | --- |
+| Crédits IA restants d'un utilisateur | `GET /api/paiements/pharmacies/{pharmacy_id}/users/{user_reference}/ai-credits/` |
+
+Paramètres de chemin:
+
+- `pharmacy_id` : référence de la pharmacie active (depuis l'URL).
+- `user_reference` : référence de l'utilisateur connecté (`GET /api/accounts/me/`).
+
+Réponse attendue (extrait pertinent):
+
+```json
+{
+  "credits": {
+    "included": 30000,
+    "used": 0,
+    "remaining": 30000,
+    "usage_percent": 0
+  }
+}
+```
+
+Le frontend utilise uniquement `credits.remaining` pour afficher
+`(X crédits IA restants)`. En cas d'erreur (401/403/404), l'appel est ignoré
+`.catch(() => null)` et le solde n'est pas affiché, sans bloquer la page de vente.
+
 ## Parrainage
 
 - **Page frontend** : `/app/referrals`
