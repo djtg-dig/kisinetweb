@@ -117,6 +117,7 @@ export type CreatedSale = {
 export async function analyzePrescription(
   pharmacyId: string,
   image: Blob,
+  signal?: AbortSignal,
 ): Promise<DetectedMedication[]> {
   const accessToken = getAccessToken();
   if (!accessToken) {
@@ -135,6 +136,7 @@ export async function analyzePrescription(
       Accept: "application/json",
     },
     body: form,
+    signal,
   });
 
   const responseText = await response.text();

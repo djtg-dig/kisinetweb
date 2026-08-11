@@ -752,6 +752,7 @@ function AiScannerModal({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const analysisAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -763,6 +764,8 @@ function AiScannerModal({
       startCamera();
     } else {
       stopCamera();
+      analysisAbortRef.current?.abort();
+      analysisAbortRef.current = null;
     }
 
     return () => stopCamera();
@@ -862,6 +865,11 @@ function AiScannerModal({
     }
   }
 
+  function cancelAnalysis() {
+    analysisAbortRef.current?.abort();
+    analysisAbortRef.current = null;
+  }
+
   async function runAnalysis() {
     if (!preview) {
       return;
@@ -872,6 +880,8 @@ function AiScannerModal({
     setError("");
 
     const originalImage = dataUrlToBlob(preview);
+    const abortController = new AbortController();
+    analysisAbortRef.current = abortController;
 
     // Sauvegarde de la capture en arrière-plan : indépendante de l'analyse
     // et non bloquante. Les échecs (ex. service de stockage indisponible)
@@ -879,11 +889,18 @@ function AiScannerModal({
     void uploadPrescriptionCapture(pharmacyId, originalImage);
 
     try {
-      const medications = await analyzePrescription(pharmacyId, originalImage);
+      const medications = await analyzePrescription(
+        pharmacyId,
+        originalImage,
+        abortController.signal,
+      );
 
       onComplete(medications);
       onClose();
     } catch (analysisError) {
+      if (abortController.signal.aborted) {
+        return;
+      }
       setError(
         analysisError instanceof Error
           ? analysisError.message
@@ -901,6 +918,15 @@ function AiScannerModal({
 
   const analyzing = stage === "analyzing";
 
+  function handleClose() {
+    // Pendant l'analyse, on annule la requête en cours pour éviter
+    // d'ajouter des produits après la fermeture.
+    if (analyzing) {
+      cancelAnalysis();
+    }
+    onClose();
+  }
+
   return (
     <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" aria-hidden="true" />
@@ -916,9 +942,8 @@ function AiScannerModal({
           </h2>
           <button
             type="button"
-            onClick={onClose}
-            disabled={analyzing}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-app-muted transition hover:bg-app-surface disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={handleClose}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-app-muted transition hover:bg-app-surface"
             aria-label="Fermer"
           >
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1047,9 +1072,8 @@ function AiScannerModal({
         <footer className="flex justify-end border-t border-app-border px-5 py-3">
           <button
             type="button"
-            onClick={onClose}
-            disabled={analyzing}
-            className="inline-flex min-h-9 items-center justify-center rounded-md border border-app-border bg-app-surface px-4 py-2 text-sm font-semibold text-app-text transition hover:bg-primary-50 focus:outline-none focus:ring-4 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={handleClose}
+            className="inline-flex min-h-9 items-center justify-center rounded-md border border-app-border bg-app-surface px-4 py-2 text-sm font-semibold text-app-text transition hover:bg-primary-50 focus:outline-none focus:ring-4 focus:ring-primary-100"
           >
             Fermer
           </button>
