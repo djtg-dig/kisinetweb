@@ -39,8 +39,10 @@ export function describeApiError(error: unknown): string {
   if (error instanceof ApiError) {
     switch (error.code) {
       case "USER_CREDIT_EXHAUSTED":
-        // Message de crédits affiché UNIQUEMENT pour ce code.
-        return CREDIT_EXHAUSTED_MESSAGE;
+        // Message de crédits affiché UNIQUEMENT pour ce code. On s'appuie sur
+        // le `detail` renvoyé par le backend (source de vérité du libellé
+        // exact), avec la constante canonique en repli.
+        return error.message || CREDIT_EXHAUSTED_MESSAGE;
       case "AI_PROVIDER_ERROR":
       case "AI_SERVICE_UNAVAILABLE":
         // Message générique : on n'expose jamais le détail d'infrastructure
