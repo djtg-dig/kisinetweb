@@ -753,6 +753,13 @@ function AiScannerModal({
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const analysisAbortRef = useRef<AbortController | null>(null);
+  const previewImgRef = useRef<HTMLImageElement | null>(null);
+  const [cropRect, setCropRect] = useState<CropRect>({ x: 0, y: 0, w: 1, h: 1 });
+  const [croppedPreviewUrl, setCroppedPreviewUrl] = useState<string | null>(null);
+  const [previewBox, setPreviewBox] = useState<{ width: number; height: number }>({
+    width: 0,
+    height: 0,
+  });
 
   useEffect(() => {
     if (open) {
@@ -780,6 +787,21 @@ function AiScannerModal({
     const timer = window.setInterval(() => setSeconds((value) => value + 1), 1000);
     return () => window.clearInterval(timer);
   }, [stage]);
+
+  useEffect(() => {
+    const image = previewImgRef.current;
+    if (!image) {
+      return;
+    }
+
+    const update = () =>
+      setPreviewBox({ width: image.clientWidth, height: image.clientHeight });
+    update();
+
+    const observer = new ResizeObserver(update);
+    observer.observe(image);
+    return () => observer.disconnect();
+  }, [stage, preview]);
 
   function stopCamera() {
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -825,6 +847,8 @@ function AiScannerModal({
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
     stopCamera();
     setPreview(canvas.toDataURL("image/jpeg"));
+    setCropRect({ x: 0, y: 0, w: 1, h: 1 });
+    setCroppedPreviewUrl(null);
     setStage("review");
   }
 
@@ -838,6 +862,8 @@ function AiScannerModal({
     const reader = new FileReader();
     reader.onload = () => {
       setPreview(reader.result as string);
+      setCropRect({ x: 0, y: 0, w: 1, h: 1 });
+      setCroppedPreviewUrl(null);
       setStage("review");
     };
     reader.readAsDataURL(file);
@@ -851,8 +877,223 @@ function AiScannerModal({
       bytes[index] = byteString.charCodeAt(index);
     }
 
-    return new File([bytes], "prescription.jpg", { type: "image/jpeg" });
+  return new File([bytes], "prescription.jpg", { type: "image/jpeg" });
+}
+
+type CropRect = { x: number; y: number; w: number; h: number };
+
+function cropImage(
+  dataUrl: string,
+  rect: CropRect,
+): Promise<{ file: File; dataUrl: string }> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => {
+      const sx = Math.round(rect.x * image.naturalWidth);
+      const sy = Math.round(rect.y * image.naturalHeight);
+      const sw = Math.max(1, Math.round(rect.w * image.naturalWidth));
+      const sh = Math.max(1, Math.round(rect.h * image.naturalHeight));
+
+      const canvas = document.createElement("canvas");
+      canvas.width = sw;
+      canvas.height = sh;
+      const context = canvas.getContext("2d");
+      if (!context) {
+        reject(new Error("Impossible de rogner l'image."));
+        return;
+      }
+
+      context.drawImage(image, sx, sy, sw, sh, 0, 0, sw, sh);
+      const croppedDataUrl = canvas.toDataURL("image/jpeg", 0.92);
+      canvas.toBlob(
+        (blob) => {
+          if (blob) {
+            resolve({
+              file: new File([blob], "prescription-cropped.jpg", { type: "image/jpeg" }),
+              dataUrl: croppedDataUrl,
+            });
+          } else {
+            reject(new Error("Échec du rognage de l'image."));
+          }
+        },
+        "image/jpeg",
+        0.92,
+      );
+    };
+    image.onerror = () => reject(new Error("Image illisible."));
+    image.src = dataUrl;
+  });
+}
+
+function CropOverlay({
+  width,
+  height,
+  rect,
+  onChange,
+}: {
+  width: number;
+  height: number;
+  rect: CropRect;
+  onChange: (rect: CropRect) => void;
+}) {
+  const layerRef = useRef<HTMLDivElement | null>(null);
+  const dragRef = useRef<{
+    mode: "draw" | "move" | "resize";
+    corner?: "nw" | "ne" | "sw" | "se";
+    startX: number;
+    startY: number;
+    startRect: CropRect;
+  } | null>(null);
+  const lastRectRef = useRef<CropRect>(rect);
+  const [localRect, setLocalRect] = useState<CropRect>(rect);
+
+  useEffect(() => {
+    if (!dragRef.current) {
+      lastRectRef.current = rect;
+      setLocalRect(rect);
+    }
+  }, [rect]);
+
+  function toNorm(clientX: number, clientY: number) {
+    const el = layerRef.current;
+    if (!el) {
+      return { x: 0, y: 0 };
+    }
+    const bounds = el.getBoundingClientRect();
+    return {
+      x: Math.min(1, Math.max(0, (clientX - bounds.left) / bounds.width)),
+      y: Math.min(1, Math.max(0, (clientY - bounds.top) / bounds.height)),
+    };
   }
+
+  function computeNext(point: { x: number; y: number }, drag: NonNullable<typeof dragRef.current>): CropRect {
+    if (drag.mode === "draw") {
+      return {
+        x: Math.min(drag.startX, point.x),
+        y: Math.min(drag.startY, point.y),
+        w: Math.max(Math.abs(point.x - drag.startX), 0.02),
+        h: Math.max(Math.abs(point.y - drag.startY), 0.02),
+      };
+    }
+
+    if (drag.mode === "move") {
+      const nextX = Math.min(
+        1 - drag.startRect.w,
+        Math.max(0, drag.startRect.x + (point.x - drag.startX)),
+      );
+      const nextY = Math.min(
+        1 - drag.startRect.h,
+        Math.max(0, drag.startRect.y + (point.y - drag.startY)),
+      );
+      return { ...drag.startRect, x: nextX, y: nextY };
+    }
+
+    const corner = drag.corner as "nw" | "ne" | "sw" | "se";
+    let nextX = drag.startRect.x;
+    let nextY = drag.startRect.y;
+    let nextW = drag.startRect.w;
+    let nextH = drag.startRect.h;
+
+    if (corner === "nw") {
+      nextX = point.x;
+      nextY = point.y;
+      nextW = drag.startRect.x + drag.startRect.w - point.x;
+      nextH = drag.startRect.y + drag.startRect.h - point.y;
+    } else if (corner === "ne") {
+      nextY = point.y;
+      nextW = point.x - drag.startRect.x;
+      nextH = drag.startRect.y + drag.startRect.h - point.y;
+    } else if (corner === "sw") {
+      nextX = point.x;
+      nextW = drag.startRect.x + drag.startRect.w - point.x;
+      nextH = point.y - drag.startRect.y;
+    } else {
+      nextW = point.x - drag.startRect.x;
+      nextH = point.y - drag.startRect.y;
+    }
+
+    nextW = Math.max(0.02, nextW);
+    nextH = Math.max(0.02, nextH);
+    return {
+      x: Math.max(0, Math.min(nextX, 1 - nextW)),
+      y: Math.max(0, Math.min(nextY, 1 - nextH)),
+      w: nextW,
+      h: nextH,
+    };
+  }
+
+  function beginDrag(
+    event: React.PointerEvent,
+    mode: "draw" | "move" | "resize",
+    corner?: "nw" | "ne" | "sw" | "se",
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    (event.target as Element).setPointerCapture?.(event.pointerId);
+    const point = toNorm(event.clientX, event.clientY);
+    dragRef.current = {
+      mode,
+      corner,
+      startX: point.x,
+      startY: point.y,
+      startRect: localRect,
+    };
+  }
+
+  function onPointerMove(event: React.PointerEvent) {
+    const drag = dragRef.current;
+    if (!drag) {
+      return;
+    }
+    const next = computeNext(toNorm(event.clientX, event.clientY), drag);
+    lastRectRef.current = next;
+    setLocalRect(next);
+  }
+
+  function endDrag() {
+    if (!dragRef.current) {
+      return;
+    }
+    dragRef.current = null;
+    onChange(lastRectRef.current);
+  }
+
+  const left = localRect.x * width;
+  const top = localRect.y * height;
+  const boxWidth = localRect.w * width;
+  const boxHeight = localRect.h * height;
+  const handle =
+    "absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-primary-600";
+
+  return (
+    <div
+      ref={layerRef}
+      className="absolute inset-0 cursor-crosshair touch-none"
+      onPointerDown={(event) => beginDrag(event, "draw")}
+      onPointerMove={onPointerMove}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
+    >
+      <div
+        className="absolute border-2 border-primary-600"
+        style={{
+          left,
+          top,
+          width: boxWidth,
+          height: boxHeight,
+          boxShadow: "0 0 0 9999px rgba(0,0,0,0.5)",
+          cursor: "move",
+        }}
+        onPointerDown={(event) => beginDrag(event, "move")}
+      >
+        <span className={`${handle} left-0 top-0`} onPointerDown={(event) => beginDrag(event, "resize", "nw")} />
+        <span className={`${handle} left-full top-0`} onPointerDown={(event) => beginDrag(event, "resize", "ne")} />
+        <span className={`${handle} left-0 top-full`} onPointerDown={(event) => beginDrag(event, "resize", "sw")} />
+        <span className={`${handle} left-full top-full`} onPointerDown={(event) => beginDrag(event, "resize", "se")} />
+      </div>
+    </div>
+  );
+}
 
   async function refreshAiCredits() {
     const userReference = userReferenceRef.current;
@@ -879,9 +1120,19 @@ function AiScannerModal({
     setSeconds(0);
     setError("");
 
-    const originalImage = dataUrlToBlob(preview);
     const abortController = new AbortController();
     analysisAbortRef.current = abortController;
+
+    const isFullImage =
+      cropRect.x === 0 && cropRect.y === 0 && cropRect.w === 1 && cropRect.h === 1;
+    let originalImage: File;
+    if (isFullImage) {
+      originalImage = dataUrlToBlob(preview);
+    } else {
+      const cropped = await cropImage(preview, cropRect);
+      originalImage = cropped.file;
+      setCroppedPreviewUrl(cropped.dataUrl);
+    }
 
     // Sauvegarde de la capture en arrière-plan : indépendante de l'analyse
     // et non bloquante. Les échecs (ex. service de stockage indisponible)
@@ -1010,12 +1261,26 @@ function AiScannerModal({
 
           {stage === "review" && preview && (
             <div className="grid gap-4">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={preview}
-                alt="Ordonnance capturée"
-                className="max-h-[55vh] w-full rounded-lg border border-app-border object-contain"
-              />
+              <div className="relative mx-auto inline-block max-w-full">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  ref={previewImgRef}
+                  src={preview}
+                  alt="Ordonnance capturée"
+                  className="block max-h-[55vh] w-auto max-w-full rounded-lg border border-app-border"
+                />
+                {previewBox.width > 0 && (
+                  <CropOverlay
+                    width={previewBox.width}
+                    height={previewBox.height}
+                    rect={cropRect}
+                    onChange={setCropRect}
+                  />
+                )}
+              </div>
+              <p className="text-xs text-app-muted">
+                Cadrez la zone de l'ordonnance à analyser, puis cliquez sur « Scanner ».
+              </p>
               {error && (
                 <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
                   {error}
@@ -1047,10 +1312,10 @@ function AiScannerModal({
 
           {analyzing && (
             <div className="grid gap-4">
-              {preview && (
+              {(croppedPreviewUrl ?? preview) && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={preview}
+                  src={(croppedPreviewUrl ?? preview) as string}
                   alt="Ordonnance analysée"
                   className="max-h-[45vh] w-full rounded-lg border border-app-border object-contain opacity-80"
                 />
