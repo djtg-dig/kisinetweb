@@ -75,7 +75,7 @@ export function AppLayout({ children, pharmacyId, permissions: initialPermission
     return (
       <div className="min-h-screen overflow-x-hidden bg-app-background pt-16 text-app-text lg:pt-[72px]">
         <div className="flex h-16 w-full items-center justify-center border-b border-app-border bg-app-surface lg:h-[72px]">
-          <div className="text-app-muted">Chargement...</div>
+          <div className="h-16 w-full border-b border-app-border bg-app-surface lg:h-[72px]" />
         </div>
         <div className="flex min-h-[calc(100vh-4rem)] flex-col lg:min-h-[calc(100vh-4.5rem)]">
           <div className="flex-1">{children}</div>

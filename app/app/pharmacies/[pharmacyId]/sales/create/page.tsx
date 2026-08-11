@@ -20,6 +20,7 @@ import {
   type SaleDraftStorage,
   type SaleProduct,
 } from "@/lib/api/sales";
+import { describeApiError } from "@/lib/api/errors";
 import { getAccountProfile } from "@/lib/api";
 import { getUserAiCredits } from "@/lib/api/billing";
 import { getPharmacyDashboard } from "@/lib/dashboard-api";
@@ -370,11 +371,8 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
       setFeedback({ tone: "success", message: "Facture créée avec succès. Le paiement sera enregistré par le caissier." });
     } catch (error) {
       setFeedback({
-        tone: "info",
-        message:
-          error instanceof Error
-            ? error.message
-            : "Impossible de créer la facture.",
+        tone: "error",
+        message: describeApiError(error),
       });
     } finally {
       setSubmitting(false);
@@ -1152,11 +1150,7 @@ function CropOverlay({
       if (abortController.signal.aborted) {
         return;
       }
-      setError(
-        analysisError instanceof Error
-          ? analysisError.message
-          : "Échec de l'analyse de l'ordonnance.",
-      );
+      setError(describeApiError(analysisError));
       setStage("review");
     } finally {
       refreshAiCredits();

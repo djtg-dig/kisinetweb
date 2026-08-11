@@ -6,6 +6,18 @@ import {
 } from "@/lib/api";
 import { getAccessToken } from "@/lib/auth";
 import { apiBaseUrl } from "@/lib/carri-account";
+import { ApiError } from "./errors";
+
+// Renvoie le code d'erreur API éventuel porté par la réponse backend.
+function extractErrorCode(data: unknown): string | undefined {
+  if (data && typeof data === "object") {
+    const code = (data as Record<string, unknown>).code;
+    if (typeof code === "string") {
+      return code;
+    }
+  }
+  return undefined;
+}
 
 export type DiscountType = "none" | "percent" | "amount";
 
@@ -143,7 +155,11 @@ export async function analyzePrescription(
   const data = parseJsonResponse(responseText);
 
   if (!response.ok) {
-    throw new Error(getApiErrorMessage(data, "Impossible d'analyser l'ordonnance."));
+    throw new ApiError(
+      getApiErrorMessage(data, "Impossible d'analyser l'ordonnance."),
+      extractErrorCode(data),
+      response.status,
+    );
   }
 
   const record = (data && typeof data === "object" ? data : {}) as Record<string, unknown>;
@@ -251,7 +267,11 @@ export async function createSale(payload: CreateSalePayload): Promise<CreatedSal
   const data = parseJsonResponse(responseText);
 
   if (!response.ok) {
-    throw new Error(getApiErrorMessage(data, "Impossible de créer la facture."));
+    throw new ApiError(
+      getApiErrorMessage(data, "Impossible de créer la facture."),
+      extractErrorCode(data),
+      response.status,
+    );
   }
 
   return data as CreatedSale;

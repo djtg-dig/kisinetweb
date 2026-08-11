@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { LoadingBubble } from "@/components/ui/loading-bubble";
 import {
   getPharmacyMembers,
   type PharmacyMember,
@@ -124,8 +125,8 @@ export default function MemberDetailPage({ params }: MemberDetailPageProps) {
       </a>
 
       {state === "loading" && (
-        <section className="mt-6 rounded-lg border border-app-border bg-app-card p-8 text-center text-sm font-semibold text-app-muted">
-          Chargement du membre...
+        <section className="mt-6 rounded-lg border border-app-border bg-app-card p-8">
+          <LoadingBubble label="Chargement du membre" />
         </section>
       )}
 
