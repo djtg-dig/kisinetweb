@@ -1185,7 +1185,7 @@ function CropOverlay({
         role="dialog"
         aria-modal="true"
         aria-labelledby="ai-scanner-title"
-        className="relative flex w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-app-border bg-app-card shadow-soft"
+        className="relative flex w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-app-border bg-app-card shadow-soft"
       >
         <header className="flex items-center justify-between gap-4 border-b border-app-border px-5 py-4">
           <h2 id="ai-scanner-title" className="text-lg font-bold text-app-text">
@@ -1267,7 +1267,7 @@ function CropOverlay({
                   ref={previewImgRef}
                   src={preview}
                   alt="Ordonnance capturée"
-                  className="block max-h-[55vh] w-auto max-w-full rounded-lg border border-app-border"
+                  className="block max-h-[78vh] w-auto max-w-full rounded-lg border border-app-border"
                 />
                 {previewBox.width > 0 && (
                   <CropOverlay
@@ -1317,7 +1317,7 @@ function CropOverlay({
                 <img
                   src={(croppedPreviewUrl ?? preview) as string}
                   alt="Ordonnance analysée"
-                  className="max-h-[45vh] w-full rounded-lg border border-app-border object-contain opacity-80"
+                  className="max-h-[70vh] w-full rounded-lg border border-app-border object-contain opacity-80"
                 />
               )}
               <div className="flex flex-col items-center justify-center gap-3 py-4">
