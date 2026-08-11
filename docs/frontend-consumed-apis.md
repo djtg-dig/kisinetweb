@@ -930,6 +930,7 @@ Content-Type: application/json
 - `POST /api/sales/`
 - `GET /api/sales/?pharmacy_reference={pharmacy_id}`
 - `POST /api/sales/vision/` (analyse d'ordonnance, multipart `pharmacy_reference` + `image`)
+- `POST /api/sales/prescription-captures/` (sauvegarde de l'image d'ordonnance capturée, multipart `pharmacy` (optionnel) + `image`)
 
 ### Page `/app/pharmacies/{pharmacy_id}/sales/create`
 

@@ -12,6 +12,7 @@ import {
   getSavedSaleDraft,
   saveSaleDraft,
   searchSaleProducts,
+  uploadPrescriptionCapture,
   type CreateSalePayload,
   type DetectedMedication,
   type DiscountType,
@@ -452,6 +453,8 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
           <AiScannerModal
             open={scannerOpen}
             pharmacyId={pharmacyId}
+            userReferenceRef={aiUserReferenceRef}
+            onCreditsUpdated={(remaining) => setAiCreditsRemaining(remaining)}
             onClose={() => setScannerOpen(false)}
             onComplete={handleScanComplete}
           />
@@ -729,11 +732,15 @@ function ProductResultCard({
 function AiScannerModal({
   open,
   pharmacyId,
+  userReferenceRef,
+  onCreditsUpdated,
   onClose,
   onComplete,
 }: {
   open: boolean;
   pharmacyId: string;
+  userReferenceRef: React.RefObject<string>;
+  onCreditsUpdated?: (remaining: number) => void;
   onClose: () => void;
   onComplete: (medications: DetectedMedication[]) => void;
 }) {
@@ -845,13 +852,13 @@ function AiScannerModal({
   }
 
   async function refreshAiCredits() {
-    const userReference = aiUserReferenceRef.current;
+    const userReference = userReferenceRef.current;
     if (!userReference) {
       return;
     }
     const credits = await getUserAiCredits(pharmacyId, userReference).catch(() => null);
     if (credits) {
-      setAiCreditsRemaining(credits.remaining);
+      onCreditsUpdated?.(credits.remaining);
     }
   }
 
@@ -864,8 +871,16 @@ function AiScannerModal({
     setSeconds(0);
     setError("");
 
+    const originalImage = dataUrlToBlob(preview);
+
+    // Sauvegarde de la capture en arrière-plan : indépendante de l'analyse
+    // et non bloquante. Les échecs (ex. service de stockage indisponible)
+    // sont ignorés car ils n'empêchent pas la création de la vente.
+    void uploadPrescriptionCapture(pharmacyId, originalImage);
+
     try {
-      const medications = await analyzePrescription(pharmacyId, dataUrlToBlob(preview));
+      const medications = await analyzePrescription(pharmacyId, originalImage);
+
       onComplete(medications);
       onClose();
     } catch (analysisError) {
@@ -1028,6 +1043,17 @@ function AiScannerModal({
             </div>
           )}
         </div>
+
+        <footer className="flex justify-end border-t border-app-border px-5 py-3">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={analyzing}
+            className="inline-flex min-h-9 items-center justify-center rounded-md border border-app-border bg-app-surface px-4 py-2 text-sm font-semibold text-app-text transition hover:bg-primary-50 focus:outline-none focus:ring-4 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Fermer
+          </button>
+        </footer>
       </div>
     </div>
   );

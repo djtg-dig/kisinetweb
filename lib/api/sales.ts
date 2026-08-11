@@ -158,6 +158,54 @@ export async function analyzePrescription(
     }));
 }
 
+export async function uploadPrescriptionCapture(
+  pharmacyId: string,
+  image: Blob,
+): Promise<void> {
+  const accessToken = getAccessToken();
+  if (!accessToken) {
+    return;
+  }
+
+  const form = new FormData();
+  form.append("pharmacy", pharmacyId);
+  form.append("image", image);
+
+  const response = await fetch(
+    apiBaseUrl.replace(/\/$/, "") + "/api/sales/prescription-captures/",
+    {
+      method: "POST",
+      cache: "no-store",
+      headers: {
+        Authorization: "Bearer " + accessToken,
+        Accept: "application/json",
+      },
+      body: form,
+    },
+  );
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    const detail = body ? " | Détail backend: " + body : "";
+    // 4xx : service de capture indisponible (ex. stockage Cloudinary) ;
+    // non bloquant pour la vente -> simple avertissement.
+    // 5xx : erreur serveur inattendue -> erreur console.
+    if (response.status >= 500) {
+      console.error(
+        "Prescription capture upload failed with status:",
+        response.status,
+        detail,
+      );
+    } else {
+      console.warn(
+        "Prescription capture upload ignored (status:",
+        response.status + ")",
+        detail,
+      );
+    }
+  }
+}
+
 export async function createSale(payload: CreateSalePayload): Promise<CreatedSale> {
   const accessToken = getAccessToken();
   if (!accessToken) {
