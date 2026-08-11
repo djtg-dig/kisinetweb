@@ -1179,13 +1179,13 @@ function CropOverlay({
   }
 
   return (
-    <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40" aria-hidden="true" />
+    <div className="fixed inset-0 z-[1100] flex items-start justify-center overflow-y-auto p-4 pt-20 sm:pt-24">
+      <div className="fixed inset-0 bg-black/40" aria-hidden="true" />
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="ai-scanner-title"
-        className="relative flex w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-app-border bg-app-card shadow-soft"
+        className="relative my-auto flex max-h-[calc(100dvh-6rem)] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-app-border bg-app-card shadow-soft"
       >
         <header className="flex items-center justify-between gap-4 border-b border-app-border px-5 py-4">
           <h2 id="ai-scanner-title" className="text-lg font-bold text-app-text">
@@ -1209,7 +1209,7 @@ function CropOverlay({
           </p>
         )}
 
-        <div className="p-5">
+        <div className="min-h-0 overflow-y-auto p-5">
           {stage === "camera" && (
             <div className="relative overflow-hidden rounded-lg border border-app-border bg-black">
               <video
@@ -1267,7 +1267,7 @@ function CropOverlay({
                   ref={previewImgRef}
                   src={preview}
                   alt="Ordonnance capturée"
-                  className="block max-h-[78vh] w-auto max-w-full rounded-lg border border-app-border"
+                  className="block max-h-[70vh] w-auto max-w-full rounded-lg border border-app-border"
                 />
                 {previewBox.width > 0 && (
                   <CropOverlay
