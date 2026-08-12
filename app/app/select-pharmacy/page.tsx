@@ -5,8 +5,9 @@ import { MainLayout } from "@/components/layout/main-layout";
 import { LinkButton } from "@/components/ui/link-button";
 import { Button } from "@/components/ui/button";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
-import { getUserPharmacies, type PharmacySummary } from "@/lib/api";
+import { getUserPharmacies, ApiAuthError, type PharmacySummary } from "@/lib/api";
 import { saveTokensFromUrlHash, setActivePharmacyId } from "@/lib/auth";
+import { carriAccountLoginUrl } from "@/lib/carri-account";
 
 type PageState = "loading" | "error" | "empty" | "ready" | "redirecting";
 
@@ -14,6 +15,7 @@ export default function SelectPharmacyPage() {
   const [state, setState] = useState<PageState>("loading");
   const [pharmacies, setPharmacies] = useState<PharmacySummary[]>([]);
   const [errorMessage, setErrorMessage] = useState("");
+  const [isAuthError, setIsAuthError] = useState(false);
 
   useEffect(() => {
     async function loadPharmacies() {
@@ -24,6 +26,9 @@ export default function SelectPharmacyPage() {
         setPharmacies(userPharmacies);
         setState(userPharmacies.length === 0 ? "empty" : "ready");
       } catch (error) {
+        // Erreur d'authentification (token expiré/invalide) : on signale le cas
+        // pour proposer une reconnexion à la place d'un message brut.
+        setIsAuthError(error instanceof ApiAuthError);
         const message = error instanceof Error ? error.message : "";
         setErrorMessage(message || "Une erreur inconnue est survenue.");
         setState("error");
@@ -68,7 +73,7 @@ export default function SelectPharmacyPage() {
         <div className="min-h-[260px]">
           {state === "loading" && <LoadingBubble label="Récupération des pharmacies" />}
           {state === "redirecting" && <RedirectingState />}
-          {state === "error" && <ErrorState message={errorMessage} />}
+          {state === "error" && <ErrorState message={errorMessage} isAuthError={isAuthError} />}
           {state === "empty" && <EmptyState />}
           {state === "ready" && (
             <PharmacyList pharmacies={pharmacies} onOpenPharmacy={openPharmacy} />
@@ -92,15 +97,27 @@ function RedirectingState() {
   return <LoadingBubble label="Ouverture de la pharmacie" />;
 }
 
-function ErrorState({ message }: { message: string }) {
+function ErrorState({ message, isAuthError = false }: { message: string; isAuthError?: boolean }) {
   return (
     <Panel tone="error">
       <p className="text-sm font-semibold text-red-600">Erreur de chargement</p>
       <h2 className="mt-2 text-xl font-bold text-app-text">Impossible de charger vos pharmacies</h2>
-      <p className="mt-2 text-sm leading-6 text-app-muted">{message}</p>
-      <LinkButton href="/" variant="secondary" className="mt-5">
-        Retour à l’accueil
-      </LinkButton>
+      {/* Message clair et exempt de détail technique (ex. « Given token not valid
+          for any token type »). En cas d'expiration de session, on propose une
+          reconnexion au lieu d'afficher l'erreur brute de l'API. */}
+      <p className="mt-2 text-sm leading-6 text-app-muted">
+        {isAuthError
+          ? "Votre session a expiré. Reconnectez-vous pour accéder à vos pharmacies."
+          : message}
+      </p>
+      <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+        {isAuthError && (
+          <LinkButton href={carriAccountLoginUrl}>Se reconnecter</LinkButton>
+        )}
+        <LinkButton href="/" variant="secondary">
+          Retour à l’accueil
+        </LinkButton>
+      </div>
     </Panel>
   );
 }

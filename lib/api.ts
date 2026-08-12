@@ -345,13 +345,24 @@ async function refreshAccessTokenIfNeeded(): Promise<boolean> {
   return refreshPromise;
 }
 
+// Erreur levée quand la session est invalidée (token absent, expiré ou refusé
+// même après tentative de refresh). On expose un message clair et stable afin
+// que l'interface puisse proposer une reconnexion à la place d'un message
+// brut du backend (ex. « Given token not valid for any token type »).
+export class ApiAuthError extends Error {
+  constructor() {
+    super("Votre session a expiré. Veuillez vous reconnecter.");
+    this.name = "ApiAuthError";
+  }
+}
+
 export async function authenticatedFetch(
   input: RequestInfo,
   init?: RequestInit,
 ): Promise<Response> {
   const accessToken = getAccessToken();
   if (!accessToken) {
-    throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
+    throw new ApiAuthError();
   }
 
   const headers = new Headers(init?.headers);
@@ -372,6 +383,12 @@ export async function authenticatedFetch(
         ...init,
         headers,
       });
+    }
+    // Le refresh a échoué ou le nouveau token est encore refusé : la session est
+    // invalidée. On lève une erreur claire au lieu de renvoyer le message brut
+    // de l'API (ex. « Given token not valid for any token type »).
+    if (response.status === 401) {
+      throw new ApiAuthError();
     }
   }
 
@@ -650,7 +667,7 @@ export async function getUserPharmacies(): Promise<PharmacySummary[]> {
   // API reelle du backend Kisinet: GET /api/pharmacies/
   const accessToken = getAccessToken();
   if (!accessToken) {
-    throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
+    throw new ApiAuthError();
   }
 
   return dedupeRequest("auth:" + accessToken + ":GET:/api/pharmacies/", async () => {
@@ -694,7 +711,7 @@ export async function getUserPharmacies(): Promise<PharmacySummary[]> {
 async function fetchApiJson<T>(path: string, fallbackMessage: string): Promise<T> {
   const accessToken = getAccessToken();
   if (!accessToken) {
-    throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
+    throw new ApiAuthError();
   }
 
   return dedupeRequest("auth:" + accessToken + ":GET:" + path, async () => {
@@ -739,7 +756,7 @@ async function fetchPublicApiJson<T>(path: string, fallbackMessage: string): Pro
 async function postApiJson<T>(path: string, fallbackMessage: string): Promise<T> {
   const accessToken = getAccessToken();
   if (!accessToken) {
-    throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
+    throw new ApiAuthError();
   }
 
   const response = await authenticatedFetch(apiBaseUrl.replace(/\/$/, "") + path, {
@@ -767,7 +784,7 @@ async function postJson<T>(
 ): Promise<T> {
   const accessToken = getAccessToken();
   if (!accessToken) {
-    throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
+    throw new ApiAuthError();
   }
 
   const response = await authenticatedFetch(apiBaseUrl.replace(/\/$/, "") + path, {
@@ -798,7 +815,7 @@ async function sendApiJson<T>(
 ): Promise<T> {
   const accessToken = getAccessToken();
   if (!accessToken) {
-    throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
+    throw new ApiAuthError();
   }
 
   const headers: HeadersInit = {
@@ -1607,7 +1624,7 @@ export function parseJsonResponse(responseText: string) {
 export async function createPharmacy(input: CreatePharmacyInput): Promise<PharmacySummary> {
   const accessToken = getAccessToken();
   if (!accessToken) {
-    throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
+    throw new ApiAuthError();
   }
 
   const adresse = {
@@ -1659,7 +1676,7 @@ export async function createPharmacyJoinRequest(
 ): Promise<PharmacyJoinRequestSummary> {
   const accessToken = getAccessToken();
   if (!accessToken) {
-    throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
+    throw new ApiAuthError();
   }
 
   const payload = {
