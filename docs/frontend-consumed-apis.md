@@ -970,8 +970,11 @@ Content-Type: application/json
      le produit correspondant via `searchSaleProducts` et l'ajoute au brouillon
      (`addProduct`). Les médicaments sans correspondance dans le stock sont signalés.
 - **Crédits IA** : la carte « Scanner avec l'IA » appelle
-  `GET /api/paiements/pharmacies/{pharmacy_id}/users/{user_reference}/ai-credits/`
-  (voir section « Crédits IA ») pour afficher `(X crédits IA restants)`.
+   `GET /api/paiements/pharmacies/{pharmacy_id}/users/{user_reference}/ai-credits/`
+   (voir section « Crédits IA ») pour afficher `(X crédits IA restants)`. La même
+   requête est consommée par la page `settings/me` (« Mon espace dans cette pharmacie »)
+   pour afficher le compteur personnel de crédits IA restants, la période en cours et
+   le taux d'utilisation.
 - **Données temporaires** : aucune donnée produit temporaire n'est utilisée pour la
   recherche manuelle ; les produits viennent de l'API existante. Le champ affiché
   `dosage` est alimenté par `strength`. Les champs non exposés par l'API actuelle
@@ -1258,7 +1261,7 @@ Endpoints consommés:
 
 | Usage frontend | Méthode et URL |
 | --- | --- |
-| Crédits IA restants d'un utilisateur | `GET /api/paiements/pharmacies/{pharmacy_id}/users/{user_reference}/ai-credits/` |
+| Crédits IA restants d'un utilisateur | `GET /api/paiements/pharmacies/{pharmacy_id}/users/{user_reference}/ai-credits/` (page vente « Scanner avec l'IA » et page `settings/me` « Mon espace ») |
 | Crédits IA restants d'une pharmacie | `GET /api/paiements/pharmacies/{pharmacy_id}/ai-credits/` |
 
 Paramètres de chemin:

@@ -29,14 +29,13 @@ const settingsCards = [
   },
 ];
 
-// Identifiant de l'utilisateur connecté pour cette pharmacie (espace personnel).
-const CURRENT_USER_REFERENCE = "USI7JZWD8H";
-
 export default async function PharmacySettingsPage({ params }: PharmacySettingsPageProps) {
   const { pharmacyId } = await params;
   const basePath = "/app/pharmacies/" + pharmacyId;
-  const mySpacePath =
-    "/settings/me?user=" + encodeURIComponent(CURRENT_USER_REFERENCE);
+  // L'espace personnel utilise le profil connecté ; le paramètre `user` reste
+  // accepté en repli mais n'est plus requis (la page résout l'utilisateur
+  // courant via /api/accounts/me/).
+  const mySpacePath = "/settings/me";
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">

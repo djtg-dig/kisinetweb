@@ -3,11 +3,17 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
 import {
+  getAccountProfile,
   getPharmacyMembers,
+  type AccountProfile,
   type PharmacyMember,
   type PharmacyMemberRole,
   type PharmacyPermissions,
 } from "@/lib/api";
+import {
+  getUserAiCredits,
+  type UserAiCredits,
+} from "@/lib/api/billing";
 
 type MySpacePageProps = {
   params: Promise<{ pharmacyId: string }>;
@@ -75,6 +81,14 @@ export default function MySpacePage({ params, searchParams }: MySpacePageProps) 
   const [state, setState] = useState<PageState>("loading");
   const [errorMessage, setErrorMessage] = useState("");
 
+  // Profil de l'utilisateur connecté (source de l'email et de la référence).
+  const [profile, setProfile] = useState<AccountProfile | null>(null);
+
+  // Crédits IA restants de l'utilisateur (endpoint facturation dédié).
+  const [aiCredits, setAiCredits] = useState<UserAiCredits | null>(null);
+  const [aiCreditsState, setAiCreditsState] = useState<"loading" | "ready" | "error">("loading");
+  const [aiCreditsError, setAiCreditsError] = useState("");
+
   useEffect(() => {
     async function readParams() {
       const resolvedParams = await params;
@@ -86,20 +100,54 @@ export default function MySpacePage({ params, searchParams }: MySpacePageProps) 
     readParams();
   }, [params, searchParams]);
 
+  // On résout l'utilisateur courant via /api/accounts/me/ pour obtenir son
+  // email (utilisé pour trouver le membre) et sa référence (pour les crédits IA).
   useEffect(() => {
-    if (!pharmacyId || !userReference) {
+    if (!pharmacyId) {
       return;
     }
+
+    let isCurrent = true;
+
+    getAccountProfile()
+      .then((data) => {
+        if (isCurrent) {
+          setProfile(data);
+        }
+      })
+      .catch(() => {
+        // Profil optionnel : on continue avec le paramètre `user` si fourni.
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [pharmacyId]);
+
+  useEffect(() => {
+    if (!pharmacyId) {
+      return;
+    }
+
+    // Email prioritaire (profil connecté), sinon repli sur le paramètre `user`.
+    const lookupEmail = profile?.email?.trim().toLowerCase() || "";
+    const lookupReference = userReference.trim();
 
     async function loadMember() {
       setState("loading");
       setErrorMessage("");
 
       try {
-        // On cherche le membre correspondant à l'utilisateur dans cette pharmacie.
         const members = await getPharmacyMembers(pharmacyId);
+        // Le backend renvoie `user` comme clé primaire (entier) et
+        // `user_email` comme email. On matche donc sur l'email du profil,
+        // ou sur la référence fournie en repli.
         const foundMember =
-          members.find((current) => current.user === userReference) || null;
+          members.find(
+            (current) =>
+              (lookupEmail && current.userEmail?.toLowerCase() === lookupEmail) ||
+              (lookupReference && current.user === lookupReference),
+          ) || null;
 
         setMember(foundMember);
         setState(foundMember ? "ready" : "not-found");
@@ -112,7 +160,52 @@ export default function MySpacePage({ params, searchParams }: MySpacePageProps) 
     }
 
     loadMember();
-  }, [pharmacyId, userReference]);
+  }, [pharmacyId, profile, userReference]);
+
+  // Chargement indépendant des crédits IA : un échec ici n'empêche pas
+  // l'affichage du reste de l'espace personnel.
+  useEffect(() => {
+    if (!pharmacyId) {
+      return;
+    }
+
+    // Référence prioritaire (profil connecté), sinon repli sur le paramètre `user`.
+    const creditUserReference =
+      profile?.reference?.trim() || userReference.trim();
+    if (!creditUserReference) {
+      setAiCreditsState("error");
+      setAiCreditsError("Utilisateur non identifié pour les crédits IA.");
+      return;
+    }
+
+    let isCurrent = true;
+    setAiCreditsState("loading");
+    setAiCreditsError("");
+
+    getUserAiCredits(pharmacyId, creditUserReference)
+      .then((data) => {
+        if (!isCurrent) {
+          return;
+        }
+        setAiCredits(data);
+        setAiCreditsState("ready");
+      })
+      .catch((error) => {
+        if (!isCurrent) {
+          return;
+        }
+        setAiCreditsError(
+          error instanceof Error
+            ? error.message
+            : "Impossible de charger vos crédits IA.",
+        );
+        setAiCreditsState("error");
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [pharmacyId, profile, userReference]);
 
   const backUrl = pharmacyId ? "/app/pharmacies/" + pharmacyId + "/settings" : "#";
 
@@ -199,19 +292,96 @@ export default function MySpacePage({ params, searchParams }: MySpacePageProps) 
               ))}
             </div>
           </section>
+
+          <section className="mt-6 rounded-lg border border-app-border bg-app-card p-6">
+            <h2 className="text-lg font-bold text-app-text">Mes crédits d'analyse IA</h2>
+            <p className="mt-2 text-sm leading-6 text-app-muted">
+              Crédits d'analyse IA restants sur votre compteur personnel pour la période en cours.
+            </p>
+
+            {aiCreditsState === "loading" && (
+              <div className="mt-4">
+                <LoadingBubble label="Chargement de vos crédits IA" />
+              </div>
+            )}
+
+            {aiCreditsState === "error" && (
+              <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
+                {aiCreditsError}
+              </div>
+            )}
+
+            {aiCreditsState === "ready" && aiCredits && (
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <InfoCard
+                  label="Crédits restants"
+                  value={aiCredits.remaining.toLocaleString("fr-FR")}
+                  strong
+                />
+                <InfoCard label="Plan" value={aiCredits.planCode || "—"} />
+                <InfoCard
+                  label="Crédits inclus"
+                  value={aiCredits.included.toLocaleString("fr-FR")}
+                />
+                <InfoCard
+                  label="Crédits utilisés"
+                  value={aiCredits.used.toLocaleString("fr-FR")}
+                />
+                <InfoCard
+                  label="Période"
+                  value={formatPeriod(aiCredits.periodStart, aiCredits.periodEnd)}
+                />
+                <InfoCard label="Taux d'utilisation" value={aiCredits.usagePercent + " %"} />
+
+                <div className="sm:col-span-2">
+                  <div className="flex items-center justify-between text-xs font-semibold text-app-muted">
+                    <span>Consommation de la période</span>
+                    <span>{aiCredits.usagePercent} %</span>
+                  </div>
+                  <div className="mt-2 h-3 w-full overflow-hidden rounded-full bg-app-surface">
+                    <div
+                      className="h-full rounded-full bg-primary-600"
+                      style={{ width: Math.min(100, aiCredits.usagePercent) + "%" }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </section>
         </>
       )}
     </main>
   );
 }
 
-function InfoCard({ label, value }: { label: string; value: string }) {
+function InfoCard({
+  label,
+  value,
+  strong = false,
+}: {
+  label: string;
+  value: string;
+  strong?: boolean;
+}) {
   return (
     <div className="rounded-md border border-app-border bg-app-background p-4">
       <p className="text-xs font-semibold uppercase tracking-wide text-app-muted">{label}</p>
-      <p className="mt-2 text-sm font-bold text-app-text">{value}</p>
+      <p
+        className={
+          "mt-2 text-sm " + (strong ? "font-bold text-primary-700" : "font-bold text-app-text")
+        }
+      >
+        {value}
+      </p>
     </div>
   );
+}
+
+function formatPeriod(start?: string, end?: string) {
+  const formattedStart = start ? formatDate(start) : "—";
+  const formattedEnd = end ? formatDate(end) : "—";
+
+  return formattedStart + " → " + formattedEnd;
 }
 
 function StatusBadge({ suspended }: { suspended: boolean }) {
