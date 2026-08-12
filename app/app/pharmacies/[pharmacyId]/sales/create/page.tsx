@@ -23,6 +23,7 @@ import {
 import { describeApiError } from "@/lib/api/errors";
 import { getAccountProfile } from "@/lib/api";
 import { getUserAiCredits } from "@/lib/api/billing";
+import { notifyAiCreditsUpdated } from "@/lib/ai-credits-events";
 import { getPharmacyDashboard } from "@/lib/dashboard-api";
 
 type CreateSalePageProps = {
@@ -1101,6 +1102,9 @@ function CropOverlay({
     const credits = await getUserAiCredits(pharmacyId, userReference).catch(() => null);
     if (credits) {
       onCreditsUpdated?.(credits.remaining);
+      // Notifie les autres pages (ex. l'espace personnel) pour qu'elles
+      // actualisent leur affichage des crédits IA.
+      notifyAiCreditsUpdated();
     }
   }
 

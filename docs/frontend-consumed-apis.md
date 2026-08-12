@@ -974,7 +974,11 @@ Content-Type: application/json
    (voir section « Crédits IA ») pour afficher `(X crédits IA restants)`. La même
    requête est consommée par la page `settings/me` (« Mon espace dans cette pharmacie »)
    pour afficher le compteur personnel de crédits IA restants, la période en cours et
-   le taux d'utilisation.
+   le taux d'utilisation. Après une analyse réussie, le scanner diffuse l'événement
+   global `kisinet:ai-credits-updated` (via `notifyAiCreditsUpdated`) ; la page
+   `settings/me` l'écoute et recharge automatiquement le compteur de crédits IA
+   (rafraîchissement inter-pages, utile si les deux pages sont ouvertes dans des
+   onglets distincts).
 - **Données temporaires** : aucune donnée produit temporaire n'est utilisée pour la
   recherche manuelle ; les produits viennent de l'API existante. Le champ affiché
   `dosage` est alimenté par `strength`. Les champs non exposés par l'API actuelle

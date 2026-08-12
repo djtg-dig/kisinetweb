@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
 import {
   getAccountProfile,
@@ -14,6 +14,7 @@ import {
   getUserAiCredits,
   type UserAiCredits,
 } from "@/lib/api/billing";
+import { AI_CREDITS_UPDATED_EVENT } from "@/lib/ai-credits-events";
 
 type MySpacePageProps = {
   params: Promise<{ pharmacyId: string }>;
@@ -89,6 +90,10 @@ export default function MySpacePage({ params, searchParams }: MySpacePageProps) 
   const [aiCreditsState, setAiCreditsState] = useState<"loading" | "ready" | "error">("loading");
   const [aiCreditsError, setAiCreditsError] = useState("");
 
+  // Identifiant de la dernière requête de crédits IA en cours (évite d'appliquer
+  // une réponse obsolète si plusieurs chargements se chevauchent ou après démontage).
+  const aiCreditsRequestId = useRef(0);
+
   useEffect(() => {
     async function readParams() {
       const resolvedParams = await params;
@@ -162,50 +167,66 @@ export default function MySpacePage({ params, searchParams }: MySpacePageProps) 
     loadMember();
   }, [pharmacyId, profile, userReference]);
 
-  // Chargement indépendant des crédits IA : un échec ici n'empêche pas
-  // l'affichage du reste de l'espace personnel.
-  useEffect(() => {
-    if (!pharmacyId) {
-      return;
-    }
+  // Recharge les crédits IA pour la référence résolue. Fonction extraite pour
+  // pouvoir être rappelée après une analyse IA (rafraîchissement ciblé).
+  const loadAiCredits = useCallback(
+    (creditReference: string) => {
+      const creditUserReference = creditReference.trim();
+      if (!creditUserReference) {
+        setAiCreditsState("error");
+        setAiCreditsError("Utilisateur non identifié pour les crédits IA.");
+        return;
+      }
 
-    // Référence prioritaire (profil connecté), sinon repli sur le paramètre `user`.
+      const requestId = ++aiCreditsRequestId.current;
+      setAiCreditsState("loading");
+      setAiCreditsError("");
+
+      getUserAiCredits(pharmacyId, creditUserReference)
+        .then((data) => {
+          if (requestId !== aiCreditsRequestId.current) {
+            return;
+          }
+          setAiCredits(data);
+          setAiCreditsState("ready");
+        })
+        .catch((error) => {
+          if (requestId !== aiCreditsRequestId.current) {
+            return;
+          }
+          setAiCreditsError(
+            error instanceof Error
+              ? error.message
+              : "Impossible de charger vos crédits IA.",
+          );
+          setAiCreditsState("error");
+        });
+    },
+    [pharmacyId],
+  );
+
+  // Chargement initial des crédits IA : un échec n'empêche pas l'affichage
+  // du reste de l'espace personnel.
+  useEffect(() => {
     const creditUserReference =
       profile?.reference?.trim() || userReference.trim();
-    if (!creditUserReference) {
-      setAiCreditsState("error");
-      setAiCreditsError("Utilisateur non identifié pour les crédits IA.");
-      return;
+    loadAiCredits(creditUserReference);
+  }, [profile, userReference, loadAiCredits]);
+
+  // Rafraîchissement automatique quand une analyse IA a été réalisée sur la
+  // page de vente (événement global diffusé par le scanner IA).
+  useEffect(() => {
+    function handleAiCreditsUpdated() {
+      const creditUserReference =
+        profile?.reference?.trim() || userReference.trim();
+      loadAiCredits(creditUserReference);
     }
 
-    let isCurrent = true;
-    setAiCreditsState("loading");
-    setAiCreditsError("");
-
-    getUserAiCredits(pharmacyId, creditUserReference)
-      .then((data) => {
-        if (!isCurrent) {
-          return;
-        }
-        setAiCredits(data);
-        setAiCreditsState("ready");
-      })
-      .catch((error) => {
-        if (!isCurrent) {
-          return;
-        }
-        setAiCreditsError(
-          error instanceof Error
-            ? error.message
-            : "Impossible de charger vos crédits IA.",
-        );
-        setAiCreditsState("error");
-      });
-
+    window.addEventListener(AI_CREDITS_UPDATED_EVENT, handleAiCreditsUpdated);
     return () => {
-      isCurrent = false;
+      window.removeEventListener(AI_CREDITS_UPDATED_EVENT, handleAiCreditsUpdated);
     };
-  }, [pharmacyId, profile, userReference]);
+  }, [profile, userReference, loadAiCredits]);
 
   const backUrl = pharmacyId ? "/app/pharmacies/" + pharmacyId + "/settings" : "#";
 
