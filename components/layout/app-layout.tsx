@@ -20,7 +20,7 @@ const appNavItems = [
   { label: "Ventes", path: "/sales/create", permission: "sale_view" },
   { label: "Facture", path: "/invoices", permission: "sale_view" },
   { label: "Rapports", path: "/reports" },
-  { label: "Notification", path: "/notifications", icon: "bell", permission: "join_request_view" },
+  { label: "(5)", path: "/notifications", icon: "bell", permission: "join_request_view" },
   { label: "Paramètres", path: "/settings" },
 ] satisfies {
   label: string;

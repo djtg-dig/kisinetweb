@@ -29,9 +29,14 @@ const settingsCards = [
   },
 ];
 
+// Identifiant de l'utilisateur connecté pour cette pharmacie (espace personnel).
+const CURRENT_USER_REFERENCE = "USI7JZWD8H";
+
 export default async function PharmacySettingsPage({ params }: PharmacySettingsPageProps) {
   const { pharmacyId } = await params;
   const basePath = "/app/pharmacies/" + pharmacyId;
+  const mySpacePath =
+    "/settings/me?user=" + encodeURIComponent(CURRENT_USER_REFERENCE);
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -54,6 +59,16 @@ export default async function PharmacySettingsPage({ params }: PharmacySettingsP
             <p className="mt-3 text-sm leading-6 text-app-muted">{card.description}</p>
           </a>
         ))}
+
+        <a
+          href={basePath + mySpacePath}
+          className="rounded-lg border border-primary-200 bg-primary-50 p-5 shadow-sm transition hover:border-primary-400 hover:shadow-soft"
+        >
+          <h2 className="text-lg font-bold text-app-text">Mon espace dans cette pharmacie</h2>
+          <p className="mt-3 text-sm leading-6 text-app-muted">
+            Consulter votre profil, votre rôle et vos permissions dans cette pharmacie.
+          </p>
+        </a>
       </section>
     </main>
   );
