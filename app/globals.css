@@ -10,36 +10,60 @@
   --color-border: 226 232 240; /* Couleur de bordure : gris */
   --color-text: 15 23 42; /* Couleur du texte : bleu foncé */
   --color-muted: 100 116 139; /* Couleur de texte secondaire : bleu-gris */
-  --color-primary-50: 239 246 255;
-  --color-primary-100: 219 234 254;
-  --color-primary-200: 191 219 254;
-  --color-primary-300: 147 197 253;
-  --color-primary-400: 96 165 250;
-  --color-primary-500: 59 130 246;
-  --color-primary-600: 37 99 235;
-  --color-primary-700: 29 78 216;
-  --color-primary-800: 30 64 175;
-  --color-primary-900: 30 58 138;
+  /* Identité visuelle inspirée de forum.minesursi.gouv.cd : bleu marine. */
+  --color-primary-50: 236 242 250;
+  --color-primary-100: 220 231 244;
+  --color-primary-200: 191 212 231;
+  --color-primary-300: 147 181 209;
+  --color-primary-400: 96 142 182;
+  --color-primary-500: 26 75 128; /* #1a4b80 bleu principal */
+  --color-primary-600: 22 66 113; /* #164271 */
+  --color-primary-700: 15 58 110; /* #0f3a6e */
+  --color-primary-800: 12 45 84; /* #0c2d54 bleu marine foncé */
+  --color-primary-900: 8 30 56; /* #081e38 */
+  /* Accent or (gold) du site de référence. */
+  --color-accent-50: 254 249 235;
+  --color-accent-100: 253 243 214;
+  --color-accent-200: 251 231 178;
+  --color-accent-300: 247 214 122;
+  --color-accent-400: 240 190 60;
+  --color-accent-500: 232 192 32; /* #e8c020 or */
+  --color-accent-600: 209 168 22;
+  --color-accent-700: 161 128 12;
+  --color-accent-800: 120 93 8;
+  --color-accent-900: 83 63 5;
 }
 
 .dark {
-  /* La classe .dark permettra d'activer plus tard le thème sombre. */
+  /* La classe .dark permet d'activer le thème sombre. */
   --color-background: 2 6 23; /* Couleur de fond principale : bleu très foncé */
   --color-surface: 15 23 42; /* Couleur de surface : bleu foncé */
   --color-card: 30 41 59; /* Couleur des cartes : bleu-gris */
   --color-border: 51 65 85; /* Couleur de bordure : bleu-gris */
   --color-text: 248 250 252; /* Couleur du texte : blanc */
   --color-muted: 148 163 184; /* Couleur de texte secondaire : gris */
-  --color-primary-50: 15 23 42;
-  --color-primary-100: 30 41 59;
-  --color-primary-200: 51 65 85;
-  --color-primary-300: 96 165 250;
-  --color-primary-400: 147 197 253;
-  --color-primary-500: 96 165 250;
-  --color-primary-600: 59 130 246;
-  --color-primary-700: 147 197 253;
-  --color-primary-800: 191 219 254;
-  --color-primary-900: 219 234 254;
+  /* Bleu marine adapté au thème sombre : teintes claires pour le texte/liens. */
+  --color-primary-50: 14 30 54;
+  --color-primary-100: 19 41 72;
+  --color-primary-200: 25 53 90;
+  --color-primary-300: 36 76 122;
+  --color-primary-400: 54 104 158;
+  --color-primary-500: 78 132 190;
+  --color-primary-600: 110 160 208;
+  --color-primary-700: 150 188 224;
+  --color-primary-800: 12 45 84; /* #0c2d54 bleu marine foncé (footer) */
+  --color-primary-900: 8 30 56;
+  /* Or plus clair pour rester lisible sur fond sombre. */
+  --color-accent-50: 83 63 5;
+  --color-accent-100: 120 93 8;
+  --color-accent-200: 161 128 12;
+  --color-accent-300: 209 168 22;
+  --color-accent-400: 232 192 32;
+  --color-accent-500: 240 190 60;
+  --color-accent-600: 247 214 122;
+  --color-accent-700: 251 231 178;
+  --color-accent-800: 253 243 214;
+  --color-accent-900: 254 249 235;
 }
 
 * {

@@ -130,7 +130,7 @@ function AppNavbar({ pharmacyId, permissions }: { pharmacyId: string; permission
               priority
             />
           </span>
-          <span className="truncate text-base font-bold text-app-text sm:text-lg">Kisinet</span>
+          <span className="truncate text-base font-bold text-app-text sm:text-lg">Kisi<span className="text-accent-700">net</span></span>
         </a>
 
         <DesktopNav basePath={basePath} permissions={permissions} pathname={pathname} />
@@ -293,7 +293,7 @@ function MenuPanel({
         Accueil
       </MenuLink>
       <MenuLink href={basePath + "/history"} onClose={onClose}>
-        Mon historique
+        Mon espace
       </MenuLink>
       <MenuLink href="/app/select-pharmacy" onClose={onClose}>
         Mes pharmacies

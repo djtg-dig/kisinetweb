@@ -361,7 +361,7 @@ function ProductShowcase() {
       <div className="overflow-hidden rounded-lg border border-app-border bg-app-card shadow-soft">
         <div className="flex items-center justify-between border-b border-app-border bg-app-surface px-4 py-3">
           <div>
-            <p className="text-sm font-bold text-app-text">Kisinet</p>
+            <p className="text-sm font-bold text-app-text">Kisi<span className="text-accent-700">net</span></p>
             <p className="text-xs text-app-muted">Vue opérationnelle pharmacie</p>
           </div>
           <span className="rounded-full bg-success-50 px-3 py-1 text-xs font-semibold text-success-700 ring-1 ring-success-100">

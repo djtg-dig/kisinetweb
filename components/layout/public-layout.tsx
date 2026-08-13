@@ -125,7 +125,7 @@ export function PublicLayout({ children, activePharmacy = null, userData: initia
                   priority
                 />
               </span>
-              <span className="text-lg font-bold text-app-text">Kisinet</span>
+              <span className="text-lg font-bold text-app-text">Kisi<span className="text-accent-700">net</span></span>
             </div>
           </nav>
         </div>
@@ -193,7 +193,7 @@ function PublicNavbar({ activePharmacy, userMenu, onMenuToggle }: PublicNavbarPr
               priority
             />
           </span>
-          <span className="text-lg font-bold text-app-text">Kisinet</span>
+          <span className="text-lg font-bold text-app-text">Kisi<span className="text-accent-700">net</span></span>
         </a>
 
         <div className="hidden items-center gap-6 text-sm font-medium text-app-muted md:flex">
