@@ -49,24 +49,47 @@ export default async function PharmacySettingsPage({ params }: PharmacySettingsP
 
       <section className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {settingsCards.map((card) => (
+          // Carte paramètre : lien cliquable mis en évidence (survol, focus, indice « Accéder »)
           <a
             key={card.path}
             href={basePath + card.path}
-            className="rounded-lg border border-app-border bg-app-card p-5 shadow-sm transition hover:border-primary-200 hover:shadow-soft"
+            className="group flex cursor-pointer flex-col rounded-lg border border-app-border bg-app-card p-5 shadow-sm outline-none transition hover:-translate-y-0.5 hover:border-primary-300 hover:bg-primary-50/40 hover:shadow-soft focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
           >
             <h2 className="text-lg font-bold text-app-text">{card.title}</h2>
-            <p className="mt-3 text-sm leading-6 text-app-muted">{card.description}</p>
+            <p className="mt-3 flex-1 text-sm leading-6 text-app-muted">
+              {card.description}
+            </p>
+            {/* Indice d'action visible au survol/focus pour renforcer l'affordance cliquable */}
+            <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-primary-700">
+              Accéder
+              <span
+                aria-hidden="true"
+                className="transition-transform group-hover:translate-x-1"
+              >
+                →
+              </span>
+            </span>
           </a>
         ))}
 
+        {/* Carte « Mon espace » : lien cliquable distinct mis en évidence de la même manière */}
         <a
           href={basePath + mySpacePath}
-          className="rounded-lg border border-primary-200 bg-primary-50 p-5 shadow-sm transition hover:border-primary-400 hover:shadow-soft"
+          className="group flex cursor-pointer flex-col rounded-lg border border-primary-200 bg-primary-50 p-5 shadow-sm outline-none transition hover:-translate-y-0.5 hover:border-primary-400 hover:bg-primary-100/50 hover:shadow-soft focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
         >
           <h2 className="text-lg font-bold text-app-text">Mon espace dans cette pharmacie</h2>
-          <p className="mt-3 text-sm leading-6 text-app-muted">
+          <p className="mt-3 flex-1 text-sm leading-6 text-app-muted">
             Consulter votre profil, votre rôle et vos permissions dans cette pharmacie.
           </p>
+          <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-primary-700">
+            Accéder
+            <span
+              aria-hidden="true"
+              className="transition-transform group-hover:translate-x-1"
+            >
+              →
+            </span>
+          </span>
         </a>
       </section>
     </main>
