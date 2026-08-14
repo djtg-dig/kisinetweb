@@ -3,6 +3,7 @@ import { PublicAuthLink } from "@/components/auth/public-auth-link";
 import { FeatureCard } from "@/components/ui/feature-card";
 import { LinkButton } from "@/components/ui/link-button";
 import { features } from "@/lib/features";
+import { HashFocus } from "@/components/hash-focus";
 
 const quickBenefits = [
   "Stock suivi en temps réel",
@@ -109,6 +110,7 @@ export default function HomePage() {
   return (
     <PublicLayout>
       <main>
+        <HashFocus />
         <section className="border-b border-app-border bg-app-background">
           <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:px-6 lg:grid-cols-[0.95fr_1.05fr] lg:px-8 lg:py-16">
             <div className="flex flex-col justify-center">
