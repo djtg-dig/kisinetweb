@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Modal } from "@/components/ui/modal";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
 import {
   acceptPharmacyJoinRequest,
@@ -20,6 +22,28 @@ type NotificationsPageProps = {
 
 type PageState = "loading" | "error" | "empty" | "ready";
 type ActionType = "accept" | "reject" | "archive";
+
+// Phrase clé renvoyée par l'API lorsque la pharmacie n'a pas d'abonnement
+// actif autorisant l'ajout de membres. Elle déclenche l'affichage d'une
+// fenêtre modale dédiée plutôt que la bannière d'erreur générique.
+// On compare de façon tolérante (minuscules, accents, espaces) car le
+// backend peut renvoyer le libellé avec un préfixe de champ ou une légère
+// variation de mise en forme.
+const SUBSCRIPTION_REQUIRED_PHRASE =
+  "veuillez souscrire la pharmacie a un abonnement pour ajouter des membres a son effectif";
+
+// Normalise un message (minuscules, suppression des accents et des
+// espaces superflus) puis vérifie la présence de la phrase clé d'abonnement
+// requis, indépendamment de sa mise en forme exacte.
+function isSubscriptionRequiredMessage(message: string): boolean {
+  const normalized = message
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return normalized.includes(SUBSCRIPTION_REQUIRED_PHRASE);
+}
 
 const statusLabels: Record<string, string> = {
   PENDING: "En attente",
@@ -41,7 +65,9 @@ export default function PharmacyNotificationsPage({ params }: NotificationsPageP
   const [joinRequests, setJoinRequests] = useState<PharmacyJoinRequestSummary[]>([]);
   const [state, setState] = useState<PageState>("loading");
   const [errorMessage, setErrorMessage] = useState("");
+  const [subscriptionMessage, setSubscriptionMessage] = useState("");
   const [runningAction, setRunningAction] = useState("");
+  const router = useRouter();
 
   useEffect(() => {
     async function readParams() {
@@ -130,9 +156,20 @@ export default function PharmacyNotificationsPage({ params }: NotificationsPageP
         ),
       );
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Impossible de traiter cette demande.",
-      );
+      const message =
+        error instanceof Error ? error.message : "Impossible de traiter cette demande.";
+
+      // L'absence d'abonnement actif est signalée par un message précis : on
+      // l'affiche dans une fenêtre modale dédiée au lieu de la bannière
+      // d'erreur générique. La détection tolérante évite qu'une légère
+      // variation de mise en forme du backend n'empêche l'ouverture de la
+      // modale.
+      if (isSubscriptionRequiredMessage(message)) {
+        setSubscriptionMessage(message);
+        return;
+      }
+
+      setErrorMessage(message);
     } finally {
       setRunningAction("");
     }
@@ -194,6 +231,32 @@ export default function PharmacyNotificationsPage({ params }: NotificationsPageP
           ))}
         </section>
       )}
+
+      {/* Fenêtre modale affichée lorsque la pharmacie doit souscrire un
+          abonnement avant de pouvoir accepter une demande d'intégration. */}
+      <Modal
+        open={Boolean(subscriptionMessage)}
+        title="Abonnement requis"
+        onClose={() => setSubscriptionMessage("")}
+      >
+        <p className="text-sm leading-6 text-app-muted">{subscriptionMessage}</p>
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={() => setSubscriptionMessage("")}
+            className="inline-flex min-h-11 items-center justify-center rounded-md border border-app-border bg-app-surface px-5 py-2.5 text-sm font-semibold text-app-text transition hover:bg-primary-50 focus:outline-none focus:ring-4 focus:ring-primary-100"
+          >
+            Fermer
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push("/tarifs")}
+            className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-700 focus:outline-none focus:ring-4 focus:ring-primary-200"
+          >
+            Prendre un abonnement
+          </button>
+        </div>
+      </Modal>
     </main>
   );
 }
