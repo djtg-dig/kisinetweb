@@ -1388,7 +1388,7 @@ function SaleDraft({
                     {formatCurrency(item.product.salePrice, currency)}
                   </td>
                   <td className="py-3 pr-4">
-                    <div className="flex w-fit items-center rounded-md border border-app-border bg-white">
+                    <div className="flex w-fit items-center rounded-md border border-app-border bg-app-card">
                       <button
                         type="button"
                         onClick={() => onQuantityChange(item.product.reference, item.quantity - 1)}
@@ -1401,7 +1401,7 @@ function SaleDraft({
                         onChange={(event) =>
                           onQuantityChange(item.product.reference, Number(event.target.value))
                         }
-                        className="h-10 w-16 border-x border-app-border text-center text-sm font-semibold outline-none"
+                        className="h-10 w-16 border-x border-app-border bg-transparent text-center text-sm font-semibold text-app-text outline-none"
                         inputMode="numeric"
                       />
                       <button
