@@ -428,13 +428,15 @@ function ProductsList({
 }) {
   return (
     <div className="rounded-lg border border-app-border bg-app-card shadow-sm">
-      <div className="hidden grid-cols-[1.4fr_1fr_0.8fr_0.7fr_0.7fr_0.8fr_0.8fr] gap-4 rounded-t-lg border-b border-app-border bg-app-surface px-5 py-3 text-xs font-bold uppercase text-app-muted lg:grid">
+      <div className="hidden grid-cols-[1.4fr_1fr_0.8fr_0.7fr_0.7fr_0.8fr_0.8fr_0.7fr_0.7fr] gap-4 rounded-t-lg border-b border-app-border bg-app-surface px-5 py-3 text-xs font-bold uppercase text-app-muted lg:grid">
         <span>Produit</span>
         <span>Catégorie</span>
         <span>Dosage</span>
         <span>Forme</span>
         <span className="text-right">Stock</span>
         <span className="text-right">Prix vente</span>
+        <span className="text-right">Création</span>
+        <span className="text-right">Expiration</span>
         <span className="text-right">Action</span>
       </div>
 
@@ -442,7 +444,7 @@ function ProductsList({
         {products.map((product, index) => (
           <article
             key={product.reference}
-            className="grid gap-4 px-5 py-4 lg:grid-cols-[1.4fr_1fr_0.8fr_0.7fr_0.7fr_0.8fr_0.8fr] lg:items-center"
+            className="grid gap-4 px-5 py-4 lg:grid-cols-[1.4fr_1fr_0.8fr_0.7fr_0.7fr_0.8fr_0.8fr_0.7fr_0.7fr] lg:items-center"
           >
             <div className="min-w-0">
               <h2 className="truncate font-bold text-app-text">{product.name}</h2>
@@ -468,6 +470,16 @@ function ProductsList({
             <InfoCell
               label="Prix vente"
               value={formatCurrency(product.salePrice)}
+              alignRight
+            />
+            <InfoCell
+              label="Création"
+              value={formatDate(product.createdDate)}
+              alignRight
+            />
+            <InfoCell
+              label="Expiration"
+              value={formatDate(product.expirationDate)}
               alignRight
             />
             <ProductActions
@@ -781,6 +793,21 @@ function ErrorState({ message, pharmacyId }: { message: string; pharmacyId: stri
 
 function formatValue(value?: string) {
   return value || "Non renseigné";
+}
+
+// Affiche une date ISO (AAAA-MM-JJ) au format JJ/MM/AAAA, ou « — » si absente.
+function formatDate(value?: string | null) {
+  if (!value) {
+    return "—";
+  }
+
+  const parts = value.split("-");
+  if (parts.length !== 3) {
+    return value;
+  }
+
+  const [year, month, day] = parts;
+  return day + "/" + month + "/" + year;
 }
 
 function formatCurrency(value: number) {

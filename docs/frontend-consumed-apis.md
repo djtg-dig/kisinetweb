@@ -754,6 +754,7 @@ Content-Type: application/json
 - `GET /api/products/filter-options/?pharmacy_reference={pharmacy_id}`
 - `GET /api/products/{reference}/?pharmacy_reference={pharmacy_id}`
 - `POST /api/products/`
+- `PATCH /api/products/{reference}/?pharmacy_reference={pharmacy_id}`
 - `DELETE /api/products/{reference}/?pharmacy_reference={pharmacy_id}`
 
 ### POST /api/products/
@@ -780,6 +781,8 @@ Content-Type: application/json
 | `package`          | string  | non         | Conditionnement commercial, max 50 caractères. Envoyé seulement si renseigné. |
 | `purchase_price`   | number  | non         | Prix d'achat, >= 0. Envoyé seulement si renseigné.              |
 | `current_stock`    | integer | non         | Stock initial, >= 0. Défaut : 0. Envoyé seulement si renseigné. |
+| `created_date`     | string  | non         | Date de création (AAAA-MM-JJ). Envoyée seulement si renseignée. |
+| `expiration_date`  | string  | non         | Date de péremption (AAAA-MM-JJ). Envoyée seulement si renseignée. |
 
 > Remarque pharmacie : le backend relie le produit à la pharmacie via le champ
 > `pharmacy_reference` (pas `pharmacy`, `pharmacy_id`, ni l'entier PK). Le champ
@@ -839,13 +842,15 @@ Content-Type: application/json
   "therapeutic_category": "ANALGESIC",
   "strength": "500 mg",
   "package": "Boîte de 10 comprimés",
-  "sale_price": "1.50",
-  "purchase_price": "0.90",
-  "current_stock": 100,
-  "is_deleted": false,
-  "deleted_at": null,
-  "created_at": "2026-07-08T12:00:00Z",
-  "updated_at": "2026-07-08T12:00:00Z"
+   "sale_price": "1.50",
+   "purchase_price": "0.90",
+   "current_stock": 100,
+   "created_date": "2026-07-08",
+   "expiration_date": "2027-07-08",
+   "is_deleted": false,
+   "deleted_at": null,
+   "created_at": "2026-07-08T12:00:00Z",
+   "updated_at": "2026-07-08T12:00:00Z"
 }
 ```
 
@@ -867,7 +872,9 @@ Content-Type: application/json
 - **Recherche** : `search` couvre notamment le nom, la référence, la description,
   la catégorie, le dosage (`strength`) et le conditionnement (`package`).
 - **Réponse attendue (200)** : objet paginé `{ count, next, previous, results }` où
-  chaque `result` est un produit (serializer de lecture).
+  chaque `result` est un produit (serializer de lecture). Chaque produit inclut
+  désormais `created_date` et `expiration_date` (dates `AAAA-MM-JJ`, éventuellement
+  `null`) utilisées par les colonnes « Création » et « Expiration » de la liste.
 - **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden`.
 - **Endpoint compagnon** : `GET /api/products/filter-options/?pharmacy_reference={pharmacy_id}`
   (`getProductFilterOptions`) renvoie les options des filtres (formes, catégories, etc.),
@@ -1155,6 +1162,25 @@ Content-Type: application/json
 - **Réponse attendue** : `204 No Content` (aucun corps).
 - **Erreurs possibles** : `400 Bad Request` (paramètre manquant), `401 Unauthorized`,
   `403 Forbidden`, `404 Not Found`.
+
+### PATCH /api/products/{reference}/
+
+- **Objectif** : modification partielle d'un produit (mise à jour des dates, prix, stock, etc.).
+- **Méthode HTTP** : `PATCH`
+- **URL** : `/api/products/{reference}/?pharmacy_reference={pharmacy_id}`
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/products/[reference]/edit`
+- **Service frontend** : `updateProduct(pharmacyId, reference, values)` dans `lib/api/products.ts`
+- **Paramètre query obligatoire** : `pharmacy_reference`.
+- **Champs envoyés (JSON)** : identiques au payload `POST`, mais tous optionnels.
+  `created_date` et `expiration_date` sont des dates `AAAA-MM-JJ` ; envoyer `null`
+  (ou une chaîne vide côté formulaire) pour effacer la valeur.
+- **Validation métier** : si `created_date` et `expiration_date` sont tous deux fournis,
+  le backend renvoie `400` avec le message `La date d'expiration ne peut pas être
+  antérieure à la date de création.` (sur le champ `expiration_date`).
+- **Réponse attendue (200)** : le produit mis à jour (serializer de lecture), incluant
+  `created_date` et `expiration_date`.
+- **Erreurs possibles** : `400 Bad Request`, `401 Unauthorized`, `403 Forbidden`,
+  `404 Not Found`.
 
 ## Permissions et dashboard
 

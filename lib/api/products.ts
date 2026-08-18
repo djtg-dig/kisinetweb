@@ -20,7 +20,8 @@ export type CreateProductPayload = {
   sale_price: number;
   purchase_price?: number | null;
   current_stock?: number;
-  expiration_date?: string;
+  created_date?: string | null;
+  expiration_date?: string | null;
 };
 
 export type Product = {
@@ -37,6 +38,7 @@ export type Product = {
   sale_price: number;
   purchase_price?: number | null;
   current_stock: number;
+  created_date?: string | null;
   expiration_date?: string | null;
   is_deleted?: boolean;
   deleted_at?: string | null;
@@ -57,6 +59,7 @@ export type ProductFormValues = {
   sale_price: string;
   purchase_price: string;
   current_stock: string;
+  created_date: string;
   expiration_date: string;
 };
 
@@ -128,6 +131,7 @@ export const initialProductFormValues: ProductFormValues = {
   sale_price: "",
   purchase_price: "",
   current_stock: "0",
+  created_date: "",
   expiration_date: "",
 };
 
@@ -167,6 +171,9 @@ export async function createProduct(
   }
   if (values.expiration_date.trim()) {
     payload.expiration_date = values.expiration_date.trim();
+  }
+  if (values.created_date.trim()) {
+    payload.created_date = values.created_date.trim();
   }
 
   const response = await fetch(apiBaseUrl.replace(/\/$/, "") + "/api/products/", {
@@ -261,4 +268,76 @@ export async function deleteProduct(
   if (!response.ok) {
     throw new Error(getApiErrorMessage(data, "Impossible de supprimer ce produit."));
   }
+}
+
+export async function updateProduct(
+  pharmacyId: string,
+  reference: string,
+  values: ProductFormValues,
+): Promise<Product> {
+  const accessToken = getAccessToken();
+  if (!accessToken) {
+    throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
+  }
+
+  // PATCH partiel: on n'envoie que les champs renseignés. Les dates sont
+  // envoyées en chaîne pour définir une valeur, ou en null pour l'effacer.
+  const payload: Record<string, unknown> = {
+    name: values.name.trim(),
+    form: values.form,
+    target_gender: values.target_gender,
+    target_age_group: values.target_age_group,
+    therapeutic_category: values.therapeutic_category,
+    created_date: values.created_date.trim() ? values.created_date.trim() : null,
+    expiration_date: values.expiration_date.trim()
+      ? values.expiration_date.trim()
+      : null,
+  };
+
+  if (values.description.trim()) {
+    payload.description = values.description.trim();
+  }
+  if (values.strength.trim()) {
+    payload.strength = values.strength.trim();
+  }
+  if (values.package.trim()) {
+    payload.package = values.package.trim();
+  }
+  if (values.sale_price.trim()) {
+    payload.sale_price = Number(values.sale_price);
+  }
+  if (values.purchase_price.trim()) {
+    payload.purchase_price = Number(values.purchase_price);
+  }
+  if (values.current_stock.trim()) {
+    payload.current_stock = Number(values.current_stock);
+  }
+
+  const params = new URLSearchParams({ pharmacy_reference: pharmacyId });
+  const url =
+    apiBaseUrl.replace(/\/$/, "") + "/api/products/" + reference + "/?" + params.toString();
+
+  const response = await fetch(url, {
+    method: "PATCH",
+    cache: "no-store",
+    headers: {
+      Authorization: "Bearer " + accessToken,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const responseText = await response.text();
+  const data = parseJsonResponse(responseText);
+
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(data, "Impossible de modifier le produit."));
+  }
+
+  if (!data || typeof data !== "object") {
+    throw new Error("La réponse du serveur est invalide.");
+  }
+
+  return data as Product;
 }

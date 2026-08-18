@@ -149,6 +149,8 @@ export type ProductSummary = {
   salePrice: number;
   purchasePrice?: number;
   currentStock: number;
+  createdDate?: string | null;
+  expirationDate?: string | null;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -571,6 +573,8 @@ function normalizeProduct(item: UnknownRecord): ProductSummary {
         ? undefined
         : Number(item.purchase_price || 0),
     currentStock: Number(item.current_stock || 0),
+    createdDate: getText(item.created_date),
+    expirationDate: getText(item.expiration_date),
     createdAt: getText(item.created_at),
     updatedAt: getText(item.updated_at),
   };

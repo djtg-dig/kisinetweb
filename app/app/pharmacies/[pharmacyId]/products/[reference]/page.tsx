@@ -136,6 +136,8 @@ function DetailCard({ product, pharmacyId }: { product: Product; pharmacyId: str
           }
         />
         <DetailRow label="Stock actuel" value={String(product.current_stock)} />
+        <DetailRow label="Date de création" value={formatDate(product.created_date)} />
+        <DetailRow label="Date d'expiration" value={formatDate(product.expiration_date)} />
         <DetailRow label="Statut" value={product.is_deleted ? "Supprimé" : "Actif"} />
         <DetailRow label="Créé le" value={formatDateTime(product.created_at)} />
         <DetailRow label="Modifié le" value={formatDateTime(product.updated_at)} />
@@ -164,6 +166,21 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 
 function formatValue(value?: string) {
   return value || "Non renseigné";
+}
+
+// Affiche une date ISO (AAAA-MM-JJ) au format JJ/MM/AAAA, ou « Non renseigné ».
+function formatDate(value?: string | null) {
+  if (!value) {
+    return "Non renseigné";
+  }
+
+  const parts = value.split("-");
+  if (parts.length !== 3) {
+    return value;
+  }
+
+  const [year, month, day] = parts;
+  return day + "/" + month + "/" + year;
 }
 
 function labelFor(
