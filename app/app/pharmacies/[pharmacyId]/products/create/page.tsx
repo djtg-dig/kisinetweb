@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { LinkButton } from "@/components/ui/link-button";
+import { ToastMessage } from "@/components/ui/toast";
 import {
   DateField,
   NumberField,
@@ -32,7 +33,7 @@ export default function CreateProductPage({ params }: CreatePageProps) {
   const [pharmacyId, setPharmacyId] = useState("");
   const [values, setValues] = useState<ProductFormValues>(initialProductFormValues);
   const [status, setStatus] = useState<SubmitStatus>("idle");
-  const [errorMessage, setErrorMessage] = useState("");
+  const [toast, setToast] = useState<{ tone: "success" | "error"; message: string } | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -92,7 +93,6 @@ export default function CreateProductPage({ params }: CreatePageProps) {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setErrorMessage("");
 
     if (!validate()) {
       return;
@@ -102,21 +102,19 @@ export default function CreateProductPage({ params }: CreatePageProps) {
 
     try {
       await createProduct(pharmacyId, values);
-      setStatus("success");
+      // Création réussie : on vide le formulaire et on affiche un toast auto-fermant.
+      setValues(initialProductFormValues);
+      setFieldErrors({});
+      setToast({ tone: "success", message: "Produit créé avec succès." });
+      setStatus("idle");
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Impossible de créer le produit.",
-      );
-      setStatus("error");
+      setToast({
+        tone: "error",
+        message:
+          error instanceof Error ? error.message : "Impossible de créer le produit.",
+      });
+      setStatus("idle");
     }
-  }
-
-  // Réinitialise le formulaire pour enchaîner sur un nouveau produit.
-  function handleAddAnother() {
-    setValues(initialProductFormValues);
-    setFieldErrors({});
-    setErrorMessage("");
-    setStatus("idle");
   }
 
   return (
@@ -138,32 +136,10 @@ export default function CreateProductPage({ params }: CreatePageProps) {
       </header>
 
       <section className="py-8">
-        {status === "success" && (
-          <div className="mb-6 rounded-lg border border-green-200 bg-green-50 p-4">
-            <p className="text-sm font-semibold text-green-700">Produit créé</p>
-            <p className="mt-1 text-sm text-green-700">
-              Le produit a bien été enregistré.
-            </p>
-            <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-              <LinkButton href={productsPath(pharmacyId)} variant="secondary">
-                Retour
-              </LinkButton>
-              <button
-                type="button"
-                onClick={handleAddAnother}
-                className="inline-flex min-h-11 items-center justify-center rounded-md bg-green-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-green-700 focus:outline-none focus:ring-4 focus:ring-green-200"
-              >
-                Ajouter un autre produit
-              </button>
-            </div>
-          </div>
-        )}
-
-        {status === "error" && errorMessage && (
-          <div className="mb-6 whitespace-pre-line rounded-lg border border-red-200 bg-red-50 p-4">
-            <p className="text-sm font-semibold text-red-600">Erreur</p>
-            <p className="mt-1 text-sm text-red-600">{errorMessage}</p>
-          </div>
+        {toast && (
+          <ToastMessage tone={toast.tone} onClose={() => setToast(null)}>
+            {toast.message}
+          </ToastMessage>
         )}
 
         <form
