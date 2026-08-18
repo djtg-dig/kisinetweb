@@ -1185,8 +1185,8 @@ function CropOverlay({
         aria-labelledby="ai-scanner-title"
         className="relative my-auto flex max-h-[calc(100dvh-6rem)] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-app-border bg-app-card shadow-soft"
       >
-        <header className="flex items-center justify-between gap-4 border-b border-app-border px-5 py-4">
-          <h2 id="ai-scanner-title" className="text-lg font-bold text-app-text">
+        <header className="flex items-center justify-between gap-4 border-b border-app-border px-5 py-3">
+          <h2 id="ai-scanner-title" className="text-base font-bold text-app-text">
             Scanner avec l'IA
           </h2>
           <button
@@ -1284,27 +1284,6 @@ function CropOverlay({
                   {error}
                 </p>
               )}
-              <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPreview(null);
-                    setError("");
-                    setStage("camera");
-                    startCamera();
-                  }}
-                  className="inline-flex min-h-11 items-center justify-center rounded-md border border-app-border bg-app-surface px-5 py-2.5 text-sm font-semibold text-app-text transition hover:bg-primary-50"
-                >
-                  Reprendre
-                </button>
-                <button
-                  type="button"
-                  onClick={runAnalysis}
-                  className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-700"
-                >
-                  Scanner
-                </button>
-              </div>
             </div>
           )}
 
@@ -1332,7 +1311,30 @@ function CropOverlay({
           )}
         </div>
 
-        <footer className="flex justify-end border-t border-app-border px-5 py-3">
+        <footer className="flex flex-wrap items-center justify-end gap-3 border-t border-app-border px-5 py-2">
+          {stage === "review" && (
+            <button
+              type="button"
+              onClick={() => {
+                setPreview(null);
+                setError("");
+                setStage("camera");
+                startCamera();
+              }}
+              className="inline-flex min-h-9 items-center justify-center rounded-md border border-app-border bg-app-surface px-4 py-2 text-sm font-semibold text-app-text transition hover:bg-primary-50"
+            >
+              Reprendre
+            </button>
+          )}
+          {stage === "review" && (
+            <button
+              type="button"
+              onClick={runAnalysis}
+              className="inline-flex min-h-9 items-center justify-center rounded-md bg-primary-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary-700"
+            >
+              Scanner
+            </button>
+          )}
           <button
             type="button"
             onClick={handleClose}
