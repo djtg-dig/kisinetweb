@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api/request";
 /**
  * Types et fonctions API pour le module de parrainage.
  */
@@ -79,7 +80,7 @@ export interface ReferralPayoutAccount {
  * Récupère la liste des pharmacies parrainées par l'utilisateur connecté.
  */
 export async function getReferredPharmacies(): Promise<ReferredPharmacy[]> {
-  const response = await fetch("/api/paiements/referrals/referred-pharmacies/", {
+  const response = await apiFetch("/api/paiements/referrals/referred-pharmacies/", {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -99,7 +100,7 @@ export async function getReferredPharmacies(): Promise<ReferredPharmacy[]> {
  * Récupère le résumé des portefeuilles de parrainage.
  */
 export async function getReferralOverview(): Promise<ReferralWalletSummary[]> {
-  const response = await fetch("/api/paiements/referrals/me/", {
+  const response = await apiFetch("/api/paiements/referrals/me/", {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -119,7 +120,7 @@ export async function getReferralOverview(): Promise<ReferralWalletSummary[]> {
  * Récupère la liste des commissions de parrainage.
  */
 export async function getReferralCommissions(): Promise<ReferralCommission[]> {
-  const response = await fetch("/api/paiements/referral-commissions/", {
+  const response = await apiFetch("/api/paiements/referral-commissions/", {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -139,7 +140,7 @@ export async function getReferralCommissions(): Promise<ReferralCommission[]> {
  * Récupère la liste des demandes de retrait.
  */
 export async function getReferralWithdrawals(): Promise<ReferralWithdrawal[]> {
-  const response = await fetch("/api/paiements/referral-withdrawals/", {
+  const response = await apiFetch("/api/paiements/referral-withdrawals/", {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -159,7 +160,7 @@ export async function getReferralWithdrawals(): Promise<ReferralWithdrawal[]> {
  * Récupère la liste des comptes de retrait.
  */
 export async function getReferralPayoutAccounts(): Promise<ReferralPayoutAccount[]> {
-  const response = await fetch("/api/paiements/referral-payout-accounts/", {
+  const response = await apiFetch("/api/paiements/referral-payout-accounts/", {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -183,7 +184,7 @@ export async function createReferralWithdrawal(data: {
   currency: string;
   payout_account_reference: string;
 }): Promise<ReferralWithdrawal> {
-  const response = await fetch("/api/paiements/referral-withdrawals/", {
+  const response = await apiFetch("/api/paiements/referral-withdrawals/", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

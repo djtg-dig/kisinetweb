@@ -1,5 +1,6 @@
 import { getAccessToken } from "@/lib/auth";
 import { apiBaseUrl } from "@/lib/carri-account";
+import { apiFetch } from "@/lib/api/request";
 
 export type InvoicePaymentStatus =
   | "UNPAID"
@@ -243,7 +244,7 @@ async function fetchInvoicesResponse(path: string, init: RequestInit = {}) {
     throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
   }
 
-  return fetch(apiBaseUrl.replace(/\/$/, "") + path, {
+  return apiFetch(apiBaseUrl.replace(/\/$/, "") + path, {
     cache: "no-store",
     ...init,
     headers: {

@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api/request";
 import {
   getAccountProfile,
   getPharmacyProducts,
@@ -140,7 +141,7 @@ export async function analyzePrescription(
   form.append("pharmacy_reference", pharmacyId);
   form.append("image", image);
 
-  const response = await fetch(apiBaseUrl.replace(/\/$/, "") + "/api/sales/vision/", {
+  const response = await apiFetch(apiBaseUrl.replace(/\/$/, "") + "/api/sales/vision/", {
     method: "POST",
     cache: "no-store",
     headers: {
@@ -189,7 +190,7 @@ export async function uploadPrescriptionCapture(
   form.append("pharmacy", pharmacyId);
   form.append("image", image);
 
-  const response = await fetch(
+  const response = await apiFetch(
     apiBaseUrl.replace(/\/$/, "") + "/api/sales/prescription-captures/",
     {
       method: "POST",
@@ -252,7 +253,7 @@ export async function createSale(payload: CreateSalePayload): Promise<CreatedSal
     })),
   };
 
-  const response = await fetch(apiBaseUrl.replace(/\/$/, "") + "/api/sales/", {
+  const response = await apiFetch(apiBaseUrl.replace(/\/$/, "") + "/api/sales/", {
     method: "POST",
     cache: "no-store",
     headers: {

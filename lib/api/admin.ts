@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api/request";
 import {
   clearAdminTokens,
   getAdminAccessToken,
@@ -798,7 +799,7 @@ async function refreshAdminToken(): Promise<boolean> {
   }
 
   try {
-    const response = await fetch(apiBaseUrl.replace(/\/$/, "") + "/api/admin/auth/refresh/", {
+    const response = await apiFetch(apiBaseUrl.replace(/\/$/, "") + "/api/admin/auth/refresh/", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ refresh: refreshToken }),
@@ -853,7 +854,7 @@ export async function fetchAdminJson<T>(
     headers.Authorization = "Bearer " + accessToken;
   }
 
-  const response = await fetch(apiBaseUrl.replace(/\/$/, "") + path, {
+  const response = await apiFetch(apiBaseUrl.replace(/\/$/, "") + path, {
     cache: "no-store",
     ...init,
     headers: {

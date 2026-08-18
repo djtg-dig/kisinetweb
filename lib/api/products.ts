@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api/request";
 import { getAccessToken } from "@/lib/auth";
 import { apiBaseUrl } from "@/lib/carri-account";
 import { getApiErrorMessage, parseJsonResponse } from "@/lib/api";
@@ -176,7 +177,7 @@ export async function createProduct(
     payload.created_date = values.created_date.trim();
   }
 
-  const response = await fetch(apiBaseUrl.replace(/\/$/, "") + "/api/products/", {
+  const response = await apiFetch(apiBaseUrl.replace(/\/$/, "") + "/api/products/", {
     method: "POST",
     cache: "no-store",
     headers: {
@@ -214,7 +215,7 @@ export async function getProductDetail(
   const url =
     apiBaseUrl.replace(/\/$/, "") + "/api/products/" + reference + "/?" + params.toString();
 
-  const response = await fetch(url, {
+  const response = await apiFetch(url, {
     cache: "no-store",
     headers: {
       Authorization: "Bearer " + accessToken,
@@ -249,7 +250,7 @@ export async function deleteProduct(
   const url =
     apiBaseUrl.replace(/\/$/, "") + "/api/products/" + reference + "/?" + params.toString();
 
-  const response = await fetch(url, {
+  const response = await apiFetch(url, {
     method: "DELETE",
     cache: "no-store",
     headers: {
@@ -317,7 +318,7 @@ export async function updateProduct(
   const url =
     apiBaseUrl.replace(/\/$/, "") + "/api/products/" + reference + "/?" + params.toString();
 
-  const response = await fetch(url, {
+  const response = await apiFetch(url, {
     method: "PATCH",
     cache: "no-store",
     headers: {

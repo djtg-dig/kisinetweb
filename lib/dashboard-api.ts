@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api/request";
 import { getAccessToken } from "@/lib/auth";
 import { dedupeRequest } from "@/lib/api-request-cache";
 import { apiBaseUrl } from "@/lib/carri-account";
@@ -106,7 +107,7 @@ async function fetchDashboardJson<T>(path: string): Promise<T> {
   }
 
   return dedupeRequest("auth:" + accessToken + ":GET:" + path, async () => {
-    const response = await fetch(apiBaseUrl.replace(/\/$/, "") + path, {
+    const response = await apiFetch(apiBaseUrl.replace(/\/$/, "") + path, {
       cache: "no-store",
       headers: {
         Authorization: "Bearer " + accessToken,

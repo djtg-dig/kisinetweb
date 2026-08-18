@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api/request";
 import { getAccessToken } from "@/lib/auth";
 import { apiBaseUrl } from "@/lib/carri-account";
 
@@ -192,7 +193,7 @@ async function fetchReferralJson<T>(path: string, init: RequestInit = {}): Promi
     throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
   }
 
-  const response = await fetch(apiBaseUrl.replace(/\/$/, "") + path, {
+  const response = await apiFetch(apiBaseUrl.replace(/\/$/, "") + path, {
     cache: "no-store",
     ...init,
     headers: {

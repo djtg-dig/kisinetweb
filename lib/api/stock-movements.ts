@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api/request";
 import { getAccessToken } from "@/lib/auth";
 import { apiBaseUrl } from "@/lib/carri-account";
 import { getApiErrorMessage, parseJsonResponse } from "@/lib/api";
@@ -120,7 +121,7 @@ async function fetchStockApiJson<T>(
     throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
   }
 
-  const response = await fetch(apiBaseUrl.replace(/\/$/, "") + path, {
+  const response = await apiFetch(apiBaseUrl.replace(/\/$/, "") + path, {
     cache: "no-store",
     ...init,
     headers: {

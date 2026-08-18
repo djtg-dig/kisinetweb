@@ -2,6 +2,7 @@ import { getAccessToken, getRefreshToken } from "@/lib/auth";
 import { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY } from "@/lib/auth";
 import { dedupeRequest } from "@/lib/api-request-cache";
 import { apiBaseUrl } from "@/lib/carri-account";
+import { apiFetch } from "@/lib/api/request";
 
 export type PharmacySummary = {
   id: string;
@@ -310,7 +311,7 @@ async function refreshAccessTokenIfNeeded(): Promise<boolean> {
   isRefreshing = true;
   refreshPromise = (async () => {
     try {
-      const response = await fetch(
+      const response = await apiFetch(
         apiBaseUrl.replace(/\/$/, "") + "/api/accounts/token/refresh/",
         {
           method: "POST",
@@ -370,7 +371,7 @@ export async function authenticatedFetch(
   const headers = new Headers(init?.headers);
   headers.set("Authorization", "Bearer " + accessToken);
 
-  let response = await fetch(input, {
+  let response = await apiFetch(input, {
     ...init,
     headers,
   });
@@ -381,7 +382,7 @@ export async function authenticatedFetch(
     if (refreshed) {
       const newToken = getAccessToken();
       headers.set("Authorization", "Bearer " + newToken);
-      response = await fetch(input, {
+      response = await apiFetch(input, {
         ...init,
         headers,
       });
@@ -739,7 +740,7 @@ async function fetchApiJson<T>(path: string, fallbackMessage: string): Promise<T
 
 async function fetchPublicApiJson<T>(path: string, fallbackMessage: string): Promise<T> {
   return dedupeRequest("public:GET:" + path, async () => {
-    const response = await fetch(apiBaseUrl.replace(/\/$/, "") + path, {
+    const response = await apiFetch(apiBaseUrl.replace(/\/$/, "") + path, {
       cache: "no-store",
       headers: {
         Accept: "application/json",

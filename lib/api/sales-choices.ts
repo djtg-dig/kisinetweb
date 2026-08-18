@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api/request";
 import { dedupeRequest } from "@/lib/api-request-cache";
 import { apiBaseUrl } from "@/lib/carri-account";
 
@@ -49,7 +50,7 @@ export async function refreshSalesChoices(): Promise<SalesChoices> {
 }
 
 async function fetchSalesChoiceList(path: string): Promise<SalesChoiceOption[]> {
-  const response = await fetch(apiBaseUrl.replace(/\/$/, "") + path, {
+  const response = await apiFetch(apiBaseUrl.replace(/\/$/, "") + path, {
     cache: "no-store",
     headers: {
       Accept: "application/json",
