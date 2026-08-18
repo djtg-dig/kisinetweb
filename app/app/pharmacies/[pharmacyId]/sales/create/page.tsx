@@ -1265,7 +1265,7 @@ function CropOverlay({
                   ref={previewImgRef}
                   src={preview}
                   alt="Ordonnance capturée"
-                  className="block max-h-[70vh] w-auto max-w-full rounded-lg border border-app-border"
+                  className="block max-h-[50vh] w-auto max-w-full rounded-lg border border-app-border object-contain"
                 />
                 {previewBox.width > 0 && (
                   <CropOverlay
@@ -1315,7 +1315,7 @@ function CropOverlay({
                 <img
                   src={(croppedPreviewUrl ?? preview) as string}
                   alt="Ordonnance analysée"
-                  className="max-h-[70vh] w-full rounded-lg border border-app-border object-contain opacity-80"
+                  className="max-h-[50vh] w-full rounded-lg border border-app-border object-contain opacity-80"
                 />
               )}
               <div className="flex flex-col items-center justify-center gap-3 py-4">
