@@ -48,13 +48,14 @@ Routes frontend protégées:
 
 - `/admin`
 - `/admin/dashboard`
-- `/admin/dashboard/analyses`
-- `/admin/dashboard/analyses/[id]`
-- `/admin/dashboard/statistiques`
-- `/admin/dashboard/erreurs`
-- `/admin/dashboard/logs`
-- `/admin/dashboard/consommation`
-- `/admin/dashboard/couts`
+- `/admin/dashboard/ai`
+- `/admin/dashboard/ai/analyses`
+- `/admin/dashboard/ai/analyses/[id]`
+- `/admin/dashboard/ai/statistiques`
+- `/admin/dashboard/ai/erreurs`
+- `/admin/dashboard/ai/logs`
+- `/admin/dashboard/ai/consommation`
+- `/admin/dashboard/ai/couts`
 - `/admin/users`
 - `/admin/pharmacies`
 - `/admin/subscriptions`

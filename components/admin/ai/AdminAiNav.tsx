@@ -10,13 +10,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const aiNavItems = [
-  { label: "Vue générale", href: "/admin/dashboard" },
-  { label: "Analyses", href: "/admin/dashboard/analyses" },
-  { label: "Statistiques", href: "/admin/dashboard/statistiques" },
-  { label: "Erreurs", href: "/admin/dashboard/erreurs" },
-  { label: "Logs", href: "/admin/dashboard/logs" },
-  { label: "Consommation", href: "/admin/dashboard/consommation" },
-  { label: "Coûts", href: "/admin/dashboard/couts" },
+  { label: "Vue générale", href: "/admin/dashboard/ai" },
+  { label: "Analyses", href: "/admin/dashboard/ai/analyses" },
+  { label: "Statistiques", href: "/admin/dashboard/ai/statistiques" },
+  { label: "Erreurs", href: "/admin/dashboard/ai/erreurs" },
+  { label: "Logs", href: "/admin/dashboard/ai/logs" },
+  { label: "Consommation", href: "/admin/dashboard/ai/consommation" },
+  { label: "Coûts", href: "/admin/dashboard/ai/couts" },
 ];
 
 export function AdminAiNav() {

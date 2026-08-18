@@ -177,7 +177,7 @@ export default function AdminAiErrorsPage() {
                       </td>
                       <td className="px-3 py-3">
                         <Link
-                          href={`/admin/dashboard/analyses/${encodeURIComponent(analysis.analysis_id)}`}
+                          href={`/admin/dashboard/ai/analyses/${encodeURIComponent(analysis.analysis_id)}`}
                           className="rounded-md bg-primary-600 px-2.5 py-1 text-xs font-bold text-white hover:bg-primary-700"
                         >
                           Ouvrir

@@ -13,6 +13,7 @@ const adminNavItems = [
   { label: "Pharmacies", href: "/admin/pharmacies" },
   { label: "Abonnements", href: "/admin/subscriptions" },
   { label: "Paiements", href: "/admin/payments" },
+  { label: "Statistique IA", href: "/admin/dashboard/ai" },
   { label: "Paramètres", href: "/admin/settings" },
 ];
 

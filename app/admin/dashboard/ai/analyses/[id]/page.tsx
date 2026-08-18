@@ -80,7 +80,7 @@ export default function AdminAiAnalysisDetailPage() {
 
       <div>
         <Link
-          href="/admin/dashboard/analyses"
+          href="/admin/dashboard/ai/analyses"
           className="text-sm font-semibold text-primary-700 hover:underline"
         >
           ← Retour au journal des analyses
