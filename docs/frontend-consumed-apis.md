@@ -48,6 +48,13 @@ Routes frontend protégées:
 
 - `/admin`
 - `/admin/dashboard`
+- `/admin/dashboard/analyses`
+- `/admin/dashboard/analyses/[id]`
+- `/admin/dashboard/statistiques`
+- `/admin/dashboard/erreurs`
+- `/admin/dashboard/logs`
+- `/admin/dashboard/consommation`
+- `/admin/dashboard/couts`
 - `/admin/users`
 - `/admin/pharmacies`
 - `/admin/subscriptions`
@@ -93,6 +100,12 @@ Endpoints consommés:
 | Mise à jour catégorie paiement admin | `PUT /api/paiements/admin/payment-categories/{id}/` | Oui, admin `is_staff` |
 | Mise à jour partielle catégorie paiement admin | `PATCH /api/paiements/admin/payment-categories/{id}/` | Oui, admin `is_staff` |
 | Suppression catégorie paiement admin | `DELETE /api/paiements/admin/payment-categories/{id}/` | Oui, admin `is_staff` |
+| Dashboard IA global | `GET /api/admin/ai/dashboard/` | Oui, admin `is_staff` |
+| Journal analyses IA | `GET /api/admin/ai/analyses/?pharmacy=...&user=...&date=...&status=...&category=...&error_id=...&business_code=...&min_cost=...&min_time=...&min_ocr=...&min_vision_score=...&min_medications=...&page=...&page_size=...` | Oui, admin `is_staff` |
+| Détail analyse IA | `GET /api/admin/ai/analyses/{analysis_id}/` | Oui, admin `is_staff` |
+| Statistiques IA | `GET /api/admin/ai/statistics/` | Oui, admin `is_staff` |
+| Alertes IA | `GET /api/admin/ai/alerts/` | Oui, admin `is_staff` |
+| Logs IA | `GET /api/admin/ai/logs/?search=...&level=...&date=...&error_id=...&event=...&page=...&page_size=...` | Oui, admin `is_staff` |
 | Action retrait parrainage admin | `POST /api/admin/referral-withdrawals/{reference}/{action}/` | Oui, admin `is_staff` |
 
 Le frontend utilise des clés de stockage séparées pour les tokens admin. La

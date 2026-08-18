@@ -835,7 +835,7 @@ function redirectAdminToLogin() {
   }
 }
 
-async function fetchAdminJson<T>(
+export async function fetchAdminJson<T>(
   path: string,
   options: RequestInit & { includeAuth?: boolean } = {},
 ): Promise<T> {
