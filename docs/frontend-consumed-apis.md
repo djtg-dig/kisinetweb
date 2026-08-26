@@ -5,11 +5,38 @@ Ce fichier liste les endpoints backend déjà consommés par l'interface fronten
 ## Authentification
 
 - `GET /api/carri-account/login/`
+- `POST /api/accounts/token/refresh/`
+- `POST /api/accounts/logout/`
+- `GET /api/accounts/session/`
 
-Les boutons frontend de connexion doivent pointer vers `/auth/carri`. Cette route
-Next appelle `GET /api/carri-account/login/`, redirige vers Carri Account en cas
-de succès, et affiche une page Kisinet si le backend renvoie `429` avec
-`detail`, `code=rate_limited` et `retry_after_seconds`.
+Les boutons frontend de connexion doivent pointer vers `/auth/carri`. Cette page
+est l'unique point frontend de démarrage et de retour d'authentification :
+
+- sans fragment, elle redirige vers la Route Handler Next `GET /api/auth/carri`,
+  qui redirige le navigateur vers `GET /api/carri-account/login/` côté backend
+  Kisinet afin que les cookies de session Django portent le `code_verifier`
+  PKCE jusqu'au callback OAuth ;
+- avec un fragment `#access=...&refresh=...`, elle stocke les tokens JWT Kisinet
+  en `localStorage`, nettoie immédiatement le fragment de l'URL, puis redirige
+  vers le paramètre `next` interne s'il existe, sinon `/app/select-pharmacy`.
+
+PKCE, OpenID Connect Discovery, scopes, `id_token`, JWKS, `state`, callback
+OAuth et échange du code restent entièrement gérés par le backend Kisinet. Le
+frontend ne consomme ni ne stocke le `id_token` Kari Accounts.
+
+Gestion des erreurs d'authentification utilisateur :
+
+- `401 Unauthorized` signifie session invalide ou expirée : le frontend tente
+  `POST /api/accounts/token/refresh/`, rejoue la requête si le refresh réussit,
+  et ferme la session locale si le refresh échoue ;
+- `403 Forbidden` signifie utilisateur authentifié mais non autorisé : le
+  frontend affiche une erreur d'autorisation et ne tente pas de reconnexion
+  automatique.
+
+La déconnexion utilisateur est best-effort côté serveur : le frontend tente
+`POST /api/accounts/logout/` avec `Authorization: Bearer <access_token>` et le
+`refresh` dans le corps JSON, mais supprime toujours les tokens locaux et le
+contexte pharmacie, même si le backend est indisponible.
 
 ## Comptes
 
@@ -113,19 +140,17 @@ Le frontend utilise des clés de stockage séparées pour les tokens admin. La
 protection réelle reste côté backend: chaque endpoint admin vérifie que
 l'utilisateur est actif et `is_staff`.
 
-Gestion centralisée des erreurs d'authentification (implémentée une seule fois
-dans la couche API commune `fetchAdminJson`, `lib/api/admin.ts`, sans
-duplication par page) : si le backend répond `401` ou `403` à une requête
-authentifiée possédant un token, le frontend (1) supprime proprement les tokens
-admin expirés, (2) tente un rafraîchissement via `POST /api/admin/auth/refresh/`
-avec le refresh token stocké, (3) en cas d'échec du refresh, vide la session et
-redirige vers `{adminLoginPath}?session_expired=1`, et (4) remonte le message
-« Votre session a expiré. Veuillez vous reconnecter. ». Si le refresh réussit, la
-requête initiale est relancée avec le nouveau token. Un verrou global empêche
-plusieurs rafraîchissements simultanés et les boucles. Les autres codes HTTP
-conserveront leur comportement habituel (message d'erreur métier affiché via
-toast). Les endpoints sans authentification (ex. `POST /api/admin/auth/login/`)
-ne déclenchent pas cette logique.
+Gestion centralisée des erreurs d'authentification admin (implémentée une seule
+fois dans `fetchAdminJson`, `lib/api/admin.ts`, sans duplication par page) :
+`401 Unauthorized` déclenche une tentative de rafraîchissement via
+`POST /api/admin/auth/refresh/` avec le refresh token stocké. Si le refresh
+réussit, la requête initiale est relancée avec le nouveau token ; sinon les
+tokens admin sont supprimés et l'utilisateur est redirigé vers
+`{adminLoginPath}?session_expired=1`. `403 Forbidden` signifie que l'admin
+connecté n'est pas autorisé à effectuer l'action demandée : le frontend affiche
+une erreur d'autorisation et ne tente pas de refresh. Les endpoints sans
+authentification (ex. `POST /api/admin/auth/login/`) ne déclenchent pas cette
+logique.
 
 La page `/admin/users` consomme `GET /api/admin/users/` et affiche les
 utilisateurs dans un tableau paginé à 20 lignes maximum. Les sections Swagger des

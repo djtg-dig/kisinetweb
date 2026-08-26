@@ -9,7 +9,7 @@ import { adminLoginPath } from "@/lib/admin/config";
 import { apiBaseUrl } from "@/lib/carri-account";
 
 // Verrou global empêchant plusieurs appels de rafraîchissement simultanés
-// lorsque plusieurs requêtes admin échouent en même temps (401/403).
+// lorsque plusieurs requêtes admin échouent en même temps (401).
 let isRefreshingAdminToken = false;
 
 export type AdminProfile = {
@@ -865,10 +865,14 @@ export async function fetchAdminJson<T>(
   const responseText = await response.text();
   const data = parseJson(responseText);
 
-  // Gestion centralisée des erreurs d'authentification (401/403) :
+  if (!response.ok && response.status === 403 && includeAuth && accessToken) {
+    throw new Error("Vous n'avez pas l'autorisation d'effectuer cette action.");
+  }
+
+  // Gestion centralisée des sessions expirées (401) :
   // on ne la déclenche que pour les requêtes authentifiées ayant un token,
   // afin de ne pas perturber les endpoints publics (ex. login).
-  if (!response.ok && (response.status === 401 || response.status === 403) && includeAuth && accessToken) {
+  if (!response.ok && response.status === 401 && includeAuth && accessToken) {
     // Une seule tentative de refresh à la fois pour éviter les boucles.
     if (!isRefreshingAdminToken) {
       isRefreshingAdminToken = true;

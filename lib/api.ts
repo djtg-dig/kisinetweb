@@ -1,8 +1,12 @@
-import { getAccessToken, getRefreshToken } from "@/lib/auth";
+import { getAccessToken, getRefreshToken, logout } from "@/lib/auth";
 import { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY } from "@/lib/auth";
 import { dedupeRequest } from "@/lib/api-request-cache";
 import { apiBaseUrl } from "@/lib/carri-account";
 import { apiFetch } from "@/lib/api/request";
+import {
+  isAuthorizationDeniedStatus,
+  isSessionExpiredStatus,
+} from "@/lib/api-auth-utils";
 
 export type PharmacySummary = {
   id: string;
@@ -36,6 +40,11 @@ export type AccountProfile = {
   phoneNumber?: string;
   dateJoined?: string;
   updatedAt?: string;
+};
+
+export type AccountSession = {
+  authenticated: boolean;
+  user: AccountProfile;
 };
 
 export type PharmacyActivity = {
@@ -359,6 +368,13 @@ export class ApiAuthError extends Error {
   }
 }
 
+export class ApiAuthorizationError extends Error {
+  constructor() {
+    super("Vous n'avez pas l'autorisation d'effectuer cette action.");
+    this.name = "ApiAuthorizationError";
+  }
+}
+
 export async function authenticatedFetch(
   input: RequestInfo,
   init?: RequestInit,
@@ -376,8 +392,13 @@ export async function authenticatedFetch(
     headers,
   });
 
-  // En cas de 401, tenter un refresh du token puis rejouer la requete
-  if (response.status === 401) {
+  // 403 signifie "authentifié mais non autorisé" : aucune reconnexion automatique.
+  if (isAuthorizationDeniedStatus(response.status)) {
+    throw new ApiAuthorizationError();
+  }
+
+  // 401 signifie "session invalide/expirée" : tenter un refresh puis rejouer.
+  if (isSessionExpiredStatus(response.status)) {
     const refreshed = await refreshAccessTokenIfNeeded();
     if (refreshed) {
       const newToken = getAccessToken();
@@ -390,8 +411,12 @@ export async function authenticatedFetch(
     // Le refresh a échoué ou le nouveau token est encore refusé : la session est
     // invalidée. On lève une erreur claire au lieu de renvoyer le message brut
     // de l'API (ex. « Given token not valid for any token type »).
-    if (response.status === 401) {
+    if (isSessionExpiredStatus(response.status)) {
+      logout();
       throw new ApiAuthError();
+    }
+    if (isAuthorizationDeniedStatus(response.status)) {
+      throw new ApiAuthorizationError();
     }
   }
 
@@ -921,6 +946,20 @@ export async function getAccountProfile(): Promise<AccountProfile> {
   );
 
   return normalizeAccountProfile((data || {}) as UnknownRecord);
+}
+
+export async function getAccountSession(): Promise<AccountSession> {
+  const data = await fetchApiJson<unknown>(
+    "/api/accounts/session/",
+    "Impossible de vérifier votre session.",
+  );
+  const record = getRecord(data) || {};
+  const userRecord = getRecord(record.user) || {};
+
+  return {
+    authenticated: Boolean(record.authenticated),
+    user: normalizeAccountProfile(userRecord),
+  };
 }
 
 export async function getPharmacyActivity(pharmacyId: string): Promise<PharmacyActivity[]> {

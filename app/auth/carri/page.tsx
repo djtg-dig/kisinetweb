@@ -2,7 +2,13 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { carriAccountBackendLoginUrl } from "@/lib/carri-account";
+import {
+  buildSafeAuthRedirect,
+  readTokensFromHash,
+  saveTokens,
+} from "@/lib/auth";
+
+const AUTH_NEXT_STORAGE_KEY = "kisinet:auth_next";
 
 export default function CarriAuthPage() {
   const router = useRouter();
@@ -13,38 +19,25 @@ export default function CarriAuthPage() {
     }
 
     const hash = window.location.hash;
+    const params = new URLSearchParams(window.location.search);
+    const requestedNext = params.get("next");
+    const storedNext = sessionStorage.getItem(AUTH_NEXT_STORAGE_KEY);
+    const nextPath = buildSafeAuthRedirect(requestedNext || storedNext);
+    const tokens = readTokensFromHash(hash);
 
-    if (hash) {
-      const params = new URLSearchParams(hash.slice(1));
-      const access = params.get("access");
-      const refresh = params.get("refresh");
-
-      if (access || refresh) {
-        fetch("/api/auth/session", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            access: access || "",
-            refresh: refresh || "",
-          }),
-        })
-          .then((response) => response.json())
-          .then(() => {
-            window.history.replaceState(null, "", "/");
-            router.push("/");
-          })
-          .catch(() => {
-            window.history.replaceState(null, "", "/");
-            router.push("/auth/carri/rate-limited?message=Erreur%20lors%20de%20la%20connexion.");
-          });
-
-        return;
-      }
+    if (tokens) {
+      saveTokens(tokens);
+      sessionStorage.removeItem(AUTH_NEXT_STORAGE_KEY);
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      router.replace(nextPath);
+      return;
     }
 
-    window.location.href = carriAccountBackendLoginUrl;
+    if (requestedNext) {
+      sessionStorage.setItem(AUTH_NEXT_STORAGE_KEY, requestedNext);
+    }
+
+    window.location.href = "/api/auth/carri" + window.location.search;
   }, [router]);
 
   return null;

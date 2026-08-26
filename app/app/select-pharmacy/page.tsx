@@ -5,8 +5,13 @@ import { MainLayout } from "@/components/layout/main-layout";
 import { LinkButton } from "@/components/ui/link-button";
 import { Button } from "@/components/ui/button";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
-import { getUserPharmacies, ApiAuthError, type PharmacySummary } from "@/lib/api";
-import { saveTokensFromUrlHash, setActivePharmacyId } from "@/lib/auth";
+import {
+  getAccountSession,
+  getUserPharmacies,
+  ApiAuthError,
+  type PharmacySummary,
+} from "@/lib/api";
+import { setActivePharmacyId } from "@/lib/auth";
 import { carriAccountLoginUrl } from "@/lib/carri-account";
 
 type PageState = "loading" | "error" | "empty" | "ready" | "redirecting";
@@ -20,8 +25,7 @@ export default function SelectPharmacyPage() {
   useEffect(() => {
     async function loadPharmacies() {
       try {
-        saveTokensFromUrlHash();
-
+        await getAccountSession();
         const userPharmacies = await getUserPharmacies();
         setPharmacies(userPharmacies);
         setState(userPharmacies.length === 0 ? "empty" : "ready");

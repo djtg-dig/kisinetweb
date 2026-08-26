@@ -6,7 +6,12 @@ import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/ui/link-button";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
 import { ThemeSwitcher } from "@/components/theme/theme-switcher";
-import { getUserPharmacies, type PharmacySummary } from "@/lib/api";
+import {
+  ApiAuthError,
+  getAccountSession,
+  getUserPharmacies,
+  type PharmacySummary,
+} from "@/lib/api";
 import {
   createReferralPayoutAccount,
   getReferralPayoutAccounts,
@@ -17,7 +22,6 @@ import {
   getAccessToken,
   getActivePharmacyId,
   logout,
-  saveTokensFromUrlHash,
 } from "@/lib/auth";
 import { carriAccountLoginUrl } from "@/lib/carri-account";
 
@@ -33,8 +37,6 @@ export default function AccountSettingsPage() {
 
   useEffect(() => {
     async function loadSettingsContext() {
-      saveTokensFromUrlHash();
-
       const accessToken = getAccessToken();
       if (!accessToken) {
         setState("anonymous");
@@ -45,6 +47,7 @@ export default function AccountSettingsPage() {
       setActivePharmacyId(storedPharmacyId);
 
       try {
+        await getAccountSession();
         const [pharmacies, accounts] = await Promise.all([
           getUserPharmacies(),
           getReferralPayoutAccounts(),
@@ -54,7 +57,12 @@ export default function AccountSettingsPage() {
         setActivePharmacy(
           pharmacies.find((pharmacy) => pharmacy.id === storedPharmacyId) || null,
         );
-      } catch {
+      } catch (error) {
+        if (error instanceof ApiAuthError) {
+          setState("anonymous");
+          return;
+        }
+
         setPharmacyLoadMessage(
           "Les informations de pharmacie ne sont pas disponibles pour le moment.",
         );

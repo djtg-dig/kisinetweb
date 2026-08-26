@@ -7,7 +7,12 @@ import { SiteFooter } from "@/components/layout/site-footer";
 import { ThemeSwitcher } from "@/components/theme/theme-switcher";
 import { getUserPharmacies, type PharmacySummary } from "@/lib/api";
 import { carriAccountLoginUrl } from "@/lib/carri-account";
-import { getAccessToken, getActivePharmacyId, logout, saveTokensFromUrlHash } from "@/lib/auth";
+import {
+  getAccessToken,
+  getActivePharmacyId,
+  logout,
+  subscribeToAuthChanges,
+} from "@/lib/auth";
 
 type PublicLayoutProps = {
   children: React.ReactNode;
@@ -47,8 +52,6 @@ export function PublicLayout({ children, activePharmacy = null, userData: initia
     let isMounted = true;
 
     async function loadUserMenu() {
-      saveTokensFromUrlHash();
-
       const accessToken = getAccessToken();
 
       if (!accessToken) {
@@ -89,9 +92,11 @@ export function PublicLayout({ children, activePharmacy = null, userData: initia
     }
 
     loadUserMenu();
+    const unsubscribe = subscribeToAuthChanges(loadUserMenu);
 
     return () => {
       isMounted = false;
+      unsubscribe();
     };
   }, [activePharmacy, initialUserData?.contextPharmacy]);
 

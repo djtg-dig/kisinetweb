@@ -5,7 +5,13 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { getPharmacyPermissions, type PharmacyPermissions } from "@/lib/api";
-import { clearActivePharmacyId, logout, setActivePharmacyId } from "@/lib/auth";
+import {
+  clearActivePharmacyId,
+  getAccessToken,
+  logout,
+  setActivePharmacyId,
+  subscribeToAuthChanges,
+} from "@/lib/auth";
 
 type AppLayoutProps = {
   children: React.ReactNode;
@@ -34,12 +40,22 @@ const disabledNavTitle = "Vous n'avez pas la permission d'accéder à cette sect
 export function AppLayout({ children, pharmacyId, permissions: initialPermissions }: AppLayoutProps) {
   const [permissions, setPermissions] = useState<PharmacyPermissions>(initialPermissions ?? {});
   const [isMounted, setIsMounted] = useState(false);
-  const [shouldRedirect, setShouldRedirect] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  useEffect(() => {
+    function redirectIfSessionClosed() {
+      if (!getAccessToken()) {
+        router.replace("/");
+      }
+    }
+
+    redirectIfSessionClosed();
+    return subscribeToAuthChanges(redirectIfSessionClosed);
+  }, [router]);
 
   useEffect(() => {
     if (!pharmacyId) return;

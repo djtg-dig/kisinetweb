@@ -26,7 +26,6 @@ import { carriAccountLoginUrl } from "@/lib/carri-account";
 import {
   getAccessToken,
   getActivePharmacyId,
-  saveTokensFromUrlHash,
   setActivePharmacyId,
 } from "@/lib/auth";
 
@@ -120,8 +119,6 @@ export default function PlanDetailPage() {
     let isMounted = true;
 
     async function loadPharmacies() {
-      saveTokensFromUrlHash();
-
       if (!getAccessToken()) {
         setPharmacyState("unauthenticated");
         return;
