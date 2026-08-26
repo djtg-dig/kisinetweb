@@ -5,6 +5,7 @@ import { LinkButton } from "@/components/ui/link-button";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
+  getPharmacyDetail,
   getPharmacyProducts,
   getPharmacyPermissions,
   getProductFilterOptions,
@@ -49,6 +50,7 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
   const [deletingReference, setDeletingReference] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
   const [pendingDelete, setPendingDelete] = useState<ProductSummary | null>(null);
+  const [pharmacyDevise, setPharmacyDevise] = useState("USD");
 
   function handleDeleteProduct(product: ProductSummary) {
     setPendingDelete(product);
@@ -103,10 +105,11 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
       setErrorMessage("");
 
       try {
-        const [page, options, pharmacyPermissions] = await Promise.all([
+        const [page, options, pharmacyPermissions, pharmacy] = await Promise.all([
           getPharmacyProducts(pharmacyId, filters),
           getProductFilterOptions(pharmacyId),
           getPharmacyPermissions(pharmacyId),
+          getPharmacyDetail(pharmacyId),
         ]);
         if (!isCurrent) {
           return;
@@ -117,6 +120,7 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
         setHasPreviousPage(Boolean(page.previous));
         setFilterOptions(options);
         setPermissions(pharmacyPermissions);
+        setPharmacyDevise(pharmacy.devise || "USD");
         setState(page.results.length ? "ready" : "empty");
       } catch (error) {
         if (!isCurrent) {
@@ -205,6 +209,7 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
               pharmacyId={pharmacyId}
               onDelete={handleDeleteProduct}
               deletingReference={deletingReference}
+              pharmacyDevise={pharmacyDevise}
             />
             <PaginationControls
               currentPage={currentPage}
@@ -419,12 +424,14 @@ function ProductsList({
   pharmacyId,
   onDelete,
   deletingReference,
+  pharmacyDevise,
 }: {
   permissions: PharmacyPermissions;
   products: ProductSummary[];
   pharmacyId: string;
   onDelete: (product: ProductSummary) => void;
   deletingReference: string;
+  pharmacyDevise: string;
 }) {
   return (
     <div className="rounded-lg border border-app-border bg-app-card shadow-sm">
@@ -469,7 +476,7 @@ function ProductsList({
             />
             <InfoCell
               label="Prix vente"
-              value={formatCurrency(product.salePrice)}
+              value={formatCurrency(product.salePrice, pharmacyDevise)}
               alignRight
             />
             <InfoCell
@@ -810,10 +817,10 @@ function formatDate(value?: string | null) {
   return day + "/" + month + "/" + year;
 }
 
-function formatCurrency(value: number) {
+function formatCurrency(value: number, currency: string) {
   return new Intl.NumberFormat("fr-FR", {
     style: "currency",
-    currency: "USD",
+    currency: currency || "USD",
   }).format(value);
 }
 
