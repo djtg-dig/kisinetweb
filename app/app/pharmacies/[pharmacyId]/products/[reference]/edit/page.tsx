@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { LinkButton } from "@/components/ui/link-button";
+import { ToastMessage } from "@/components/ui/toast";
 import {
   DateField,
   NumberField,
@@ -194,17 +195,14 @@ export default function EditProductPage({ params }: EditPageProps) {
           )}
 
           {loadState === "ready" && status === "success" && (
-            <div className="mb-6 rounded-lg border border-green-200 bg-green-50 p-4">
-              <p className="text-sm font-semibold text-green-700">Produit modifié</p>
-              <p className="mt-1 text-sm text-green-700">
-                Les modifications ont bien été enregistrées.
-              </p>
-              <div className="mt-4">
-                <LinkButton href={productsPath(pharmacyId)} variant="secondary">
-                  Retour à la liste
-                </LinkButton>
-              </div>
-            </div>
+            <ToastMessage
+              tone="success"
+              position="center"
+              duration={3000}
+              onClose={() => setStatus("idle")}
+            >
+              Produit modifié. Les modifications ont bien été enregistrées.
+            </ToastMessage>
           )}
 
           {loadState === "ready" && status !== "success" && (
