@@ -9,12 +9,27 @@
 
 import { NETWORK_ERROR_MESSAGE } from "./errors";
 
+// Point d'injection réservé aux tests unitaires : il permet de remplacer le
+// `fetch` natif par une implémentation simulée, sans backend. En production
+// cette fonction n'est jamais appelée et `apiFetch` utilise toujours le
+// `fetch` natif (valeur par défaut ci-dessous).
+type ApiFetchImpl = (
+  input: RequestInfo | URL,
+  init?: RequestInit,
+) => Promise<Response>;
+
+let apiFetchImpl: ApiFetchImpl = (input, init) => fetch(input, init);
+
+export function setApiFetchImpl(impl: ApiFetchImpl): void {
+  apiFetchImpl = impl;
+}
+
 export async function apiFetch(
   input: RequestInfo | URL,
   init?: RequestInit,
 ): Promise<Response> {
   try {
-    return await fetch(input, init);
+    return await apiFetchImpl(input, init);
   } catch {
     // Le détail technique reste interne : on ne le journalise pas afin qu'il
     // n'apparaisse ni à l'utilisateur ni dans la console du navigateur. La page
