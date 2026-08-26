@@ -304,57 +304,74 @@ type UnknownRecord = Record<string, unknown>;
 // Gestion du refresh token automatique
 // ──────────────────────────────────────────────────
 
-let isRefreshing = false;
+// Promesse partagée du refresh en cours. Elle sert de verrou single-flight :
+// dès qu'un refresh démarre, tous les appelants concurrents se branchent dessus
+// au lieu de lancer leur propre requête `/api/accounts/token/refresh/`. Elle est
+// assignée de façon synchrone (avant tout `await`) afin qu'aucun second appel
+// ne puisse créer un refresh concurrent. `isRefreshing` n'est plus nécessaire.
 let refreshPromise: Promise<boolean> | null = null;
 
 async function refreshAccessTokenIfNeeded(): Promise<boolean> {
-  if (isRefreshing && refreshPromise) {
+  // Un refresh est déjà en cours : on rejoint la même promesse. Cela empêche
+  // plusieurs POST /token/refresh/ simultanés, qui avec ROTATE_REFRESH_TOKENS +
+  // BLACKLIST_AFTER_ROTATION feraient échouer le second (refresh déjà blacklisté)
+  // et déclencheraient un logout intempestif.
+  if (refreshPromise) {
     return refreshPromise;
   }
 
+  // La promesse est créée immédiatement (synchrone) ; le corps asynchrone ne
+  // tourne qu'une seule fois. `finally` ne la nettoie qu'après résolution.
+  refreshPromise = performTokenRefresh();
+
+  try {
+    return await refreshPromise;
+  } finally {
+    refreshPromise = null;
+  }
+}
+
+// Corps réel du refresh. Single-flight : appelé une seule fois à la fois grâce
+// au verrou `refreshPromise` ci-dessus.
+async function performTokenRefresh(): Promise<boolean> {
   const refreshToken = getRefreshToken();
   if (!refreshToken) {
     return false;
   }
 
-  isRefreshing = true;
-  refreshPromise = (async () => {
-    try {
-      const response = await apiFetch(
-        apiBaseUrl.replace(/\/$/, "") + "/api/accounts/token/refresh/",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify({ refresh: refreshToken }),
+  try {
+    const response = await apiFetch(
+      apiBaseUrl.replace(/\/$/, "") + "/api/accounts/token/refresh/",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
         },
-      );
+        body: JSON.stringify({ refresh: refreshToken }),
+      },
+    );
 
-      if (!response.ok) {
-        return false;
-      }
-
-      const data = await response.json();
-      if (data.access) {
-        localStorage.setItem(ACCESS_TOKEN_KEY, data.access);
-        if (data.refresh) {
-          localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh);
-        }
-        return true;
-      }
-
+    if (!response.ok) {
       return false;
-    } catch {
-      return false;
-    } finally {
-      isRefreshing = false;
-      refreshPromise = null;
     }
-  })();
 
-  return refreshPromise;
+    const data = await response.json();
+    if (!data?.access) {
+      return false;
+    }
+
+    // Nouveau access token (obligatoire). Le refresh token tourné par le backend
+    // (ROTATE_REFRESH_TOKENS) est stocké si présent, sinon l'ancien reste valide.
+    localStorage.setItem(ACCESS_TOKEN_KEY, data.access);
+    if (data.refresh) {
+      localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh);
+    }
+
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // Erreur levée quand la session est invalidée (token absent, expiré ou refusé
@@ -399,18 +416,25 @@ export async function authenticatedFetch(
 
   // 401 signifie "session invalide/expirée" : tenter un refresh puis rejouer.
   if (isSessionExpiredStatus(response.status)) {
+    const originalAccessToken = accessToken;
     const refreshed = await refreshAccessTokenIfNeeded();
-    if (refreshed) {
-      const newToken = getAccessToken();
+    const currentAccessToken = getAccessToken();
+
+    // On rejoue la requête initiale avec le token (éventuellement renouvelé)
+    // une seule fois. Le refresh est single-flight : un appel concurrent rejoint
+    // la même promesse et ne déclenche pas son propre logout intempestif.
+    if (refreshed || currentAccessToken !== originalAccessToken) {
+      const newToken = currentAccessToken || originalAccessToken;
       headers.set("Authorization", "Bearer " + newToken);
       response = await apiFetch(input, {
         ...init,
         headers,
       });
     }
-    // Le refresh a échoué ou le nouveau token est encore refusé : la session est
-    // invalidée. On lève une erreur claire au lieu de renvoyer le message brut
-    // de l'API (ex. « Given token not valid for any token type »).
+
+    // 401 persistant APRÈS le refresh partagé et le retry : la session est
+    // réellement invalidée. On lève une erreur claire au lieu de renvoyer le
+    // message brut de l'API (ex. « Given token not valid for any token type »).
     if (isSessionExpiredStatus(response.status)) {
       logout();
       throw new ApiAuthError();
