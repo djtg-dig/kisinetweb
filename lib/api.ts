@@ -997,6 +997,44 @@ export async function getCountries(): Promise<CountryOption[]> {
     .filter((country, index, list) => list.findIndex((item) => item.phoneCode === country.phoneCode) === index);
 }
 
+// Option de devise issue de l'API publique des devises. Le code ISO (ex. "CDF",
+// "USD") est utilisé comme valeur stockée dans la pharmacie (`devise`).
+export type CurrencyOption = {
+  code: string;
+  label: string;
+  value: string;
+};
+
+// Liste les devises via l'endpoint public `GET /api/paiements/currencies/`.
+// L'endpoint est public (AllowAny) : on utilise `fetchPublicApiJson` pour éviter
+// d'exiger un jeton d'authentification. Aucune devise n'est codée en dur côté
+// frontend ; la source de vérité est la base backend (table Currency).
+export async function getCurrencies(): Promise<CurrencyOption[]> {
+  const data = await fetchPublicApiJson<unknown[] | { results?: unknown[] }>(
+    "/api/paiements/currencies/",
+    "Impossible de charger les devises.",
+  );
+
+  const rows: unknown[] = Array.isArray(data)
+    ? data
+    : Array.isArray((data as { results?: unknown[] }).results)
+      ? (data as { results?: unknown[] }).results!
+      : [];
+
+  return rows
+    .filter((item: unknown): item is UnknownRecord => Boolean(item) && typeof item === "object")
+    .map((item) => {
+      const code = String(item.code || "");
+      const name = String(item.name || code);
+      return {
+        code,
+        label: name ? `${code} — ${name}` : code,
+        value: code,
+      };
+    })
+    .filter((currency) => Boolean(currency.code));
+}
+
 export type PharmacyPlanFeature = {
   label: string;
   enabled: boolean;

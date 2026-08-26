@@ -8,8 +8,10 @@ import {
   createPharmacy,
   getCitiesOrProvinces,
   getCountries,
+  getCurrencies,
   type CityOrProvinceOption,
   type CountryOption,
+  type CurrencyOption,
 } from "@/lib/api";
 import { setActivePharmacyId } from "@/lib/auth";
 
@@ -29,7 +31,7 @@ const initialFormState: FormState = {
   name: "",
   email: "",
   phoneNumber: "",
-  devise: "USD",
+  devise: "",
   countryPhoneCode: "",
   cityOrProvinceId: "",
   street: "",
@@ -42,16 +44,17 @@ const initialFormState: FormState = {
 const referralCodePattern = /^US[A-Z0-9]{8}$/;
 const referralCodeLength = 10;
 
-const currencyOptions = [
-  { label: "USD", value: "USD" },
-  { label: "CDF", value: "CDF" },
-];
+// Les devises ne sont plus codées en dur : elles proviennent de l'endpoint
+// public `/api/paiements/currencies/`, chargé dans `loadReferenceData`.
+const currencyOptions: CurrencyOption[] = [];
 
 export default function CreatePharmacyPage() {
   const [form, setForm] = useState<FormState>(initialFormState);
   const [countries, setCountries] = useState<CountryOption[]>([]);
   const [citiesOrProvinces, setCitiesOrProvinces] = useState<CityOrProvinceOption[]>([]);
+  const [currencies, setCurrencies] = useState<CurrencyOption[]>([]);
   const [isLoadingCountries, setIsLoadingCountries] = useState(true);
+  const [isLoadingCurrencies, setIsLoadingCurrencies] = useState(true);
   const [isLoadingCities, setIsLoadingCities] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -63,24 +66,50 @@ export default function CreatePharmacyPage() {
   useEffect(() => {
     let isMounted = true;
 
-    async function loadCountries() {
+    async function loadReferenceData() {
       setIsLoadingCountries(true);
+      setIsLoadingCurrencies(true);
       setErrorMessage("");
 
       try {
-        const rows = await getCountries();
+        // Chargement en parallèle des pays et des devises, les deux étant
+        // fournis par des endpoints publics. Les devises proviennent de
+        // `/api/paiements/currencies/` (source de vérité backend).
+        const [countryRows, currencyRows] = await Promise.all([
+          getCountries(),
+          getCurrencies(),
+        ]);
+
         if (!isMounted) {
           return;
         }
 
-        setCountries(rows);
+        setCountries(countryRows);
+        setCurrencies(currencyRows);
+
         setForm((current) => {
-          if (current.countryPhoneCode || !rows.length) {
-            return current;
+          const next = { ...current };
+
+          // Devise par défaut : CDF (devise locale RDC) si présente, sinon USD,
+          // sinon la première devise disponible. On évite toute valeur codée en
+          // dur qui ne figurerait pas dans la base.
+          if (!current.devise && currencyRows.length) {
+            const preferred =
+              currencyRows.find((currency) => currency.code === "CDF") ||
+              currencyRows.find((currency) => currency.code === "USD") ||
+              currencyRows[0];
+            next.devise = preferred.code;
           }
 
-          const defaultCountry = rows.find((country) => country.phoneCode === "+243") || rows[0];
-          return { ...current, countryPhoneCode: defaultCountry.phoneCode };
+          // Pays par défaut : RDC (+243) si présent, sinon le premier pays.
+          if (!current.countryPhoneCode) {
+            const defaultCountry =
+              countryRows.find((country) => country.phoneCode === "+243") ||
+              countryRows[0];
+            next.countryPhoneCode = defaultCountry?.phoneCode || "";
+          }
+
+          return next;
         });
       } catch (error) {
         if (!isMounted) {
@@ -88,15 +117,16 @@ export default function CreatePharmacyPage() {
         }
 
         const message = error instanceof Error ? error.message : "";
-        setErrorMessage(message || "Impossible de charger les pays.");
+        setErrorMessage(message || "Impossible de charger les données de référence.");
       } finally {
         if (isMounted) {
           setIsLoadingCountries(false);
+          setIsLoadingCurrencies(false);
         }
       }
     }
 
-    loadCountries();
+    loadReferenceData();
 
     return () => {
       isMounted = false;
@@ -271,8 +301,9 @@ export default function CreatePharmacyPage() {
                 label="Devise"
                 value={form.devise}
                 onChange={(value) => updateField("devise", value)}
-                options={currencyOptions}
+                options={currencies}
                 required
+                disabled={isLoadingCurrencies}
               />
 
               <TextField
