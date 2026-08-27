@@ -121,6 +121,7 @@ export type ExpirationReport = {
 type UnknownRecord = Record<string, unknown>;
 type PaginatedApiResponse = {
   count?: number | string;
+  data?: unknown[];
   next?: string | null;
   previous?: string | null;
   results?: unknown[];
@@ -306,7 +307,13 @@ function normalizePage(data: unknown) {
   }
 
   const record = getRecord(data) as PaginatedApiResponse | null;
-  const rawResults = Array.isArray(record?.results) ? record.results : [];
+  // Le backend Rapports renvoie les lignes dans `data`; `results` reste accepté
+  // pour garder la compatibilité avec une pagination DRF standard.
+  const rawResults = Array.isArray(record?.data)
+    ? record.data
+    : Array.isArray(record?.results)
+      ? record.results
+      : [];
   const results = rawResults.filter(isRecord);
 
   return {
@@ -346,9 +353,13 @@ function normalizeInventorySummary(value: unknown): InventoryReportSummary {
 
   return {
     productsCount: numberFrom(record.products_count ?? record.total_products ?? record.productsCount),
-    totalStockQuantity: numberFrom(record.total_stock_quantity ?? record.total_stock ?? record.totalStockQuantity),
-    outOfStockProducts: numberFrom(record.out_of_stock_products ?? record.out_of_stock ?? record.outOfStockProducts),
-    lowStockProducts: numberFrom(record.low_stock_products ?? record.low_stock ?? record.lowStockProducts),
+    totalStockQuantity: numberFrom(record.total_stock_quantity ?? record.total_stock ?? record.stock_total ?? record.totalStockQuantity),
+    outOfStockProducts: numberFrom(
+      record.out_of_stock_products ?? record.out_of_stock_products_count ?? record.out_of_stock ?? record.outOfStockProducts,
+    ),
+    lowStockProducts: numberFrom(
+      record.low_stock_products ?? record.low_stock_products_count ?? record.low_stock ?? record.lowStockProducts,
+    ),
     estimatedStockValue: stockValue === null || stockValue === undefined ? null : numberFrom(stockValue),
   };
 }
@@ -375,10 +386,12 @@ function normalizeExpirationSummary(value: unknown): ExpirationReportSummary {
   const record = getRecord(value) || {};
 
   return {
-    expired: numberFrom(record.expired),
-    expiringSoon: numberFrom(record.expiring_soon ?? record.expiringSoon),
-    valid: numberFrom(record.valid),
-    noExpiration: numberFrom(record.no_expiration ?? record.without_expiration ?? record.noExpiration),
+    expired: numberFrom(record.expired ?? record.expired_products_count),
+    expiringSoon: numberFrom(record.expiring_soon ?? record.expiring_soon_products_count ?? record.expiringSoon),
+    valid: numberFrom(record.valid ?? record.valid_products_count),
+    noExpiration: numberFrom(
+      record.no_expiration ?? record.products_without_expiration_date_count ?? record.without_expiration ?? record.noExpiration,
+    ),
   };
 }
 
