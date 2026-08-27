@@ -43,9 +43,6 @@ type KpiCard = { label: string; value: string; tone?: "success" | "warning" | "e
 
 const emptyFeatures: ReportFeatures = {
   reports: false,
-  reports_sales: false,
-  reports_inventory: false,
-  reports_expirations: false,
 };
 
 const defaultPeriod: PeriodFilters = {
@@ -833,19 +830,17 @@ function ExpirationStatusBadge({ status }: { status: string }) {
 }
 
 function buildAvailableTabs(features: ReportFeatures): { id: ReportTab; label: string }[] {
-  const tabs: { id: ReportTab; label: string }[] = [{ id: "overview", label: "Vue d'ensemble" }];
-
-  if (features.reports_sales) {
-    tabs.push({ id: "sales", label: "Ventes" });
-  }
-  if (features.reports_inventory) {
-    tabs.push({ id: "inventory", label: "Stock" });
-  }
-  if (features.reports_expirations) {
-    tabs.push({ id: "expirations", label: "Péremptions" });
+  // Une seule feature `reports` englobe toutes les sections visibles.
+  if (!features.reports) {
+    return [];
   }
 
-  return tabs;
+  return [
+    { id: "overview", label: "Vue d'ensemble" },
+    { id: "sales", label: "Ventes" },
+    { id: "inventory", label: "Stock" },
+    { id: "expirations", label: "Péremptions" },
+  ];
 }
 
 function getKpiValueClass(tone?: "success" | "warning" | "error") {

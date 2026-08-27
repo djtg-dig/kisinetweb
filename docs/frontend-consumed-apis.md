@@ -704,6 +704,12 @@ Content-Type: application/json
   `subscription`, `is_archived_at`, `created_at`, `updated_at`.
 - **Format des dates** : `YYYY-MM-DD HH:MM:SS` (ex. `2026-08-02 14:11:02`), sans fuseau
   ni microsecondes.
+- **Objet `subscription`** : `plan_code`, `plan_name`, `duration_months`, `status`,
+  `trial_starts_at`, `trial_ends_at`, `starts_at`, `expires_at`, `auto_renew`,
+  `total_amount`, `discount_percentage`, `is_trial_active`, `is_active`, et
+  **`features`** (dictionnaire des fonctionnalités du plan, ex. `{"Produits": true,
+  "Stock": true, "Ventes": true, "IA": true, "reports": true}`). Le frontend utilise
+  `subscription.features.reports` comme feature unique pour tout l'espace « Rapports ».
 - **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden`, `404 Not Found`.
 
 > Note : cette même route est aussi celle utilisée par l'édition (voir `PUT` ci-dessous).
@@ -1240,8 +1246,7 @@ Content-Type: application/json
   la permission correspondante n'est pas accordée. `Produits` dépend de
   `product_view`, `Stock` de `stock_view`, `Ventes` de `sale_view`, `Facture` de
   `sale_view`, et `Notification` de `join_request_view`. L'onglet `Rapports`
-  est affiché uniquement si la feature de plan `reports` est active, puis il
-  dépend de la permission `report_view`.
+  dépend de la feature de plan `reports` et de la permission `report_view`.
 - **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden`.
 
 ## Rapports pharmacie
@@ -1277,8 +1282,7 @@ paginer et formater l'affichage.
 - **Service frontend** : `getSalesReport(pharmacyReference, filters)` dans
   `lib/api/reports.ts`
 - **Authentification** : requise avec `Authorization: Bearer <access_token>`.
-- **Permissions/features frontend** : `report_view`, `reports` et
-  `reports_sales`.
+- **Permissions/features frontend** : `report_view` et `reports`.
 - **Query params envoyés si renseignés** : `start_date`, `end_date`, `user`,
   `product`, `page`.
 - **Réponse utilisée** : résumé (`sales_count`, `items_sold`, `revenue`) et
@@ -1295,8 +1299,7 @@ paginer et formater l'affichage.
 - **Service frontend** : `getInventoryReport(pharmacyReference, filters)` dans
   `lib/api/reports.ts`
 - **Authentification** : requise avec `Authorization: Bearer <access_token>`.
-- **Permissions/features frontend** : `report_view`, `reports` et
-  `reports_inventory`.
+- **Permissions/features frontend** : `report_view` et `reports`.
 - **Query params envoyés si renseignés** : `page`.
 - **Réponse utilisée** : résumé du nombre de produits, quantité totale en stock,
   ruptures, stocks faibles, valeur estimée si renvoyée, puis liste paginée avec
@@ -1314,8 +1317,7 @@ paginer et formater l'affichage.
 - **Service frontend** : `getExpirationReport(pharmacyReference, filters)` dans
   `lib/api/reports.ts`
 - **Authentification** : requise avec `Authorization: Bearer <access_token>`.
-- **Permissions/features frontend** : `report_view`, `reports` et
-  `reports_expirations`.
+- **Permissions/features frontend** : `report_view` et `reports`.
 - **Query params envoyés si renseignés** : `status`, `start_date`, `end_date`,
   `page`.
 - **Réponse utilisée** : résumé (`expired`, `expiring_soon`, `valid`,

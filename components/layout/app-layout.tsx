@@ -44,9 +44,6 @@ const appNavItems = [
 const disabledNavTitle = "Vous n'avez pas la permission d'accéder à cette section dans cette pharmacie.";
 const hiddenReportFeatures: ReportFeatures = {
   reports: false,
-  reports_sales: false,
-  reports_inventory: false,
-  reports_expirations: false,
 };
 
 export function AppLayout({ children, pharmacyId, permissions: initialPermissions }: AppLayoutProps) {

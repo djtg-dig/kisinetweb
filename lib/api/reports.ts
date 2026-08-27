@@ -13,13 +13,11 @@ export type ReportPeriod = {
   endDate?: string;
 };
 
-export type ReportFeatureKey =
-  | "reports"
-  | "reports_sales"
-  | "reports_inventory"
-  | "reports_expirations";
+export type ReportFeatureKey = "reports";
 
-export type ReportFeatures = Record<ReportFeatureKey, boolean>;
+export type ReportFeatures = {
+  reports: boolean;
+};
 
 export type ReportFilters = ReportPeriod & {
   page?: string;
@@ -132,9 +130,6 @@ type PaginatedApiResponse = {
 
 const defaultReportFeatures: ReportFeatures = {
   reports: false,
-  reports_sales: false,
-  reports_inventory: false,
-  reports_expirations: false,
 };
 
 export async function getReportOverview(
@@ -418,11 +413,9 @@ function normalizeFeatureMap(value: unknown): ReportFeatures | null {
 
   const record = value as UnknownRecord;
 
+  // Une seule feature `reports` pilote tous les rapports côté frontend.
   return {
     reports: Boolean(record.reports),
-    reports_sales: Boolean(record.reports_sales),
-    reports_inventory: Boolean(record.reports_inventory),
-    reports_expirations: Boolean(record.reports_expirations),
   };
 }
 
