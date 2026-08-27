@@ -4,7 +4,12 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { SiteFooter } from "@/components/layout/site-footer";
-import { getPharmacyPermissions, type PharmacyPermissions } from "@/lib/api";
+import { getPharmacyDetail, getPharmacyPermissions, type PharmacyPermissions } from "@/lib/api";
+import {
+  getReportFeaturesFromPharmacy,
+  type ReportFeatureKey,
+  type ReportFeatures,
+} from "@/lib/api/reports";
 import {
   clearActivePharmacyId,
   getAccessToken,
@@ -25,7 +30,7 @@ const appNavItems = [
   { label: "Stock", path: "/stock", permission: "stock_view" },
   { label: "Ventes", path: "/sales/create", permission: "sale_view" },
   { label: "Facture", path: "/invoices", permission: "sale_view" },
-  { label: "Rapports", path: "/reports" },
+  { label: "Rapports", path: "/reports", permission: "report_view", feature: "reports" },
   { label: "(5)", path: "/notifications", icon: "bell", permission: "join_request_view" },
   { label: "Paramètres", path: "/settings" },
 ] satisfies {
@@ -33,12 +38,20 @@ const appNavItems = [
   path: string;
   icon?: string;
   permission?: keyof PharmacyPermissions;
+  feature?: ReportFeatureKey;
 }[];
 
 const disabledNavTitle = "Vous n'avez pas la permission d'accéder à cette section dans cette pharmacie.";
+const hiddenReportFeatures: ReportFeatures = {
+  reports: false,
+  reports_sales: false,
+  reports_inventory: false,
+  reports_expirations: false,
+};
 
 export function AppLayout({ children, pharmacyId, permissions: initialPermissions }: AppLayoutProps) {
   const [permissions, setPermissions] = useState<PharmacyPermissions>(initialPermissions ?? {});
+  const [reportFeatures, setReportFeatures] = useState<ReportFeatures>(hiddenReportFeatures);
   const [isMounted, setIsMounted] = useState(false);
   const router = useRouter();
 
@@ -69,13 +82,19 @@ export function AppLayout({ children, pharmacyId, permissions: initialPermission
       if (!pharmacyId) return;
       
       try {
-        const currentPermissions = await getPharmacyPermissions(pharmacyId);
+        // Les features du plan sont chargées avec le détail pharmacie déjà utilisé ailleurs.
+        const [currentPermissions, pharmacy] = await Promise.all([
+          getPharmacyPermissions(pharmacyId),
+          getPharmacyDetail(pharmacyId),
+        ]);
         if (isMounted) {
           setPermissions(currentPermissions);
+          setReportFeatures(getReportFeaturesFromPharmacy(pharmacy));
         }
       } catch {
         if (isMounted) {
           setPermissions({});
+          setReportFeatures(hiddenReportFeatures);
         }
       }
     }
@@ -103,7 +122,7 @@ export function AppLayout({ children, pharmacyId, permissions: initialPermission
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-app-background pt-16 text-app-text lg:pt-[72px]">
-      <AppNavbar pharmacyId={pharmacyId} permissions={permissions} />
+      <AppNavbar pharmacyId={pharmacyId} permissions={permissions} reportFeatures={reportFeatures} />
       <div className="relative z-0 flex min-h-[calc(100vh-4rem)] flex-col lg:min-h-[calc(100vh-4.5rem)]">
         <div className="flex-1">{children}</div>
         <SiteFooter />
@@ -112,7 +131,15 @@ export function AppLayout({ children, pharmacyId, permissions: initialPermission
   );
 }
 
-function AppNavbar({ pharmacyId, permissions }: { pharmacyId: string; permissions: PharmacyPermissions }) {
+function AppNavbar({
+  pharmacyId,
+  permissions,
+  reportFeatures,
+}: {
+  pharmacyId: string;
+  permissions: PharmacyPermissions;
+  reportFeatures: ReportFeatures;
+}) {
   const basePath = "/app/pharmacies/" + pharmacyId;
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -149,14 +176,34 @@ function AppNavbar({ pharmacyId, permissions }: { pharmacyId: string; permission
           <span className="truncate text-base font-bold text-app-text sm:text-lg">Kisi<span className="text-accent-700">net</span></span>
         </a>
 
-        <DesktopNav basePath={basePath} permissions={permissions} pathname={pathname} />
-        <MobileNav basePath={basePath} permissions={permissions} pathname={pathname} />
+        <DesktopNav
+          basePath={basePath}
+          permissions={permissions}
+          reportFeatures={reportFeatures}
+          pathname={pathname}
+        />
+        <MobileNav
+          basePath={basePath}
+          permissions={permissions}
+          reportFeatures={reportFeatures}
+          pathname={pathname}
+        />
       </nav>
     </header>
   );
 }
 
-function DesktopNav({ basePath, permissions, pathname }: { basePath: string; permissions: PharmacyPermissions; pathname: string }) {
+function DesktopNav({
+  basePath,
+  permissions,
+  reportFeatures,
+  pathname,
+}: {
+  basePath: string;
+  permissions: PharmacyPermissions;
+  reportFeatures: ReportFeatures;
+  pathname: string;
+}) {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -178,16 +225,16 @@ function DesktopNav({ basePath, permissions, pathname }: { basePath: string; per
     <div className="hidden min-w-0 flex-1 items-center justify-end gap-2 lg:flex">
       <div className="flex min-w-0 items-center gap-1 text-sm font-semibold text-app-muted">
         {appNavItems.map((item) => (
-          <NavLink
-            key={item.path}
-            href={basePath + item.path}
-            isActive={isActivePath(pathname, basePath + item.path, item.path)}
-            icon={item.icon}
-            enabled={isNavItemEnabled(item, permissions)}
-          >
-            {item.label}
-          </NavLink>
-        ))}
+            <NavLink
+              key={item.path}
+              href={basePath + item.path}
+              isActive={isActivePath(pathname, basePath + item.path, item.path)}
+              icon={item.icon}
+              enabled={isNavItemEnabled(item, permissions, reportFeatures)}
+            >
+              {item.label}
+            </NavLink>
+          ))}
       </div>
 
       <div ref={menuRef} className="relative shrink-0">
@@ -210,6 +257,7 @@ function DesktopNav({ basePath, permissions, pathname }: { basePath: string; per
             includeAppLinks={false}
             mode="desktop"
             permissions={permissions}
+            reportFeatures={reportFeatures}
             onClose={() => setIsUserMenuOpen(false)}
           />
         )}
@@ -218,7 +266,17 @@ function DesktopNav({ basePath, permissions, pathname }: { basePath: string; per
   );
 }
 
-function MobileNav({ basePath, permissions, pathname }: { basePath: string; permissions: PharmacyPermissions; pathname: string }) {
+function MobileNav({
+  basePath,
+  permissions,
+  reportFeatures,
+  pathname,
+}: {
+  basePath: string;
+  permissions: PharmacyPermissions;
+  reportFeatures: ReportFeatures;
+  pathname: string;
+}) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -257,6 +315,7 @@ function MobileNav({ basePath, permissions, pathname }: { basePath: string; perm
           includeAppLinks
           mode="mobile"
           permissions={permissions}
+          reportFeatures={reportFeatures}
           onClose={() => setIsMenuOpen(false)}
         />
       )}
@@ -269,12 +328,14 @@ function MenuPanel({
   includeAppLinks,
   mode,
   permissions,
+  reportFeatures,
   onClose,
 }: {
   basePath: string;
   includeAppLinks: boolean;
   mode: "desktop" | "mobile";
   permissions: PharmacyPermissions;
+  reportFeatures: ReportFeatures;
   onClose: () => void;
 }) {
   const panelClass =
@@ -290,18 +351,18 @@ function MenuPanel({
       {includeAppLinks && (
         <>
           {appNavItems.map((item) => (
-            <MenuLink
-              key={item.path}
-              href={basePath + item.path}
-              enabled={isNavItemEnabled(item, permissions)}
-              onClose={onClose}
-            >
-              <span className="inline-flex items-center gap-2">
-                {item.icon === "bell" && <BellIcon className="h-4 w-4" />}
-                {item.label}
-              </span>
-            </MenuLink>
-          ))}
+              <MenuLink
+                key={item.path}
+                href={basePath + item.path}
+                enabled={isNavItemEnabled(item, permissions, reportFeatures)}
+                onClose={onClose}
+              >
+                <span className="inline-flex items-center gap-2">
+                  {item.icon === "bell" && <BellIcon className="h-4 w-4" />}
+                  {item.label}
+                </span>
+              </MenuLink>
+            ))}
           <div className="my-2 border-t border-app-border" />
         </>
       )}
@@ -420,8 +481,11 @@ function MenuLink({
 function isNavItemEnabled(
   item: (typeof appNavItems)[number],
   permissions: PharmacyPermissions,
+  reportFeatures: ReportFeatures,
 ) {
-  return item.permission ? Boolean(permissions[item.permission]) : true;
+  const hasPermission = item.permission ? Boolean(permissions[item.permission]) : true;
+  const hasFeature = item.feature ? Boolean(reportFeatures[item.feature]) : true;
+  return hasPermission && hasFeature;
 }
 
 function isActivePath(pathname: string, href: string, path: string) {

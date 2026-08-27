@@ -1219,12 +1219,14 @@ Content-Type: application/json
   `/app/pharmacies/[pharmacyId]/products`,
   `/app/pharmacies/[pharmacyId]/products/create`,
   `/app/pharmacies/[pharmacyId]/invoices`,
+  `/app/pharmacies/[pharmacyId]/reports`,
   `/app/pharmacies/[pharmacyId]/settings/human-resources`
 - **Service frontend** : `getPharmacyPermissions(pharmacyId)` dans `lib/api`
 - **Réponse attendue (200)** : objet dont les clés sont les permissions (ex.
   `product_view`, `product_create`, `product_update`, `product_delete`,
-  `sale_view`, `sale_create`, `sale_payment_create`, `sale_cancel`) avec des
-  valeurs booléennes.
+  `sale_view`, `sale_create`, `sale_payment_create`, `sale_cancel`,
+  `report_view`, `report_export`, `report_financial_view`, `report_staff_view`,
+  `report_ai_view`) avec des valeurs booléennes.
 - **Comportement frontend dashboard** : la page dashboard charge ces permissions
   en même temps que les données du dashboard. Les actions `Nouvelle vente` et
   `Entrée de stock` restent visibles, mais elles ne sont cliquables que si
@@ -1237,8 +1239,90 @@ Content-Type: application/json
   restent visibles dans la navigation de la pharmacie, mais ils sont désactivés si
   la permission correspondante n'est pas accordée. `Produits` dépend de
   `product_view`, `Stock` de `stock_view`, `Ventes` de `sale_view`, `Facture` de
-  `sale_view`, et `Notification` de `join_request_view`.
+  `sale_view`, et `Notification` de `join_request_view`. L'onglet `Rapports`
+  est affiché uniquement si la feature de plan `reports` est active, puis il
+  dépend de la permission `report_view`.
 - **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden`.
+
+## Rapports pharmacie
+
+La page `/app/pharmacies/[pharmacyId]/reports` consomme les rapports backend
+avec le module `lib/api/reports.ts`. Les totaux, revenus, stocks et statuts de
+péremption sont fournis par le backend ; le frontend ne fait que filtrer,
+paginer et formater l'affichage.
+
+### GET /api/pharmacies/{pharmacy_reference}/reports/overview/
+
+- **Objectif** : afficher la vue d'ensemble des rapports.
+- **Méthode HTTP** : `GET`
+- **URL** : `/api/pharmacies/{pharmacy_reference}/reports/overview/`
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/reports`
+- **Service frontend** : `getReportOverview(pharmacyReference, period)` dans
+  `lib/api/reports.ts`
+- **Authentification** : requise avec `Authorization: Bearer <access_token>`.
+- **Permissions/features frontend** : `report_view` et `reports`.
+- **Query params envoyés si renseignés** : `start_date`, `end_date`.
+- **Réponse utilisée** : compte des ventes, chiffre d'affaires, articles vendus,
+  produits actifs, stock total, produits en rupture, produits proches de la
+  péremption et produits expirés.
+- **Erreurs possibles** : `400 Bad Request`, `401 Unauthorized`,
+  `403 Forbidden`, `404 Not Found`, `500 Internal Server Error`.
+
+### GET /api/pharmacies/{pharmacy_reference}/reports/sales/
+
+- **Objectif** : afficher le rapport paginé des ventes.
+- **Méthode HTTP** : `GET`
+- **URL** : `/api/pharmacies/{pharmacy_reference}/reports/sales/`
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/reports`
+- **Service frontend** : `getSalesReport(pharmacyReference, filters)` dans
+  `lib/api/reports.ts`
+- **Authentification** : requise avec `Authorization: Bearer <access_token>`.
+- **Permissions/features frontend** : `report_view`, `reports` et
+  `reports_sales`.
+- **Query params envoyés si renseignés** : `start_date`, `end_date`, `user`,
+  `product`, `page`.
+- **Réponse utilisée** : résumé (`sales_count`, `items_sold`, `revenue`) et
+  liste paginée avec référence, date, utilisateur, total et nombre d'articles.
+- **Erreurs possibles** : `400 Bad Request`, `401 Unauthorized`,
+  `403 Forbidden`, `404 Not Found`, `500 Internal Server Error`.
+
+### GET /api/pharmacies/{pharmacy_reference}/reports/inventory/
+
+- **Objectif** : afficher le rapport paginé du stock.
+- **Méthode HTTP** : `GET`
+- **URL** : `/api/pharmacies/{pharmacy_reference}/reports/inventory/`
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/reports`
+- **Service frontend** : `getInventoryReport(pharmacyReference, filters)` dans
+  `lib/api/reports.ts`
+- **Authentification** : requise avec `Authorization: Bearer <access_token>`.
+- **Permissions/features frontend** : `report_view`, `reports` et
+  `reports_inventory`.
+- **Query params envoyés si renseignés** : `page`.
+- **Réponse utilisée** : résumé du nombre de produits, quantité totale en stock,
+  ruptures, stocks faibles, valeur estimée si renvoyée, puis liste paginée avec
+  référence, produit, stock, prix d'achat, prix de vente, statut stock et valeur
+  estimée.
+- **Erreurs possibles** : `400 Bad Request`, `401 Unauthorized`,
+  `403 Forbidden`, `404 Not Found`, `500 Internal Server Error`.
+
+### GET /api/pharmacies/{pharmacy_reference}/reports/expirations/
+
+- **Objectif** : afficher le rapport paginé des péremptions.
+- **Méthode HTTP** : `GET`
+- **URL** : `/api/pharmacies/{pharmacy_reference}/reports/expirations/`
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/reports`
+- **Service frontend** : `getExpirationReport(pharmacyReference, filters)` dans
+  `lib/api/reports.ts`
+- **Authentification** : requise avec `Authorization: Bearer <access_token>`.
+- **Permissions/features frontend** : `report_view`, `reports` et
+  `reports_expirations`.
+- **Query params envoyés si renseignés** : `status`, `start_date`, `end_date`,
+  `page`.
+- **Réponse utilisée** : résumé (`expired`, `expiring_soon`, `valid`,
+  `no_expiration`) et liste paginée avec référence, produit, stock actuel, date
+  de péremption et statut.
+- **Erreurs possibles** : `400 Bad Request`, `401 Unauthorized`,
+  `403 Forbidden`, `404 Not Found`, `500 Internal Server Error`.
 
 ### GET /api/pharmacies/{pharmacy_id}/activity/
 

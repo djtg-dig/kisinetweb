@@ -235,6 +235,11 @@ export type PharmacyPermissions = {
   sale_create?: boolean;
   sale_payment_create?: boolean;
   sale_cancel?: boolean;
+  report_view?: boolean;
+  report_export?: boolean;
+  report_financial_view?: boolean;
+  report_staff_view?: boolean;
+  report_ai_view?: boolean;
 };
 
 export type PharmacyMemberRole = "OWNER" | "MANAGER" | "PHARMACIST" | "EMPLOYEE";
