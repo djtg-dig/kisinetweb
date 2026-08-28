@@ -85,24 +85,54 @@ const proofPoints = [
 
 const faqs = [
   {
+    question: "Qu'est-ce que Kisinet ?",
+    answer:
+      "Kisinet est une plateforme de gestion destinée aux pharmacies et structures de santé. Elle permet notamment de gérer les produits, les stocks, les ventes, les collaborateurs, les permissions et les opérations de la pharmacie.",
+  },
+  {
     question: "Kisinet est-il une pharmacie en ligne ?",
     answer:
-      "Non. Kisinet est une application de gestion interne pour les pharmacies et les établissements autorisés.",
+      "Non. Kisinet est un outil de gestion interne pour les pharmacies et établissements de santé. Il ne s'agit pas d'une plateforme publique de vente de médicaments.",
   },
   {
     question: "Puis-je gérer plusieurs pharmacies ?",
     answer:
-      "Oui. Kisinet est pensé pour suivre plusieurs espaces de travail avec une organisation claire.",
+      "Oui. Un utilisateur peut gérer plusieurs pharmacies selon les conditions et limites prévues par son compte et ses abonnements.",
   },
   {
-    question: "Puis-je inviter mes employés ?",
+    question: "Puis-je inviter des collaborateurs ?",
     answer:
-      "Oui. Les rôles et permissions permettent d'encadrer les accès de chaque collaborateur.",
+      "Oui, selon les règles du plan et de l'abonnement de la pharmacie. Les accès des collaborateurs peuvent être contrôlés avec des permissions adaptées.",
+  },
+  {
+    question: "Kisinet permet-il de gérer les stocks ?",
+    answer:
+      "Oui. Kisinet permet de suivre les produits, les quantités disponibles, les mouvements de stock et les produits nécessitant une attention particulière.",
+  },
+  {
+    question: "Kisinet permet-il de suivre les ventes ?",
+    answer:
+      "Oui. Les ventes réalisées dans une pharmacie peuvent être enregistrées et suivies depuis l'espace de gestion.",
+  },
+  {
+    question: "Kisinet utilise-t-il l'intelligence artificielle ?",
+    answer:
+      "Oui. Certaines fonctionnalités de Kisinet utilisent l'intelligence artificielle, notamment pour l'analyse assistée des ordonnances, selon les fonctionnalités disponibles pour la pharmacie.",
+  },
+  {
+    question: "Mes employés ont-ils accès à toutes les informations ?",
+    answer:
+      "Non. Kisinet utilise un système de permissions permettant de limiter les actions et informations accessibles à chaque collaborateur.",
+  },
+  {
+    question: "Puis-je consulter des rapports ?",
+    answer:
+      "Oui, lorsque cette fonctionnalité est incluse dans le plan de la pharmacie et que l'utilisateur possède les permissions nécessaires.",
   },
   {
     question: "Kisinet convient-il à une petite pharmacie ?",
     answer:
-      "Oui. L'interface reste simple pour démarrer, puis accompagne la croissance de l'activité.",
+      "Oui. Kisinet est conçu pour pouvoir être utilisé aussi bien par de petites structures que par des pharmacies ayant des besoins de gestion plus importants.",
   },
 ];
 
@@ -255,8 +285,11 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section id="faq" className="border-y border-app-border bg-app-surface">
-          <div className="mx-auto max-w-6xl scroll-mt-24 px-4 py-16 sm:px-6 lg:px-8">
+        <section
+          id="faq"
+          className="scroll-mt-24 border-y border-app-border bg-app-surface"
+        >
+          <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:px-8">
             <SectionHeading
               eyebrow="FAQ"
               title="Questions fréquentes"
@@ -335,16 +368,11 @@ export default function HomePage() {
                   </a>
                 </p>
               </article>
-              {/* Carte Téléphone — coordonnée secondaire de contact */}
+              {/* Carte Adresse — localisation générale de l'entreprise */}
               <article className="rounded-lg border border-app-border bg-app-card p-5 shadow-sm">
-                <h3 className="text-lg font-bold text-app-text">Téléphone</h3>
-                <p className="mt-2 text-sm leading-6 text-app-muted">
-                  +243 000 000 000
-                </p>
-              </article>
-              {/* Carte Adresse — localisation de l'entreprise */}
-              <article className="rounded-lg border border-app-border bg-app-card p-5 shadow-sm">
-                <h3 className="text-lg font-bold text-app-text">Adresse</h3>
+                <h3 className="text-lg font-bold text-app-text">
+                  Localisation
+                </h3>
                 <p className="mt-2 text-sm leading-6 text-app-muted">
                   Kinshasa, République Démocratique du Congo
                 </p>
