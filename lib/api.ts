@@ -228,6 +228,8 @@ export type PharmacyPermissions = {
   product_create?: boolean;
   product_update?: boolean;
   product_delete?: boolean;
+  product_export_pdf?: boolean;
+  product_export_excel?: boolean;
   stock_view?: boolean;
   stock_adjust?: boolean;
   stock_transfer?: boolean;

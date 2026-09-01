@@ -787,6 +787,8 @@ Content-Type: application/json
 - `POST /api/products/`
 - `PATCH /api/products/{reference}/?pharmacy_reference={pharmacy_id}`
 - `DELETE /api/products/{reference}/?pharmacy_reference={pharmacy_id}`
+- `GET /api/products/export/pdf/?pharmacy_reference={pharmacy_id}`
+- `GET /api/products/export/excel/?pharmacy_reference={pharmacy_id}`
 
 ### POST /api/products/
 
@@ -910,6 +912,30 @@ Content-Type: application/json
 - **Endpoint compagnon** : `GET /api/products/filter-options/?pharmacy_reference={pharmacy_id}`
   (`getProductFilterOptions`) renvoie les options des filtres (formes, catégories, etc.),
   dont les tris `strength`, `-strength`, `package` et `-package`.
+
+### GET /api/products/export/pdf/
+
+- **Objectif** : télécharger la liste des produits au format PDF.
+- **Méthode HTTP** : `GET`
+- **URL** : `/api/products/export/pdf/?pharmacy_reference={pharmacy_id}`
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/products`
+- **Service frontend** : `downloadProductExport(pharmacyId, "pdf", filters)` dans `lib/api/products.ts`
+- **Permission requise** : `product_export_pdf`.
+- **Paramètres** : `pharmacy_reference` obligatoire, mêmes filtres que la liste produits. `page` n'est pas transmis par le frontend pour exporter tous les résultats filtrés.
+- **Réponse attendue (200)** : fichier `application/pdf` avec `Content-Disposition: attachment`.
+- **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden` avec le message métier du backend.
+
+### GET /api/products/export/excel/
+
+- **Objectif** : télécharger la liste des produits au format Excel.
+- **Méthode HTTP** : `GET`
+- **URL** : `/api/products/export/excel/?pharmacy_reference={pharmacy_id}`
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/products`
+- **Service frontend** : `downloadProductExport(pharmacyId, "excel", filters)` dans `lib/api/products.ts`
+- **Permission requise** : `product_export_excel`.
+- **Paramètres** : `pharmacy_reference` obligatoire, mêmes filtres que la liste produits. `page` n'est pas transmis par le frontend pour exporter tous les résultats filtrés.
+- **Réponse attendue (200)** : fichier `.xlsx` avec `Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` et `Content-Disposition: attachment`.
+- **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden` avec le message métier du backend.
 
 ## Stock (mouvements)
 
@@ -1230,6 +1256,7 @@ Content-Type: application/json
 - **Service frontend** : `getPharmacyPermissions(pharmacyId)` dans `lib/api`
 - **Réponse attendue (200)** : objet dont les clés sont les permissions (ex.
   `product_view`, `product_create`, `product_update`, `product_delete`,
+  `product_export_pdf`, `product_export_excel`,
   `sale_view`, `sale_create`, `sale_payment_create`, `sale_cancel`,
   `report_view`, `report_export`, `report_financial_view`, `report_staff_view`,
   `report_ai_view`) avec des valeurs booléennes.

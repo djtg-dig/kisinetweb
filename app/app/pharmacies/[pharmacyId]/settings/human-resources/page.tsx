@@ -63,6 +63,8 @@ const permissionGroups = [
       ["product_create", "Ajouter des produits"],
       ["product_update", "Modifier les produits"],
       ["product_delete", "Supprimer les produits"],
+      ["product_export_pdf", "Exporter les produits en PDF"],
+      ["product_export_excel", "Exporter les produits en Excel"],
       ["stock_view", "Voir le stock"],
       ["stock_adjust", "Ajuster le stock"],
       ["stock_transfer", "Transférer le stock"],

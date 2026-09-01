@@ -4,6 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { LinkButton } from "@/components/ui/link-button";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
+import { ToastMessage } from "@/components/ui/toast";
 import {
   getPharmacyDetail,
   getPharmacyProducts,
@@ -15,13 +18,18 @@ import {
   type ProductFilters,
   type ProductSummary,
 } from "@/lib/api";
-import { deleteProduct } from "@/lib/api/products";
+import {
+  deleteProduct,
+  downloadProductExport,
+  type ProductExportFormat,
+} from "@/lib/api/products";
 
 type ProductsPageProps = {
   params: Promise<{ pharmacyId: string }>;
 };
 
 type PageState = "loading" | "error" | "empty" | "ready";
+type ToastFeedback = { tone: "success" | "error" | "warning"; text: string } | null;
 
 const defaultFilters: ProductFilters = {
   ordering: "name",
@@ -51,6 +59,13 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
   const [reloadKey, setReloadKey] = useState(0);
   const [pendingDelete, setPendingDelete] = useState<ProductSummary | null>(null);
   const [pharmacyDevise, setPharmacyDevise] = useState("USD");
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [exportingFormat, setExportingFormat] = useState<ProductExportFormat | null>(null);
+  const [toast, setToast] = useState<ToastFeedback>(null);
+
+  const canExportPdf = Boolean(permissions.product_export_pdf);
+  const canExportExcel = Boolean(permissions.product_export_excel);
+  const canExportProducts = canExportPdf || canExportExcel;
 
   function handleDeleteProduct(product: ProductSummary) {
     setPendingDelete(product);
@@ -73,6 +88,38 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
       setPendingDelete(null);
     } finally {
       setDeletingReference("");
+    }
+  }
+
+  async function handleExportProducts(format: ProductExportFormat) {
+    // Une seule generation tourne a la fois pour eviter les doubles clics.
+    if (exportingFormat) {
+      return;
+    }
+
+    setExportingFormat(format);
+    setErrorMessage("");
+
+    try {
+      await downloadProductExport(pharmacyId, format, filters);
+      setToast({
+        tone: "success",
+        text:
+          format === "pdf"
+            ? "Export PDF généré avec succès."
+            : "Export Excel généré avec succès.",
+      });
+      setExportModalOpen(false);
+    } catch (error) {
+      setToast({
+        tone: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Impossible de générer l'export demandé.",
+      });
+    } finally {
+      setExportingFormat(null);
     }
   }
 
@@ -162,6 +209,16 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
               pharmacyId={pharmacyId}
             />
           )}
+          {canExportProducts && (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setExportModalOpen(true)}
+              className="sm:self-stretch"
+            >
+              Exporter
+            </Button>
+          )}
           <SummaryPill label="Produits" value={String(products.length)} />
           <SummaryPill label="Stock total" value={String(totalStock)} />
         </div>
@@ -238,6 +295,22 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
         onConfirm={confirmDeleteProduct}
         onCancel={() => setPendingDelete(null)}
       />
+      <ExportProductsModal
+        open={exportModalOpen}
+        canExportPdf={canExportPdf}
+        canExportExcel={canExportExcel}
+        exportingFormat={exportingFormat}
+        onExport={handleExportProducts}
+        onClose={() => setExportModalOpen(false)}
+      />
+      {toast && (
+        <ToastMessage
+          tone={toast.tone}
+          onClose={() => setToast(null)}
+        >
+          {toast.text}
+        </ToastMessage>
+      )}
     </main>
   );
 }
@@ -595,6 +668,71 @@ function AddProductButton({
     >
       Ajouter un produit
     </span>
+  );
+}
+
+function ExportProductsModal({
+  open,
+  canExportPdf,
+  canExportExcel,
+  exportingFormat,
+  onExport,
+  onClose,
+}: {
+  open: boolean;
+  canExportPdf: boolean;
+  canExportExcel: boolean;
+  exportingFormat: ProductExportFormat | null;
+  onExport: (format: ProductExportFormat) => void;
+  onClose: () => void;
+}) {
+  const isExporting = exportingFormat !== null;
+
+  return (
+    <Modal
+      open={open}
+      title="Exporter la liste des produits"
+      onClose={onClose}
+      saving={isExporting}
+    >
+      <div className="grid gap-5">
+        <p className="text-sm leading-6 text-app-muted">Choisissez le format d’export.</p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {canExportPdf && (
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={isExporting}
+              onClick={() => onExport("pdf")}
+              className="w-full"
+            >
+              {exportingFormat === "pdf" ? "Génération PDF..." : "En PDF"}
+            </Button>
+          )}
+          {canExportExcel && (
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={isExporting}
+              onClick={() => onExport("excel")}
+              className="w-full"
+            >
+              {exportingFormat === "excel" ? "Génération Excel..." : "Excel"}
+            </Button>
+          )}
+        </div>
+        <div className="flex justify-end border-t border-app-border pt-4">
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={isExporting}
+            onClick={onClose}
+          >
+            Annuler
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 

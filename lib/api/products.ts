@@ -1,7 +1,7 @@
 import { apiFetch } from "@/lib/api/request";
 import { getAccessToken } from "@/lib/auth";
 import { apiBaseUrl } from "@/lib/carri-account";
-import { getApiErrorMessage, parseJsonResponse } from "@/lib/api";
+import { getApiErrorMessage, parseJsonResponse, type ProductFilters } from "@/lib/api";
 
 export type ProductFormOption = {
   value: string;
@@ -341,4 +341,111 @@ export async function updateProduct(
   }
 
   return data as Product;
+}
+
+export type ProductExportFormat = "pdf" | "excel";
+
+// Liste unique des filtres produits acceptés par les endpoints d'export.
+// `page` est volontairement exclu pour télécharger tous les résultats filtrés.
+const PRODUCT_EXPORT_FILTERS: [keyof ProductFilters, string][] = [
+  ["search", "search"],
+  ["reference", "reference"],
+  ["name", "name"],
+  ["form", "form"],
+  ["targetGender", "target_gender"],
+  ["targetAgeGroup", "target_age_group"],
+  ["therapeuticCategory", "therapeutic_category"],
+  ["strength", "strength"],
+  ["package", "package"],
+  ["stockStatus", "stock_status"],
+  ["minStock", "min_stock"],
+  ["maxStock", "max_stock"],
+  ["minSalePrice", "min_sale_price"],
+  ["maxSalePrice", "max_sale_price"],
+  ["minPurchasePrice", "min_purchase_price"],
+  ["maxPurchasePrice", "max_purchase_price"],
+  ["createdFrom", "created_from"],
+  ["createdTo", "created_to"],
+  ["updatedFrom", "updated_from"],
+  ["updatedTo", "updated_to"],
+  ["ordering", "ordering"],
+];
+
+function appendProductExportFilters(params: URLSearchParams, filters: ProductFilters) {
+  // Chaque filtre est ajouté seulement s'il contient une valeur réelle.
+  for (const [frontendName, apiName] of PRODUCT_EXPORT_FILTERS) {
+    const value = filters[frontendName];
+    if (value && value.trim()) {
+      params.set(apiName, value.trim());
+    }
+  }
+}
+
+function getFilenameFromDisposition(disposition: string | null, fallback: string) {
+  // Le backend renvoie un Content-Disposition simple avec filename="...".
+  const match = disposition?.match(/filename="?([^"]+)"?/i);
+  return match?.[1] || fallback;
+}
+
+function saveBlob(blob: Blob, filename: string) {
+  // URL objet temporaire: elle permet un téléchargement authentifié côté client.
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+export async function downloadProductExport(
+  pharmacyId: string,
+  format: ProductExportFormat,
+  filters: ProductFilters = {},
+): Promise<string> {
+  const accessToken = getAccessToken();
+  if (!accessToken) {
+    throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
+  }
+
+  const params = new URLSearchParams({ pharmacy_reference: pharmacyId });
+  appendProductExportFilters(params, filters);
+
+  const endpoint = format === "pdf" ? "/api/products/export/pdf/" : "/api/products/export/excel/";
+  const response = await apiFetch(
+    apiBaseUrl.replace(/\/$/, "") + endpoint + "?" + params.toString(),
+    {
+      cache: "no-store",
+      headers: {
+        Authorization: "Bearer " + accessToken,
+        Accept:
+          format === "pdf"
+            ? "application/pdf"
+            : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      },
+    },
+  );
+
+  if (!response.ok) {
+    const responseText = await response.text();
+    const data = parseJsonResponse(responseText);
+    throw new Error(
+      getApiErrorMessage(
+        data,
+        format === "pdf"
+          ? "Impossible de générer l'export PDF."
+          : "Impossible de générer l'export Excel.",
+      ),
+    );
+  }
+
+  const fallbackFilename = format === "pdf" ? "produits.pdf" : "produits.xlsx";
+  const filename = getFilenameFromDisposition(
+    response.headers.get("Content-Disposition"),
+    fallbackFilename,
+  );
+  const blob = await response.blob();
+  saveBlob(blob, filename);
+  return filename;
 }
