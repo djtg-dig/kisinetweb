@@ -1587,7 +1587,8 @@ le JWT avant de rejouer une requête expirée.
 - **Comportement frontend** : la page notifications affiche les notifications avec filtrage par catégorie, statut de lecture et pharmacie. Chaque notification non lue affiche un indicateur visuel.
 - **Page pharmacie** : `/app/pharmacies/[pharmacyId]/notifications` transmet toujours
   `pharmacy=<pharmacyId>` pour ne pas mélanger les notifications globales personnelles
-  avec les événements de la pharmacie courante.
+  avec les événements de la pharmacie courante. Une notification dont
+  `pharmacy_reference = null` ne doit pas apparaître sur cette page.
 - **Compteurs de page** : les totaux `Toutes`, `Non lues` et `Lues` sont lus via ce
   même endpoint avec `page_size=1`, afin d'utiliser le champ paginé `count` sans
   charger l'historique complet.
@@ -1599,25 +1600,27 @@ le JWT avant de rejouer une requête expirée.
 - **URL** : `/api/notifications/unread-count/`
 - **Service frontend** : `getUnreadNotificationCount()` dans `lib/api/notifications`
 - **Authentification** : requise.
+- **Paramètres query** :
+  - `pharmacy` : filtre optionnel sur la référence de pharmacie.
 - **Réponse attendue (200)** : `{ "count": number }`
 - **Comportement frontend** : le badge de la navbar pharmacie affiche ce compteur
-  global utilisateur. Si `count = 0`, aucun badge n'est rendu. Si `count > 99`,
-  afficher `99+`.
+  avec `pharmacy=<pharmacyId>`, donc uniquement les notifications non lues de
+  l'utilisateur connecté rattachées à la pharmacie courante. Si `count = 0`,
+  aucun badge n'est rendu. Si `count > 99`, afficher `99+`.
 - **Synchronisation** : après `markNotificationAsRead` ou `markAllNotificationsAsRead`,
   le service notifications déclenche un événement navigateur local
   `kisinet:notifications_refresh`; `AppLayout` recharge alors ce compteur.
-- **Limite backend actuelle** : cet endpoint ne prend pas de paramètre `pharmacy`.
-  Le badge navbar reste donc global utilisateur tant que le backend ne fournit pas
-  un compteur non lu filtrable par pharmacie.
 
 ### GET /api/notifications/unread-summary/
 
 - **Objectif** : récupérer le résumé des notifications non lues groupées par catégorie.
 - **Méthode HTTP** : `GET`
 - **URL** : `/api/notifications/unread-summary/`
-- **Page frontend** : future page globale `/app/notifications` ou usage global.
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/notifications`, future page globale `/app/notifications`.
 - **Service frontend** : `getUnreadNotificationSummary()` dans `lib/api/notifications`
 - **Authentification** : requise.
+- **Paramètres query** :
+  - `pharmacy` : filtre optionnel sur la référence de pharmacie.
 - **Réponse attendue (200)** :
   ```json
   {
@@ -1630,14 +1633,16 @@ le JWT avant de rejouer une requête expirée.
     }
   }
   ```
-- **Comportement frontend** : le service reste disponible pour une page globale
-  utilisateur. La page pharmacie ne l'utilise pas pour ses cartes, car le backend
-  ne filtre pas encore ce résumé par `pharmacy`.
-- **Cartes page pharmacie** : les groupes `payments`, `commissions`, `products` et
-  `ai_credits` sont alignés sur les groupes backend connus, mais leurs compteurs
-  sont calculés par des appels paginés `GET /api/notifications/?pharmacy=...&category=...&is_read=false&page_size=1`.
-  Cette stratégie évite d'afficher des notifications globales dans une page
-  spécifique à une pharmacie.
+- **Comportement frontend** : la page pharmacie appelle
+  `GET /api/notifications/unread-summary/?pharmacy=<pharmacyId>` afin de garder
+  le résumé backend borné à la pharmacie courante. Les cards affichées sur cette
+  page restent orientées pharmacie et n'affichent pas les groupes personnels
+  `commissions` ou `withdrawals`.
+- **Cards page pharmacie** : les compteurs visibles sont calculés avec des appels
+  légers `GET /api/notifications/?pharmacy=<pharmacyId>&category=<category>&is_read=false&page_size=1`.
+  Les groupes affichés sont `Toutes`, `Produits`, `Stock`, `Crédits IA`,
+  `Abonnement`, `Paiements` et `Membres`. Le frontend ne charge pas toutes les
+  notifications pour les recompter localement.
 
 ### POST /api/notifications/{reference}/read/
 
@@ -1670,6 +1675,28 @@ le JWT avant de rejouer une requête expirée.
   dans le payload pour limiter l'action aux notifications de la pharmacie courante.
   Après succès, les notifications affichées sont marquées comme lues, les compteurs
   et cartes de la page sont rechargés, puis le badge navbar est revalidé.
+
+### Séparation page pharmacie / notifications personnelles
+
+La route `/app/pharmacies/[pharmacyId]/notifications` est strictement limitée au
+contexte pharmacie. La règle principale n'est pas la catégorie seule: la
+notification doit être rattachée à la pharmacie courante via
+`pharmacy_reference = <pharmacyId>`.
+
+| Type | Page pharmacie |
+|------|----------------|
+| `AI_CREDIT_LOW` | Oui si `pharmacy_reference = <pharmacyId>` |
+| `AI_CREDIT_PURCHASE` | Oui si `pharmacy_reference = <pharmacyId>` |
+| `PRODUCT_EXPIRATION` | Oui si `pharmacy_reference = <pharmacyId>` |
+| `STOCK_LOW` | Oui si `pharmacy_reference = <pharmacyId>` |
+| `SUBSCRIPTION_PAYMENT` | Oui si `pharmacy_reference = <pharmacyId>` |
+| `SUBSCRIPTION_EXPIRING` | Oui si `pharmacy_reference = <pharmacyId>` |
+| `SUBSCRIPTION_EXPIRED` | Oui si `pharmacy_reference = <pharmacyId>` |
+| `PAYMENT_SUCCESS` | Oui si `pharmacy_reference = <pharmacyId>` |
+| `PAYMENT_FAILED` | Oui si `pharmacy_reference = <pharmacyId>` |
+| `COMMISSION_RECEIVED` | Non si `pharmacy_reference = null` |
+| `WITHDRAWAL_*` | Non si `pharmacy_reference = null` |
+| `SYSTEM` | Non si `pharmacy_reference = null` |
 
 ### Catégories de notifications
 

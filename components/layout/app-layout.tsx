@@ -112,7 +112,7 @@ export function AppLayout({ children, pharmacyId, permissions: initialPermission
 
     async function loadUnreadCount() {
       try {
-        const count = await getUnreadNotificationCount();
+        const count = await getUnreadNotificationCount({ pharmacy: pharmacyId });
         if (isMounted) {
           setUnreadNotificationCount(count);
         }

@@ -72,8 +72,8 @@ type NotificationCategoryGroupDefinition = {
   categories: NotificationCategory[];
 };
 
-// Groupes alignes avec le selector backend; ils servent uniquement quand le
-// backend ne fournit pas encore de resume filtre par pharmacie.
+// Groupes alignes avec le selector backend pour garder les cards resume
+// coherentes entre la page pharmacie et une future page globale.
 export const NOTIFICATION_CATEGORY_GROUPS: NotificationCategoryGroupDefinition[] = [
   {
     key: "payments",
@@ -253,9 +253,15 @@ export async function getNotifications(
   return fetchNotifications(filters);
 }
 
-export async function getUnreadNotificationCount(): Promise<number> {
+export async function getUnreadNotificationCount(filters: Pick<NotificationFilters, "pharmacy"> = {}): Promise<number> {
   try {
-    const response = await authenticatedFetch(apiBaseUrl.replace(/\/$/, "") + "/api/notifications/unread-count/", {
+    const params = new URLSearchParams();
+    if (filters.pharmacy) params.set("pharmacy", filters.pharmacy);
+
+    const queryString = params.toString();
+    const path = "/api/notifications/unread-count/" + (queryString ? "?" + queryString : "");
+
+    const response = await authenticatedFetch(apiBaseUrl.replace(/\/$/, "") + path, {
       cache: "no-store",
       headers: {
         Accept: "application/json",
@@ -285,13 +291,21 @@ export async function getUnreadNotificationCountForPharmacy(pharmacy: string): P
     return 0;
   }
 
-  return getNotificationCount({ pharmacy, is_read: false });
+  return getUnreadNotificationCount({ pharmacy });
 }
 
-export async function getUnreadNotificationSummary(): Promise<NotificationUnreadSummary> {
+export async function getUnreadNotificationSummary(
+  filters: Pick<NotificationFilters, "pharmacy"> = {},
+): Promise<NotificationUnreadSummary> {
   try {
+    const params = new URLSearchParams();
+    if (filters.pharmacy) params.set("pharmacy", filters.pharmacy);
+
+    const queryString = params.toString();
+    const path = "/api/notifications/unread-summary/" + (queryString ? "?" + queryString : "");
+
     const response = await authenticatedFetch(
-      apiBaseUrl.replace(/\/$/, "") + "/api/notifications/unread-summary/",
+      apiBaseUrl.replace(/\/$/, "") + path,
       {
         cache: "no-store",
         headers: {

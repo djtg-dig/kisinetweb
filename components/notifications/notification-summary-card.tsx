@@ -8,6 +8,8 @@ type NotificationSummaryCardProps = {
   isActive: boolean;
   onClick: (category: string) => void;
   isAll?: boolean;
+  label?: string;
+  description?: string;
 };
 
 function SummaryIcon({ category }: { category: string }) {
@@ -52,7 +54,8 @@ function SummaryIcon({ category }: { category: string }) {
     category.includes("PRODUCT") ||
     category.includes("STOCK") ||
     category.includes("Produits") ||
-    normalizedCategory.includes("products")
+    normalizedCategory.includes("products") ||
+    normalizedCategory.includes("stock")
   ) {
     return (
       <svg
@@ -116,7 +119,11 @@ function SummaryIcon({ category }: { category: string }) {
     );
   }
 
-  if (category.includes("Abonnement") || category.includes("SUBSCRIPTION")) {
+  if (
+    category.includes("Abonnement") ||
+    category.includes("SUBSCRIPTION") ||
+    normalizedCategory.includes("subscription")
+  ) {
     return (
       <svg
         className={iconClass}
@@ -131,6 +138,25 @@ function SummaryIcon({ category }: { category: string }) {
         <path d="M16 2v4" />
         <path d="M8 2v4" />
         <path d="M3 10h18" />
+      </svg>
+    );
+  }
+
+  if (normalizedCategory.includes("members")) {
+    return (
+      <svg
+        className={iconClass}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
       </svg>
     );
   }
@@ -157,10 +183,13 @@ export function NotificationSummaryCard({
   isActive,
   onClick,
   isAll = false,
+  label,
+  description,
 }: NotificationSummaryCardProps) {
-  const displayLabel = isAll ? "Toutes" : getCategoryLabel(category);
+  // Les pages peuvent fournir un libelle metier tout en gardant le fallback global.
+  const displayLabel = isAll ? "Toutes" : label || getCategoryLabel(category);
   const displayCount = count > 99 ? "99+" : count;
-  const description = isAll ? "Notifications" : getCategoryDescription(category);
+  const displayDescription = isAll ? "Notifications" : description || getCategoryDescription(category);
 
   return (
     <button
@@ -190,7 +219,7 @@ export function NotificationSummaryCard({
       </div>
       <div className={`flex items-center gap-1.5 ${isActive ? "text-primary-700" : "text-app-muted"}`}>
         <SummaryIcon category={category} />
-        <span className="text-xs">{description}</span>
+        <span className="text-xs">{displayDescription}</span>
       </div>
     </button>
   );

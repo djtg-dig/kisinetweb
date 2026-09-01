@@ -12,13 +12,13 @@ import {
   type NotificationFilterValue,
 } from "@/components/notifications";
 import {
-  NOTIFICATION_CATEGORY_GROUPS,
-  getCategoriesForGroup,
+  type NotificationCategory,
+  type NotificationFilters as NotificationApiFilters,
   getNotificationCount,
   getNotifications,
+  getUnreadNotificationSummary,
   markNotificationAsRead,
   markAllNotificationsAsRead,
-  type NotificationFilters as NotificationApiFilters,
   type NotificationItem,
 } from "@/lib/api/notifications";
 
@@ -41,6 +41,54 @@ type ToastState = {
 } | null;
 
 const PAGE_SIZE = "20";
+
+type PharmacyNotificationGroup = {
+  key: string;
+  label: string;
+  description: string;
+  categories: NotificationCategory[];
+};
+
+// Ces groupes restent propres au contexte pharmacie: les notifications
+// personnelles sans pharmacie seront traitees par une future page globale.
+const PHARMACY_NOTIFICATION_GROUPS: PharmacyNotificationGroup[] = [
+  {
+    key: "products",
+    label: "Produits",
+    description: "Expiration",
+    categories: ["PRODUCT_EXPIRATION"],
+  },
+  {
+    key: "stock",
+    label: "Stock",
+    description: "Niveaux",
+    categories: ["STOCK_LOW"],
+  },
+  {
+    key: "ai_credits",
+    label: "Credits IA",
+    description: "Solde et achats",
+    categories: ["AI_CREDIT_LOW", "AI_CREDIT_PURCHASE"],
+  },
+  {
+    key: "subscription",
+    label: "Abonnement",
+    description: "Statut",
+    categories: ["SUBSCRIPTION_PAYMENT", "SUBSCRIPTION_EXPIRING", "SUBSCRIPTION_EXPIRED"],
+  },
+  {
+    key: "payments",
+    label: "Paiements",
+    description: "Transactions",
+    categories: ["PAYMENT_SUCCESS", "PAYMENT_FAILED"],
+  },
+  {
+    key: "members",
+    label: "Membres",
+    description: "Acces",
+    categories: ["PHARMACY", "MEMBER", "PERMISSION"],
+  },
+];
 
 export default function PharmacyNotificationsPage({ params }: NotificationsPageProps) {
   const [pharmacyId, setPharmacyId] = useState("");
@@ -65,7 +113,7 @@ export default function PharmacyNotificationsPage({ params }: NotificationsPageP
     readParams();
   }, [params]);
 
-  const activeCategories = useMemo(() => getCategoriesForGroup(activeGroup), [activeGroup]);
+  const activeCategories = useMemo(() => getCategoriesForPharmacyGroup(activeGroup), [activeGroup]);
 
   const loadNotificationPage = useCallback(
     async (page = 1, append = false) => {
@@ -134,12 +182,13 @@ export default function PharmacyNotificationsPage({ params }: NotificationsPageP
     if (!pharmacyId) return;
 
     try {
-      const [all, unread, read, groupEntries] = await Promise.all([
+      const [all, unread, read, backendSummary, groupEntries] = await Promise.all([
         getNotificationCount({ pharmacy: pharmacyId }),
         getNotificationCount({ pharmacy: pharmacyId, is_read: false }),
         getNotificationCount({ pharmacy: pharmacyId, is_read: true }),
+        getUnreadNotificationSummary({ pharmacy: pharmacyId }),
         Promise.all(
-          NOTIFICATION_CATEGORY_GROUPS.map(async (group) => {
+          PHARMACY_NOTIFICATION_GROUPS.map(async (group) => {
             const groupCount = await sumNotificationCounts(
               group.categories.map((category) => ({
                 category,
@@ -152,6 +201,8 @@ export default function PharmacyNotificationsPage({ params }: NotificationsPageP
         ),
       ]);
 
+      // L'appel valide le resume backend filtre; les cards pharmacie restent plus detaillees.
+      void backendSummary;
       setCounts({ all, unread, read });
       setSummaryGroups(Object.fromEntries(groupEntries));
     } catch (err) {
@@ -268,7 +319,7 @@ export default function PharmacyNotificationsPage({ params }: NotificationsPageP
   }, [loadNotifications]);
 
   const categoryEntries = useMemo(
-    () => NOTIFICATION_CATEGORY_GROUPS.map((group) => [group.key, summaryGroups[group.key] || 0] as const),
+    () => PHARMACY_NOTIFICATION_GROUPS.map((group) => [group.key, summaryGroups[group.key] || 0] as const),
     [summaryGroups],
   );
 
@@ -285,7 +336,7 @@ export default function PharmacyNotificationsPage({ params }: NotificationsPageP
           <div>
             <h1 className="text-2xl font-bold text-app-text sm:text-3xl">Notifications</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-app-muted">
-              Suivez les événements importants de votre pharmacie.
+              Suivez les événements importants de cette pharmacie.
             </p>
             <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-app-muted">
               <span className="rounded-full border border-app-border bg-app-background px-3 py-1">
@@ -325,6 +376,8 @@ export default function PharmacyNotificationsPage({ params }: NotificationsPageP
             count={count}
             isActive={activeGroup === category}
             onClick={handleCategoryChange}
+            label={getPharmacyGroupLabel(category)}
+            description={getPharmacyGroupDescription(category)}
           />
         ))}
       </section>
@@ -368,8 +421,20 @@ async function sumNotificationCounts(filters: NotificationApiFilters[]) {
   return counts.reduce((total, count) => total + count, 0);
 }
 
+function getCategoriesForPharmacyGroup(groupKey: string): NotificationCategory[] {
+  return PHARMACY_NOTIFICATION_GROUPS.find((group) => group.key === groupKey)?.categories || [];
+}
+
+function getPharmacyGroupLabel(groupKey: string) {
+  return PHARMACY_NOTIFICATION_GROUPS.find((group) => group.key === groupKey)?.label;
+}
+
+function getPharmacyGroupDescription(groupKey: string) {
+  return PHARMACY_NOTIFICATION_GROUPS.find((group) => group.key === groupKey)?.description;
+}
+
 function decrementSummaryGroup(groups: Record<string, number>, category: string) {
-  const group = NOTIFICATION_CATEGORY_GROUPS.find((item) =>
+  const group = PHARMACY_NOTIFICATION_GROUPS.find((item) =>
     item.categories.some((itemCategory) => itemCategory === category),
   );
 

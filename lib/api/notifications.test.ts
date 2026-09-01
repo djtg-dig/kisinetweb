@@ -1,7 +1,7 @@
 // Tests unitaires de la couche API notifications.
 //
 // Ils valident le contrat consomme par la page pharmacie sans backend reel :
-// filtres de liste, compteur via pagination legere et synchronisation du badge.
+// filtres de liste, compteurs pharmacie et synchronisation du badge.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -84,6 +84,32 @@ async function setup() {
       );
     }
 
+    if (String(input).includes("/api/notifications/unread-count/")) {
+      return Promise.resolve(
+        new Response(JSON.stringify({ count: 4 }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    }
+
+    if (String(input).includes("/api/notifications/unread-summary/")) {
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            total: 4,
+            groups: {
+              payments: 0,
+              commissions: 0,
+              products: 3,
+              ai_credits: 1,
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+    }
+
     return Promise.resolve(
       new Response(
         JSON.stringify({
@@ -159,6 +185,35 @@ test("getNotificationCount utilise une page legere pour lire count", async () =>
   assert.equal(url.searchParams.get("page_size"), "1");
 });
 
+test("getUnreadNotificationCount transmet le filtre pharmacie au backend", async () => {
+  const notifications = await setup();
+  capturedRequests = [];
+  forceFirstNotifications401 = false;
+  store.set(ACCESS_KEY, "access-token");
+
+  const count = await notifications.getUnreadNotificationCount({ pharmacy: "PH12345678" });
+
+  const url = new URL(capturedRequests[0]!.url);
+  assert.equal(count, 4);
+  assert.equal(url.pathname, "/api/notifications/unread-count/");
+  assert.equal(url.searchParams.get("pharmacy"), "PH12345678");
+});
+
+test("getUnreadNotificationSummary transmet le filtre pharmacie au backend", async () => {
+  const notifications = await setup();
+  capturedRequests = [];
+  forceFirstNotifications401 = false;
+  store.set(ACCESS_KEY, "access-token");
+
+  const summary = await notifications.getUnreadNotificationSummary({ pharmacy: "PH12345678" });
+
+  const url = new URL(capturedRequests[0]!.url);
+  assert.equal(summary.total, 4);
+  assert.equal(summary.groups.products, 3);
+  assert.equal(url.pathname, "/api/notifications/unread-summary/");
+  assert.equal(url.searchParams.get("pharmacy"), "PH12345678");
+});
+
 test("markNotificationAsRead declenche le rafraichissement du badge", async () => {
   const notifications = await setup();
   capturedRequests = [];
@@ -170,6 +225,22 @@ test("markNotificationAsRead declenche le rafraichissement du badge", async () =
 
   assert.equal(capturedRequests[0]?.method, "POST");
   assert.equal(new URL(capturedRequests[0]!.url).pathname, "/api/notifications/NT12345678/read/");
+  assert.equal(lastDispatchedEvent, notifications.NOTIFICATION_BADGE_REFRESH_EVENT);
+});
+
+test("markAllNotificationsAsRead envoie le filtre pharmacie au backend", async () => {
+  const notifications = await setup();
+  capturedRequests = [];
+  forceFirstNotifications401 = false;
+  lastDispatchedEvent = "";
+  store.set(ACCESS_KEY, "access-token");
+
+  await notifications.markAllNotificationsAsRead({ pharmacy: "PH12345678" });
+
+  const request = capturedRequests[0];
+  assert.equal(request?.method, "POST");
+  assert.equal(new URL(request!.url).pathname, "/api/notifications/read-all/");
+  assert.deepEqual(JSON.parse(request!.body || "{}"), { pharmacy: "PH12345678" });
   assert.equal(lastDispatchedEvent, notifications.NOTIFICATION_BADGE_REFRESH_EVENT);
 });
 
