@@ -1542,3 +1542,123 @@ côté agrégateur sur `POST /api/webhook/`.
 > Note : `{pharmacy_id}` dans les URLs pharmacies correspond à la **référence** publique
 > de la pharmacie (ex. `PH0UKUI3NQ`), jamais à l'identifiant interne. Le frontend utilise
 > dynamiquement le `pharmacyId` de l'URL, jamais une valeur en dur.
+
+## Notifications
+
+Le backend fournit un système de notifications centralisé pour Kisinet. Le frontend consume les endpoints:
+
+| Usage frontend | Méthode et URL | Auth |
+| --- | --- | --- |
+| Liste notifications | `GET /api/notifications/` | Oui |
+| Compteur non lues | `GET /api/notifications/unread-count/` | Oui |
+| Résumé par catégorie | `GET /api/notifications/unread-summary/` | Oui |
+| Marquer comme lue | `POST /api/notifications/{reference}/read/` | Oui |
+| Marquer tout comme lu | `POST /api/notifications/read-all/` | Oui |
+
+### GET /api/notifications/
+
+- **Objectif** : lister les notifications de l'utilisateur connecté.
+- **Méthode HTTP** : `GET`
+- **URL** : `/api/notifications/`
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/notifications`
+- **Service frontend** : `getNotifications(filters)` dans `lib/api/notifications`
+- **Authentification** : requise avec `Authorization: Bearer <access_token>`.
+- **Paramètres query** :
+  - `category` : filtre optionnel sur la catégorie de notification ;
+  - `pharmacy` : filtre optionnel sur la référence de pharmacie ;
+  - `is_read` : `true` ou `false` pour filtrer par statut de lecture ;
+  - `page`, `page_size` : pagination DRF standard.
+- **Réponse attendue (200)** : objet paginé `{ count, next, previous, results }`. Chaque `result` contient :
+  - `reference` : identifiant unique de la notification ;
+  - `category` : catégorie de notification (ex: `AI_CREDIT_LOW`, `PRODUCT_EXPIRATION`, `PAYMENT_SUCCESS`) ;
+  - `severity` : gravité (`INFO`, `SUCCESS`, `WARNING`, `CRITICAL`) ;
+  - `title` : titre de la notification ;
+  - `message` : corps du message ;
+  - `pharmacy_reference` : référence de la pharmacie associée (ou `null`) ;
+  - `pharmacy_name` : nom de la pharmacie (ou `null`) ;
+  - `action_url` : URL d'action optionnelle (ou `null`) ;
+  - `is_read` : booléen indiquant si la notification est lue ;
+  - `read_at` : date de lecture (ou `null`) ;
+  - `created_at` : date de création.
+- **Comportement frontend** : la page notifications affiche les notifications avec filtrage par catégorie, statut de lecture et pharmacie. Chaque notification non lue affiche un indicateur visuel.
+
+### GET /api/notifications/unread-count/
+
+- **Objectif** : récupérer le nombre de notifications non lues pour le badge navbar.
+- **Méthode HTTP** : `GET`
+- **URL** : `/api/notifications/unread-count/`
+- **Service frontend** : `getUnreadNotificationCount()` dans `lib/api/notifications`
+- **Authentification** : requise.
+- **Réponse attendue (200)** : `{ "count": number }`
+- **Comportement frontend** : le badge de la navbar affiche ce compteur. Si `count > 99`, afficher "99+".
+
+### GET /api/notifications/unread-summary/
+
+- **Objectif** : récupérer le résumé des notifications non lues groupées par catégorie.
+- **Méthode HTTP** : `GET`
+- **URL** : `/api/notifications/unread-summary/`
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/notifications`
+- **Service frontend** : `getUnreadNotificationSummary()` dans `lib/api/notifications`
+- **Authentification** : requise.
+- **Réponse attendue (200)** :
+  ```json
+  {
+    "total": 5,
+    "groups": {
+      "payments": 1,
+      "commissions": 1,
+      "products": 2,
+      "ai_credits": 1
+    }
+  }
+  ```
+- **Comportement frontend** : les cartes résumé en haut de la page notifications affichent ces décomptes par catégorie.
+
+### POST /api/notifications/{reference}/read/
+
+- **Objectif** : marquer une notification spécifique comme lue.
+- **Méthode HTTP** : `POST`
+- **URL** : `/api/notifications/{reference}/read/`
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/notifications`
+- **Service frontend** : `markNotificationAsRead(reference)` dans `lib/api/notifications`
+- **Authentification** : requise.
+- **Payload** : aucun corps requis.
+- **Réponse attendue (200)** : `{ "detail": "Notification marquée comme lue." }`
+- **Comportement frontend** : après succès, mettre à jour localement la notification, décrémenter le compteur et revalider les données.
+
+### POST /api/notifications/read-all/
+
+- **Objectif** : marquer toutes les notifications non lues comme lues.
+- **Méthode HTTP** : `POST`
+- **URL** : `/api/notifications/read-all/`
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/notifications`
+- **Service frontend** : `markAllNotificationsAsRead(options)` dans `lib/api/notifications`
+- **Authentification** : requise.
+- **Payload optionnel** :
+  - `category` : ne marquer comme lues que les notifications de cette catégorie ;
+  - `pharmacy` : ne marquer comme lues que les notifications de cette pharmacie.
+- **Réponse attendue (200)** : `{ "detail": "X notification(s) marquée(s) comme lue(s).", "marked_count": X }`
+- **Comportement frontend** : après succès, réinitialiser le compteur à 0 et marquer toutes les notifications visuellement comme lues.
+
+### Catégories de notifications
+
+| Code | Label frontend | Description |
+|------|---------------|-------------|
+| `AI_CREDIT_LOW` | Crédits IA | Crédits IA faibles |
+| `AI_CREDIT_PURCHASE` | Achat de crédits IA | Achat de crédits confirmé |
+| `PRODUCT_EXPIRATION` | Produits | Produit proche de l'expiration |
+| `STOCK_LOW` | Stock | Stock faible |
+| `SUBSCRIPTION_PAYMENT` | Abonnement | Paiement d'abonnement confirmé |
+| `SUBSCRIPTION_EXPIRING` | Abonnement | Abonnement proche de l'expiration |
+| `SUBSCRIPTION_EXPIRED` | Abonnement | Abonnement expiré |
+| `PAYMENT_SUCCESS` | Paiements | Paiement réussi |
+| `PAYMENT_FAILED` | Paiements | Paiement échoué |
+| `COMMISSION_RECEIVED` | Commissions | Commission de parrainage reçue |
+| `WITHDRAWAL_REQUESTED` | Retraits | Demande de retrait effectuée |
+| `WITHDRAWAL_APPROVED` | Retraits | Retrait approuvé |
+| `WITHDRAWAL_REJECTED` | Retraits | Retrait rejeté |
+| `WITHDRAWAL_PAID` | Retraits | Retrait payé |
+| `PHARMACY` | Pharmacie | Événement relié à la pharmacie |
+| `MEMBER` | Membres | Événement relié à un membre |
+| `PERMISSION` | Permissions | Modification de permission |
+| `SYSTEM` | Système | Notification système |

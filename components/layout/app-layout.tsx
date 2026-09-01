@@ -10,6 +10,7 @@ import {
   type ReportFeatureKey,
   type ReportFeatures,
 } from "@/lib/api/reports";
+import { getUnreadNotificationCount } from "@/lib/api/notifications";
 import {
   clearActivePharmacyId,
   getAccessToken,
@@ -31,7 +32,7 @@ const appNavItems = [
   { label: "Ventes", path: "/sales/create", permission: "sale_view" },
   { label: "Facture", path: "/invoices", permission: "sale_view" },
   { label: "Rapports", path: "/reports", permission: "report_view", feature: "reports" },
-  { label: "(5)", path: "/notifications", icon: "bell", permission: "join_request_view" },
+  { label: "Notifications", path: "/notifications", icon: "bell", permission: "join_request_view" },
   { label: "Paramètres", path: "/settings" },
 ] satisfies {
   label: string;
@@ -50,6 +51,7 @@ export function AppLayout({ children, pharmacyId, permissions: initialPermission
   const [permissions, setPermissions] = useState<PharmacyPermissions>(initialPermissions ?? {});
   const [reportFeatures, setReportFeatures] = useState<ReportFeatures>(hiddenReportFeatures);
   const [isMounted, setIsMounted] = useState(false);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const router = useRouter();
 
   useEffect(() => {
@@ -77,9 +79,8 @@ export function AppLayout({ children, pharmacyId, permissions: initialPermission
 
     async function loadPermissions() {
       if (!pharmacyId) return;
-      
+
       try {
-        // Les features du plan sont chargées avec le détail pharmacie déjà utilisé ailleurs.
         const [currentPermissions, pharmacy] = await Promise.all([
           getPharmacyPermissions(pharmacyId),
           getPharmacyDetail(pharmacyId),
@@ -103,6 +104,29 @@ export function AppLayout({ children, pharmacyId, permissions: initialPermission
     };
   }, [pharmacyId]);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadUnreadCount() {
+      try {
+        const count = await getUnreadNotificationCount();
+        if (isMounted) {
+          setUnreadNotificationCount(count);
+        }
+      } catch {
+        // Silently fail - badge will show 0
+      }
+    }
+
+    loadUnreadCount();
+    const interval = setInterval(loadUnreadCount, 60000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [pharmacyId]);
+
   if (!isMounted) {
     return (
       <div className="min-h-screen overflow-x-hidden bg-app-background pt-16 text-app-text lg:pt-[72px]">
@@ -119,7 +143,12 @@ export function AppLayout({ children, pharmacyId, permissions: initialPermission
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-app-background pt-16 text-app-text lg:pt-[72px]">
-      <AppNavbar pharmacyId={pharmacyId} permissions={permissions} reportFeatures={reportFeatures} />
+      <AppNavbar
+        pharmacyId={pharmacyId}
+        permissions={permissions}
+        reportFeatures={reportFeatures}
+        unreadNotificationCount={unreadNotificationCount}
+      />
       <div className="relative z-0 flex min-h-[calc(100vh-4rem)] flex-col lg:min-h-[calc(100vh-4.5rem)]">
         <div className="flex-1">{children}</div>
         <SiteFooter />
@@ -132,10 +161,12 @@ function AppNavbar({
   pharmacyId,
   permissions,
   reportFeatures,
+  unreadNotificationCount,
 }: {
   pharmacyId: string;
   permissions: PharmacyPermissions;
   reportFeatures: ReportFeatures;
+  unreadNotificationCount: number;
 }) {
   const basePath = "/app/pharmacies/" + pharmacyId;
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -178,12 +209,14 @@ function AppNavbar({
           permissions={permissions}
           reportFeatures={reportFeatures}
           pathname={pathname}
+          unreadNotificationCount={unreadNotificationCount}
         />
         <MobileNav
           basePath={basePath}
           permissions={permissions}
           reportFeatures={reportFeatures}
           pathname={pathname}
+          unreadNotificationCount={unreadNotificationCount}
         />
       </nav>
     </header>
@@ -195,11 +228,13 @@ function DesktopNav({
   permissions,
   reportFeatures,
   pathname,
+  unreadNotificationCount,
 }: {
   basePath: string;
   permissions: PharmacyPermissions;
   reportFeatures: ReportFeatures;
   pathname: string;
+  unreadNotificationCount: number;
 }) {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -228,6 +263,7 @@ function DesktopNav({
               isActive={isActivePath(pathname, basePath + item.path, item.path)}
               icon={item.icon}
               enabled={isNavItemEnabled(item, permissions, reportFeatures)}
+              badgeCount={item.icon === "bell" ? unreadNotificationCount : undefined}
             >
               {item.label}
             </NavLink>
@@ -268,11 +304,13 @@ function MobileNav({
   permissions,
   reportFeatures,
   pathname,
+  unreadNotificationCount,
 }: {
   basePath: string;
   permissions: PharmacyPermissions;
   reportFeatures: ReportFeatures;
   pathname: string;
+  unreadNotificationCount: number;
 }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -314,6 +352,7 @@ function MobileNav({
           permissions={permissions}
           reportFeatures={reportFeatures}
           onClose={() => setIsMenuOpen(false)}
+          unreadNotificationCount={unreadNotificationCount}
         />
       )}
     </div>
@@ -327,6 +366,7 @@ function MenuPanel({
   permissions,
   reportFeatures,
   onClose,
+  unreadNotificationCount,
 }: {
   basePath: string;
   includeAppLinks: boolean;
@@ -334,6 +374,7 @@ function MenuPanel({
   permissions: PharmacyPermissions;
   reportFeatures: ReportFeatures;
   onClose: () => void;
+  unreadNotificationCount?: number;
 }) {
   const panelClass =
     mode === "mobile"
@@ -357,6 +398,11 @@ function MenuPanel({
                 <span className="inline-flex items-center gap-2">
                   {item.icon === "bell" && <BellIcon className="h-4 w-4" />}
                   {item.label}
+                  {item.icon === "bell" && unreadNotificationCount && unreadNotificationCount > 0 && (
+                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary-600 px-1.5 text-xs font-semibold text-white">
+                      {unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}
+                    </span>
+                  )}
                 </span>
               </MenuLink>
             ))}
@@ -404,12 +450,14 @@ function NavLink({
   isActive,
   icon,
   enabled = true,
+  badgeCount,
   children,
 }: {
   href: string;
   isActive: boolean;
   icon?: string;
   enabled?: boolean;
+  badgeCount?: number;
   children: React.ReactNode;
 }) {
   if (!enabled) {
@@ -422,6 +470,11 @@ function NavLink({
       >
         {icon === "bell" && <BellIcon className="h-4 w-4" />}
         {children}
+        {icon === "bell" && badgeCount !== undefined && badgeCount > 0 && (
+          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary-600 px-1.5 text-xs font-semibold text-white">
+            {badgeCount > 99 ? "99+" : badgeCount}
+          </span>
+        )}
       </span>
     );
   }
@@ -435,6 +488,11 @@ function NavLink({
     >
       {icon === "bell" && <BellIcon className="h-4 w-4" />}
       {children}
+      {icon === "bell" && badgeCount !== undefined && badgeCount > 0 && (
+        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary-600 px-1.5 text-xs font-semibold text-white">
+          {badgeCount > 99 ? "99+" : badgeCount}
+        </span>
+      )}
     </a>
   );
 }
