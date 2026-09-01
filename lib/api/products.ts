@@ -419,10 +419,9 @@ export async function downloadProductExport(
       cache: "no-store",
       headers: {
         Authorization: "Bearer " + accessToken,
-        Accept:
-          format === "pdf"
-            ? "application/pdf"
-            : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        // L'endpoint renvoie le vrai Content-Type du fichier; `*/*` laisse
+        // aussi le backend retourner une erreur JSON lisible en cas de 403.
+        Accept: "*/*",
       },
     },
   );
