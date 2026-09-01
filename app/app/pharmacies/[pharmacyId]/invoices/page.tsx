@@ -271,6 +271,7 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
       {selectedInvoice && (
         <InvoiceDetailDialog
           invoice={selectedInvoice}
+          pharmacyId={pharmacyId}
           currency={currency}
           onClose={() => setSelectedInvoice(null)}
         />
@@ -624,13 +625,22 @@ function InvoiceActions({
 
 function InvoiceDetailDialog({
   invoice,
+  pharmacyId,
   currency,
   onClose,
 }: {
   invoice: Invoice;
+  pharmacyId: string;
   currency: string;
   onClose: () => void;
 }) {
+  const invoiceProductsPath =
+    "/app/pharmacies/" +
+    encodeURIComponent(pharmacyId) +
+    "/invoices/" +
+    encodeURIComponent(invoice.reference) +
+    "/products";
+
   return (
     <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4">
       <button
@@ -665,6 +675,13 @@ function InvoiceDetailDialog({
           <Detail label="Payé" value={formatCurrency(invoice.paidAmount, currency)} />
           <Detail label="Reste" value={formatCurrency(invoice.remainingAmount, currency)} />
           <Detail label="Statut" value={getStatusLabel(invoice.paymentStatus)} />
+        </div>
+
+        {/* Action de consultation : elle ouvre la page complète des lignes de cette facture. */}
+        <div className="mt-6 flex flex-col gap-3 border-t border-app-border pt-5 sm:flex-row sm:justify-end">
+          <LinkButton href={invoiceProductsPath} onClick={onClose}>
+            Voir les produits
+          </LinkButton>
         </div>
       </section>
     </div>

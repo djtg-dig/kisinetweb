@@ -41,6 +41,23 @@ export type Invoice = {
   createdAt: string;
 };
 
+// Ligne de produit issue du détail de facture renvoyé par `/api/sales/{reference}/`.
+export type InvoiceProductLine = {
+  pharmacy: string;
+  product: string;
+  productName: string;
+  unitPrice: number;
+  quantity: number;
+  totalPrice: number;
+};
+
+// Détail de facture avec ses lignes, utilisé par la page produits de facture.
+export type InvoiceDetail = Invoice & {
+  pharmacy: string;
+  changeAmount: number;
+  items: InvoiceProductLine[];
+};
+
 export type InvoiceFilters = {
   search?: string;
   status?: string;
@@ -100,6 +117,7 @@ export type InvoicePaymentResult = {
 type InvoiceApiItem = {
   id?: string | number;
   reference?: string;
+  pharmacy?: string;
   customer_name?: string;
   customer?: string;
   customer_phone?: string;
@@ -109,11 +127,22 @@ type InvoiceApiItem = {
   amount?: string | number;
   paid_amount?: string | number;
   remaining_amount?: string | number;
+  change_amount?: string | number;
   status?: string;
   payment_status?: string;
   created_by?: string | { full_name?: string; email?: string; username?: string };
   created_by_name?: string;
   created_at?: string;
+  items?: InvoiceProductLineApiItem[];
+};
+
+type InvoiceProductLineApiItem = {
+  pharmacy?: string;
+  product?: string;
+  product_name?: string;
+  unit_price?: string | number;
+  quantity?: string | number;
+  total_price?: string | number;
 };
 
 type InvoiceSummaryApi = {
@@ -188,6 +217,21 @@ export async function getInvoiceMetadata(pharmacyId: string): Promise<InvoiceMet
     paymentStatuses: data.payment_statuses || [],
     orderings: data.orderings || [],
   };
+}
+
+export async function getInvoiceDetail(
+  pharmacyId: string,
+  reference: string,
+): Promise<InvoiceDetail> {
+  const params = new URLSearchParams();
+  params.set("pharmacy_reference", pharmacyId);
+
+  // Le détail expose les produits, contrairement à la liste paginée des factures.
+  const data = await fetchInvoicesJson<unknown>(
+    "/api/sales/" + encodeURIComponent(reference) + "/?" + params.toString(),
+  );
+
+  return normalizeInvoiceDetail((data || {}) as InvoiceApiItem);
 }
 
 export async function getPendingPharmacyInvoices(pharmacyId: string): Promise<PendingInvoice[]> {
@@ -313,6 +357,35 @@ function normalizeInvoice(item: InvoiceApiItem): Invoice {
     paymentStatus,
     createdBy: normalizeCreatedBy(item.created_by, item.created_by_name),
     createdAt: item.created_at || "",
+  };
+}
+
+function normalizeInvoiceDetail(item: InvoiceApiItem): InvoiceDetail {
+  const invoice = normalizeInvoice(item);
+
+  // Les lignes restent calculées depuis les montants backend, avec un secours local si nécessaire.
+  return {
+    ...invoice,
+    pharmacy: item.pharmacy || "",
+    changeAmount: toNumber(item.change_amount),
+    items: Array.isArray(item.items) ? item.items.map(normalizeInvoiceProductLine) : [],
+  };
+}
+
+function normalizeInvoiceProductLine(item: InvoiceProductLineApiItem): InvoiceProductLine {
+  const unitPrice = toNumber(item.unit_price);
+  const quantity = Number(item.quantity || 0);
+  const totalPrice =
+    item.total_price === undefined ? unitPrice * quantity : toNumber(item.total_price);
+
+  // On garde les copies historiques du backend pour afficher la facture telle qu'elle a été créée.
+  return {
+    pharmacy: item.pharmacy || "",
+    product: item.product || "Produit sans référence",
+    productName: item.product_name || "Produit non renseigné",
+    unitPrice,
+    quantity: Number.isFinite(quantity) ? quantity : 0,
+    totalPrice,
   };
 }
 
