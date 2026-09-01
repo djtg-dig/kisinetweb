@@ -145,6 +145,64 @@ export type PharmacyJoinRequestSummary = {
   createdAt?: string;
 };
 
+export type PharmacyLegalDocumentType =
+  | "RCCM"
+  | "ID_NAT"
+  | "NIF"
+  | "PHARMACY_LICENSE"
+  | "OPERATING_LICENSE"
+  | "PHARMACIST_LICENSE"
+  | "TAX_DOCUMENT"
+  | "OTHER";
+
+export type PharmacyLegalDocumentVerificationStatus =
+  | "PENDING"
+  | "VERIFIED"
+  | "REJECTED"
+  | "EXPIRED";
+
+export type PharmacyLegalDocument = {
+  id: number;
+  pharmacy: string;
+  document_type: PharmacyLegalDocumentType;
+  document_type_display: string;
+  title: string;
+  document_number: string;
+  file: string;
+  issued_at: string | null;
+  expires_at: string | null;
+  issuing_authority: string;
+  verification_status: PharmacyLegalDocumentVerificationStatus;
+  verification_status_display: string;
+  verification_note: string;
+  verified_at: string | null;
+  verified_by: string | null;
+  is_active: boolean;
+  is_expired: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CreatePharmacyLegalDocumentInput = {
+  document_type: PharmacyLegalDocumentType;
+  title?: string;
+  document_number?: string;
+  file: File;
+  issued_at?: string;
+  expires_at?: string;
+  issuing_authority?: string;
+};
+
+export type UpdatePharmacyLegalDocumentInput = {
+  title?: string;
+  document_number?: string;
+  file?: File;
+  issued_at?: string;
+  expires_at?: string;
+  issuing_authority?: string;
+  is_active?: boolean;
+};
+
 export type ProductSummary = {
   reference: string;
   pharmacyReference: string;
@@ -237,11 +295,14 @@ export type PharmacyPermissions = {
   sale_create?: boolean;
   sale_payment_create?: boolean;
   sale_cancel?: boolean;
+  subscription_pay?: boolean;
   report_view?: boolean;
   report_export?: boolean;
   report_financial_view?: boolean;
   report_staff_view?: boolean;
   report_ai_view?: boolean;
+  pharmacy_legal_document_view?: boolean;
+  pharmacy_legal_document_manage?: boolean;
 };
 
 export type PharmacyMemberRole = "OWNER" | "MANAGER" | "PHARMACIST" | "EMPLOYEE";
@@ -651,6 +712,31 @@ function normalizePharmacyJoinRequest(item: UnknownRecord): PharmacyJoinRequestS
     reviewerEmail: getText(item.reviewer_email),
     reviewedAt: getText(item.reviewed_at),
     createdAt: getText(item.created_at),
+  };
+}
+
+function normalizePharmacyLegalDocument(item: UnknownRecord): PharmacyLegalDocument {
+  return {
+    id: Number(item.id) || 0,
+    pharmacy: String(item.pharmacy || ""),
+    document_type: (item.document_type as PharmacyLegalDocumentType) || "OTHER",
+    document_type_display: String(item.document_type_display || ""),
+    title: String(item.title || ""),
+    document_number: String(item.document_number || ""),
+    file: String(item.file || ""),
+    issued_at: getText(item.issued_at) ?? null,
+    expires_at: getText(item.expires_at) ?? null,
+    issuing_authority: String(item.issuing_authority || ""),
+    verification_status:
+      (item.verification_status as PharmacyLegalDocumentVerificationStatus) || "PENDING",
+    verification_status_display: String(item.verification_status_display || ""),
+    verification_note: String(item.verification_note || ""),
+    verified_at: getText(item.verified_at) ?? null,
+    verified_by: getText(item.verified_by) ?? null,
+    is_active: Boolean(item.is_active),
+    is_expired: Boolean(item.is_expired),
+    created_at: String(item.created_at || ""),
+    updated_at: String(item.updated_at || ""),
   };
 }
 
@@ -1675,6 +1761,173 @@ export async function archivePharmacyJoinRequest(
   return data && typeof data === "object"
     ? normalizePharmacyJoinRequest(data as UnknownRecord)
     : {};
+}
+
+export async function getPharmacyLegalDocuments(
+  pharmacyId: string,
+): Promise<PharmacyLegalDocument[]> {
+  const data = await fetchApiJson<unknown>(
+    "/api/pharmacies/" + pharmacyId + "/legal-documents/",
+    "Impossible de charger les documents juridiques.",
+  );
+  const rows = Array.isArray(data) ? data : [];
+  return rows
+    .filter((item: unknown): item is UnknownRecord => Boolean(item) && typeof item === "object")
+    .map(normalizePharmacyLegalDocument);
+}
+
+export async function getPharmacyLegalDocument(
+  pharmacyId: string,
+  documentId: number,
+): Promise<PharmacyLegalDocument> {
+  const data = await fetchApiJson<unknown>(
+    "/api/pharmacies/" + pharmacyId + "/legal-documents/" + documentId + "/",
+    "Impossible de charger ce document juridique.",
+  );
+  return normalizePharmacyLegalDocument((data || {}) as UnknownRecord);
+}
+
+export async function createPharmacyLegalDocument(
+  pharmacyId: string,
+  input: CreatePharmacyLegalDocumentInput,
+): Promise<PharmacyLegalDocument> {
+  const formData = new FormData();
+  formData.append("document_type", input.document_type);
+  if (input.title !== undefined) formData.append("title", input.title);
+  if (input.document_number !== undefined) formData.append("document_number", input.document_number);
+  if (input.file) formData.append("file", input.file);
+  if (input.issued_at) formData.append("issued_at", input.issued_at);
+  if (input.expires_at) formData.append("expires_at", input.expires_at);
+  if (input.issuing_authority) formData.append("issuing_authority", input.issuing_authority);
+
+  const accessToken = getAccessToken();
+  if (!accessToken) {
+    throw new ApiAuthError();
+  }
+
+  const response = await authenticatedFetch(
+    apiBaseUrl.replace(/\/$/, "") + "/api/pharmacies/" + pharmacyId + "/legal-documents/",
+    {
+      method: "POST",
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+        Authorization: "Bearer " + accessToken,
+      },
+      body: formData,
+    },
+  );
+
+  const responseText = await response.text();
+  const data = parseJsonResponse(responseText);
+
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(data, "Impossible de créer ce document juridique."));
+  }
+
+  return normalizePharmacyLegalDocument((data || {}) as UnknownRecord);
+}
+
+export async function updatePharmacyLegalDocument(
+  pharmacyId: string,
+  documentId: number,
+  input: UpdatePharmacyLegalDocumentInput,
+): Promise<PharmacyLegalDocument> {
+  const formData = new FormData();
+  if (input.title !== undefined) formData.append("title", input.title);
+  if (input.document_number !== undefined)
+    formData.append("document_number", input.document_number);
+  if (input.file) formData.append("file", input.file);
+  if (input.issued_at !== undefined) formData.append("issued_at", input.issued_at);
+  if (input.expires_at !== undefined) formData.append("expires_at", input.expires_at);
+  if (input.issuing_authority !== undefined)
+    formData.append("issuing_authority", input.issuing_authority);
+  if (input.is_active !== undefined) formData.append("is_active", String(input.is_active));
+
+  const accessToken = getAccessToken();
+  if (!accessToken) {
+    throw new ApiAuthError();
+  }
+
+  const response = await authenticatedFetch(
+    apiBaseUrl.replace(/\/$/, "") + "/api/pharmacies/" + pharmacyId + "/legal-documents/" + documentId + "/",
+    {
+      method: "PATCH",
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+        Authorization: "Bearer " + accessToken,
+      },
+      body: formData,
+    },
+  );
+
+  const responseText = await response.text();
+  const data = parseJsonResponse(responseText);
+
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(data, "Impossible de mettre à jour ce document juridique."));
+  }
+
+  return normalizePharmacyLegalDocument((data || {}) as UnknownRecord);
+}
+
+export async function deletePharmacyLegalDocument(pharmacyId: string, documentId: number) {
+  const accessToken = getAccessToken();
+  if (!accessToken) {
+    throw new ApiAuthError();
+  }
+
+  const response = await authenticatedFetch(
+    apiBaseUrl.replace(/\/$/, "") + "/api/pharmacies/" + pharmacyId + "/legal-documents/" + documentId + "/",
+    {
+      method: "DELETE",
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+        Authorization: "Bearer " + accessToken,
+      },
+    },
+  );
+
+  if (!response.ok) {
+    const responseText = await response.text();
+    const data = parseJsonResponse(responseText);
+    throw new Error(getApiErrorMessage(data, "Impossible de supprimer ce document juridique."));
+  }
+}
+
+export async function getPharmacyLegalDocumentDownloadUrl(
+  pharmacyId: string,
+  documentId: number,
+): Promise<{ url: string }> {
+  const accessToken = getAccessToken();
+  if (!accessToken) {
+    throw new ApiAuthError();
+  }
+
+  const response = await authenticatedFetch(
+    apiBaseUrl.replace(/\/$/, "") + "/api/pharmacies/" + pharmacyId + "/legal-documents/" + documentId + "/download/",
+    {
+      method: "GET",
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+        Authorization: "Bearer " + accessToken,
+      },
+    },
+  );
+
+  if (!response.ok) {
+    const responseText = await response.text();
+    const data = parseJsonResponse(responseText);
+    throw new Error(getApiErrorMessage(data, "Impossible d'obtenir l'URL de téléchargement."));
+  }
+
+  const responseText = await response.text();
+  const data = parseJsonResponse(responseText);
+
+  return { url: String((data as { url?: string }).url || "") };
 }
 
 function getApiErrorMessages(data: unknown, fallback: string, path = ""): string[] {

@@ -37,12 +37,15 @@ const permissionGroups = [
       ["pharmacy_view", "Voir la pharmacie"],
       ["pharmacy_update", "Modifier la pharmacie"],
       ["pharmacy_delete", "Archiver la pharmacie"],
+      ["pharmacy_legal_document_view", "Voir les documents juridiques"],
+      ["pharmacy_legal_document_manage", "Gérer les documents juridiques"],
     ],
   },
   {
     title: "Membres",
     permissions: [
       ["member_view", "Voir les membres"],
+      ["member_invite", "Inviter des membres"],
       ["member_update", "Modifier les membres"],
       ["member_suspend", "Suspendre les membres"],
       ["member_delete", "Supprimer les membres"],
@@ -55,6 +58,22 @@ const permissionGroups = [
       ["join_request_view", "Voir les demandes"],
       ["join_request_accept", "Accepter les demandes"],
       ["join_request_reject", "Refuser les demandes"],
+    ],
+  },
+  {
+    title: "Abonnement",
+    permissions: [
+      ["subscription_pay", "Payer l'abonnement"],
+    ],
+  },
+  {
+    title: "Rapports",
+    permissions: [
+      ["report_view", "Voir les rapports"],
+      ["report_export", "Exporter les rapports"],
+      ["report_financial_view", "Voir les rapports financiers"],
+      ["report_staff_view", "Voir les rapports du personnel"],
+      ["report_ai_view", "Voir les rapports d'activité IA"],
     ],
   },
   {

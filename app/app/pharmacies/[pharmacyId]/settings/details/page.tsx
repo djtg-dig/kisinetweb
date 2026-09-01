@@ -6,13 +6,21 @@ import {
   getCountries,
   getPharmacyDetail,
   getPharmacyPermissions,
+  getPharmacyLegalDocuments,
+  createPharmacyLegalDocument,
+  updatePharmacyLegalDocument,
+  deletePharmacyLegalDocument,
+  getPharmacyLegalDocumentDownloadUrl,
   updatePharmacy,
   type CityOrProvinceOption,
   type CountryOption,
   type PharmacyDetail,
   type PharmacyPermissions,
+  type PharmacyLegalDocument,
+  type PharmacyLegalDocumentType,
   type UpdatePharmacyAddressInput,
   type UpdatePharmacyInput,
+  type CreatePharmacyLegalDocumentInput,
 } from "@/lib/api";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
 
@@ -35,8 +43,31 @@ type AddressFormState = {
 
 type PageState = "loading" | "error" | "ready";
 
-// Section en cours d'edition : coordonnees, adresse ou aucune.
-type EditingSection = "coordinates" | "address" | null;
+// Section en cours d'edition : coordonnees, adresse, documents ou aucune.
+type EditingSection = "coordinates" | "address" | "legal-document" | null;
+
+// Type de formulaire pour un document juridique.
+type LegalDocumentFormState = {
+  documentId?: number;
+  document_type?: PharmacyLegalDocumentType;
+  title?: string;
+  document_number?: string;
+  file?: File | null;
+  issued_at?: string;
+  expires_at?: string;
+  issuing_authority?: string;
+};
+
+const documentTypeLabels: Record<PharmacyLegalDocumentType, string> = {
+  RCCM: "Registre de Commerce et du Crédit Mobilier",
+  ID_NAT: "Identification Nationale",
+  NIF: "Numéro d'Identification Fiscale",
+  PHARMACY_LICENSE: "Autorisation d'ouverture de pharmacie",
+  OPERATING_LICENSE: "Licence d'exploitation",
+  PHARMACIST_LICENSE: "Autorisation /'agrément du pharmacien",
+  TAX_DOCUMENT: "Document fiscal",
+  OTHER: "Autre document",
+};
 
 export default function SettingsDetailsPage({ params }: SettingsDetailsPageProps) {
   const [pharmacyId, setPharmacyId] = useState("");
@@ -52,6 +83,13 @@ export default function SettingsDetailsPage({ params }: SettingsDetailsPageProps
   // Listes geographiques pour les menus deroulants et l'affichage des noms.
   const [countries, setCountries] = useState<CountryOption[]>([]);
   const [cities, setCities] = useState<CityOrProvinceOption[]>([]);
+
+  // Documents juridiques.
+  const [legalDocuments, setLegalDocuments] = useState<PharmacyLegalDocument[]>([]);
+  const [legalDocumentsState, setLegalDocumentsState] = useState<"loading" | "ready" | "error">(
+    "loading",
+  );
+  const [legalDocumentForm, setLegalDocumentForm] = useState<LegalDocumentFormState>({});
 
   useEffect(() => {
     if (!successMessage) {
@@ -109,6 +147,16 @@ export default function SettingsDetailsPage({ params }: SettingsDetailsPageProps
         } catch {
           // Sans permission active, on considère simplement l'édition désactivée.
           setPermissions({});
+        }
+
+        // Charge les documents juridiques si l'utilisateur a la permission de les voir.
+        try {
+          const docs = await getPharmacyLegalDocuments(pharmacyId);
+          setLegalDocuments(docs);
+          setLegalDocumentsState("ready");
+        } catch {
+          setLegalDocuments([]);
+          setLegalDocumentsState("error");
         }
       } catch (error) {
         // Le message vient directement de l'API (ex : permission refusée).
@@ -227,10 +275,43 @@ export default function SettingsDetailsPage({ params }: SettingsDetailsPageProps
     });
   }
 
+  function startEditingLegalDocument(document?: PharmacyLegalDocument) {
+    setSuccessMessage("");
+    setErrorMessage("");
+    setEditingSection("legal-document");
+    setLegalDocumentForm({
+      documentId: document?.id,
+      document_type: document?.document_type,
+      title: document?.title ?? "",
+      document_number: document?.document_number ?? "",
+      file: null,
+      issued_at: document?.issued_at ?? "",
+      expires_at: document?.expires_at ?? "",
+      issuing_authority: document?.issuing_authority ?? "",
+    });
+  }
+
+  function startCreatingLegalDocument() {
+    setSuccessMessage("");
+    setErrorMessage("");
+    setEditingSection("legal-document");
+    setLegalDocumentForm({
+      documentId: undefined,
+      document_type: undefined,
+      title: "",
+      document_number: "",
+      file: null,
+      issued_at: "",
+      expires_at: "",
+      issuing_authority: "",
+    });
+  }
+
   function cancelEditing() {
     setEditingSection(null);
     setCoordinatesForm({});
     setAddressForm({});
+    setLegalDocumentForm({});
     setErrorMessage("");
   }
 
@@ -246,6 +327,20 @@ export default function SettingsDetailsPage({ params }: SettingsDetailsPageProps
     setErrorMessage("");
     setSuccessMessage("");
     setAddressForm((current) => ({ ...current, [name]: value }));
+  }
+
+  function handleLegalDocumentField(event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
+    const { name, value } = event.target;
+    setErrorMessage("");
+    setSuccessMessage("");
+    setLegalDocumentForm((current) => ({ ...current, [name]: value }));
+  }
+
+  function handleLegalDocumentFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    setErrorMessage("");
+    setSuccessMessage("");
+    setLegalDocumentForm((current) => ({ ...current, file }));
   }
 
   async function loadAddressCities(countryId: string) {
@@ -370,7 +465,114 @@ export default function SettingsDetailsPage({ params }: SettingsDetailsPageProps
     }
   }
 
+  async function saveLegalDocument() {
+    if (!pharmacyId) {
+      return;
+    }
+
+    if (!legalDocumentForm.document_type) {
+      setErrorMessage("Le type de document est obligatoire.");
+      return;
+    }
+
+    setIsSaving(true);
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    try {
+      if (legalDocumentForm.documentId) {
+        // Mise à jour d'un document existant.
+        const updated = await updatePharmacyLegalDocument(
+          pharmacyId,
+          legalDocumentForm.documentId,
+          {
+            title: legalDocumentForm.title,
+            document_number: legalDocumentForm.document_number,
+            file: legalDocumentForm.file ?? undefined,
+            issued_at: legalDocumentForm.issued_at || undefined,
+            expires_at: legalDocumentForm.expires_at || undefined,
+            issuing_authority: legalDocumentForm.issuing_authority,
+          },
+        );
+        setLegalDocuments((current) =>
+          current.map((doc) => (doc.id === updated.id ? updated : doc)),
+        );
+        setSuccessMessage("Document mis à jour.");
+      } else {
+        // Création d'un nouveau document.
+        if (!legalDocumentForm.file) {
+          setErrorMessage("Le fichier est obligatoire pour un nouveau document.");
+          setIsSaving(false);
+          return;
+        }
+        const created = await createPharmacyLegalDocument(pharmacyId, {
+          document_type: legalDocumentForm.document_type,
+          title: legalDocumentForm.title,
+          document_number: legalDocumentForm.document_number,
+          file: legalDocumentForm.file,
+          issued_at: legalDocumentForm.issued_at || undefined,
+          expires_at: legalDocumentForm.expires_at || undefined,
+          issuing_authority: legalDocumentForm.issuing_authority,
+        });
+        setLegalDocuments((current) => [created, ...current]);
+        setSuccessMessage("Document ajouté.");
+      }
+      setEditingSection(null);
+      setLegalDocumentForm({});
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Impossible d'enregistrer le document.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleDeleteLegalDocument(documentId: number) {
+    if (!pharmacyId) {
+      return;
+    }
+
+    if (!window.confirm("Voulez-vous vraiment supprimer ce document ?")) {
+      return;
+    }
+
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    try {
+      await deletePharmacyLegalDocument(pharmacyId, documentId);
+      setLegalDocuments((current) => current.filter((doc) => doc.id !== documentId));
+      setSuccessMessage("Document supprimé.");
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Impossible de supprimer ce document.",
+      );
+    }
+  }
+
+  async function handleDownloadLegalDocument(documentId: number) {
+    if (!pharmacyId) {
+      return;
+    }
+
+    setErrorMessage("");
+
+    try {
+      const { url } = await getPharmacyLegalDocumentDownloadUrl(pharmacyId, documentId);
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Impossible de télécharger ce document.",
+      );
+    }
+  }
+
   const canEdit = Boolean(permissions.pharmacy_update) && !pharmacy?.isArchivedAt;
+  const canManageLegalDocuments =
+    Boolean(permissions.pharmacy_legal_document_manage) && !pharmacy?.isArchivedAt;
 
   // Noms lisibles pour l'affichage en lecture seule.
   const countryName =
@@ -587,6 +789,180 @@ export default function SettingsDetailsPage({ params }: SettingsDetailsPageProps
               )}
             </article>
           )}
+
+          {/* Section des documents juridiques */}
+          <article className="rounded-lg border border-app-border bg-app-card p-5">
+            <SectionHeader
+              title="Informations juridiques"
+              canEdit={canManageLegalDocuments}
+              isEditing={editingSection === "legal-document"}
+              onEdit={startCreatingLegalDocument}
+            />
+
+            {legalDocumentsState === "loading" && (
+              <div className="mt-4">
+                <LoadingBubble label="Chargement des documents" />
+              </div>
+            )}
+
+            {legalDocumentsState === "error" && (
+              <p className="mt-4 text-sm text-app-muted">
+                Impossible de charger les documents juridiques.
+              </p>
+            )}
+
+            {legalDocumentsState === "ready" && (
+              <>
+                {editingSection === "legal-document" ? (
+                  <>
+                    <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                      <SelectField
+                        label="Type de document"
+                        name="document_type"
+                        value={legalDocumentForm.document_type ?? ""}
+                        options={Object.entries(documentTypeLabels).map(([value, label]) => ({
+                          value,
+                          label,
+                        }))}
+                        onChange={handleLegalDocumentField}
+                        disabled={Boolean(legalDocumentForm.documentId)}
+                      />
+                      <TextField
+                        label="Titre"
+                        name="title"
+                        value={legalDocumentForm.title ?? ""}
+                        onChange={handleLegalDocumentField}
+                      />
+                      <TextField
+                        label="Numéro du document"
+                        name="document_number"
+                        value={legalDocumentForm.document_number ?? ""}
+                        onChange={handleLegalDocumentField}
+                      />
+                      <TextField
+                        label="Autorité émettrice"
+                        name="issuing_authority"
+                        value={legalDocumentForm.issuing_authority ?? ""}
+                        onChange={handleLegalDocumentField}
+                      />
+                      <TextField
+                        label="Date d'émission"
+                        name="issued_at"
+                        type="date"
+                        value={legalDocumentForm.issued_at ?? ""}
+                        onChange={handleLegalDocumentField}
+                      />
+                      <TextField
+                        label="Date d'expiration"
+                        name="expires_at"
+                        type="date"
+                        value={legalDocumentForm.expires_at ?? ""}
+                        onChange={handleLegalDocumentField}
+                      />
+                    </div>
+
+                    <div className="mt-4">
+                      <label className="block">
+                        <span className="text-xs font-medium uppercase tracking-wide text-app-muted">
+                          Fichier {legalDocumentForm.documentId ? "(laisser vide pour conserver l'existant)" : ""}
+                        </span>
+                        <input
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          onChange={handleLegalDocumentFileChange}
+                          className="mt-1 min-h-10 w-full rounded-md border border-app-border bg-app-background px-3 text-sm font-medium text-app-text outline-none transition focus:border-primary-600 focus:ring-4 focus:ring-primary-100"
+                        />
+                        <p className="mt-1 text-xs text-app-muted">
+                          Formats acceptés : PDF, JPG, JPEG, PNG. Taille maximale : 10 Mo.
+                        </p>
+                      </label>
+                    </div>
+
+                    <EditActions
+                      isSaving={isSaving}
+                      onCancel={cancelEditing}
+                      onSave={saveLegalDocument}
+                      saveLabel={legalDocumentForm.documentId ? "Enregistrer" : "Ajouter"}
+                    />
+                  </>
+                ) : (
+                  <>
+                    {legalDocuments.length === 0 ? (
+                      <p className="mt-4 text-sm text-app-muted">
+                        Aucun document juridique enregistré.
+                      </p>
+                    ) : (
+                      <div className="mt-4 space-y-3">
+                        {legalDocuments.map((doc) => (
+                          <div
+                            key={doc.id}
+                            className="flex items-start justify-between rounded-md border border-app-border bg-app-background p-3"
+                          >
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-semibold text-app-text">
+                                  {documentTypeLabels[doc.document_type] || doc.document_type}
+                                </p>
+                                <StatusBadge status={doc.verification_status} />
+                              </div>
+                              {doc.title && (
+                                <p className="mt-1 text-xs text-app-muted">{doc.title}</p>
+                              )}
+                              {doc.document_number && (
+                                <p className="mt-1 text-xs text-app-muted">
+                                  N° {doc.document_number}
+                                </p>
+                              )}
+                              {doc.issuing_authority && (
+                                <p className="mt-1 text-xs text-app-muted">
+                                  Émis par : {doc.issuing_authority}
+                                </p>
+                              )}
+                              {doc.issued_at && (
+                                <p className="mt-1 text-xs text-app-muted">
+                                  Émis le : {formatDate(doc.issued_at)}
+                                  {doc.expires_at && (
+                                    <> — Expire le : {formatDate(doc.expires_at)}</>
+                                  )}
+                                </p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadLegalDocument(doc.id)}
+                                className="rounded-md border border-app-border bg-app-card px-3 py-1.5 text-xs font-semibold text-app-text transition hover:bg-primary-50"
+                              >
+                                Télécharger
+                              </button>
+                              {canManageLegalDocuments && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => startEditingLegalDocument(doc)}
+                                    className="rounded-md border border-app-border bg-app-card px-3 py-1.5 text-xs font-semibold text-app-text transition hover:bg-primary-50"
+                                  >
+                                    Modifier
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteLegalDocument(doc.id)}
+                                    className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-100"
+                                  >
+                                    Supprimer
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </>
+            )}
+          </article>
         </section>
       )}
     </main>
@@ -819,4 +1195,45 @@ function ReadOnlyField({
       {note && <p className="mt-1 text-xs text-app-muted">{note}</p>}
     </div>
   );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const styles: Record<string, string> = {
+    PENDING: "bg-yellow-50 text-yellow-700 ring-yellow-100",
+    VERIFIED: "bg-success-50 text-success-700 ring-success-100",
+    REJECTED: "bg-red-50 text-red-700 ring-red-100",
+    EXPIRED: "bg-red-50 text-red-700 ring-red-100",
+  };
+
+  const labels: Record<string, string> = {
+    PENDING: "En attente",
+    VERIFIED: "Vérifié",
+    REJECTED: "Rejeté",
+    EXPIRED: "Expiré",
+  };
+
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${
+        styles[status] || "bg-app-surface text-app-muted"
+      }`}
+    >
+      {labels[status] || status}
+    </span>
+  );
+}
+
+function formatDate(value?: string | null) {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("fr-FR", {
+    dateStyle: "medium",
+  }).format(date);
 }
