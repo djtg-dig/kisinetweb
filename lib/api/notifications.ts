@@ -1,7 +1,5 @@
-import { apiFetch } from "@/lib/api/request";
-import { getAccessToken } from "@/lib/auth";
 import { apiBaseUrl } from "@/lib/carri-account";
-import { getApiErrorMessage, parseJsonResponse } from "@/lib/api";
+import { authenticatedFetch, getApiErrorMessage, parseJsonResponse } from "@/lib/api";
 
 export type NotificationSeverity = "INFO" | "SUCCESS" | "WARNING" | "CRITICAL";
 
@@ -65,6 +63,55 @@ export type NotificationFilters = {
   page_size?: string;
 };
 
+export const NOTIFICATION_BADGE_REFRESH_EVENT = "kisinet:notifications_refresh";
+
+type NotificationCategoryGroupDefinition = {
+  key: string;
+  label: string;
+  description: string;
+  categories: NotificationCategory[];
+};
+
+// Groupes alignes avec le selector backend; ils servent uniquement quand le
+// backend ne fournit pas encore de resume filtre par pharmacie.
+export const NOTIFICATION_CATEGORY_GROUPS: NotificationCategoryGroupDefinition[] = [
+  {
+    key: "payments",
+    label: "Paiements",
+    description: "Transactions",
+    categories: [
+      "SUBSCRIPTION_PAYMENT",
+      "PAYMENT_SUCCESS",
+      "PAYMENT_FAILED",
+      "AI_CREDIT_PURCHASE",
+    ],
+  },
+  {
+    key: "commissions",
+    label: "Commissions",
+    description: "Revenus",
+    categories: [
+      "COMMISSION_RECEIVED",
+      "WITHDRAWAL_REQUESTED",
+      "WITHDRAWAL_APPROVED",
+      "WITHDRAWAL_REJECTED",
+      "WITHDRAWAL_PAID",
+    ],
+  },
+  {
+    key: "products",
+    label: "Produits",
+    description: "Stock & expiration",
+    categories: ["PRODUCT_EXPIRATION", "STOCK_LOW"],
+  },
+  {
+    key: "ai_credits",
+    label: "Credits IA",
+    description: "Utilisation IA",
+    categories: ["AI_CREDIT_LOW"],
+  },
+];
+
 const CATEGORY_LABELS: Record<string, string> = {
   AI_CREDIT_LOW: "Crédits IA",
   AI_CREDIT_PURCHASE: "Achat de crédits IA",
@@ -86,6 +133,22 @@ const CATEGORY_LABELS: Record<string, string> = {
   SYSTEM: "Système",
 };
 
+const CATEGORY_GROUP_LABELS = NOTIFICATION_CATEGORY_GROUPS.reduce<Record<string, string>>(
+  (labels, group) => {
+    labels[group.key] = group.label;
+    return labels;
+  },
+  {},
+);
+
+const CATEGORY_GROUP_DESCRIPTIONS = NOTIFICATION_CATEGORY_GROUPS.reduce<Record<string, string>>(
+  (descriptions, group) => {
+    descriptions[group.key] = group.description;
+    return descriptions;
+  },
+  {},
+);
+
 const SEVERITY_COLORS: Record<NotificationSeverity, { bg: string; text: string; ring: string }> = {
   INFO: { bg: "bg-blue-50", text: "text-blue-700", ring: "ring-blue-100" },
   SUCCESS: { bg: "bg-green-50", text: "text-green-700", ring: "ring-green-100" },
@@ -94,11 +157,35 @@ const SEVERITY_COLORS: Record<NotificationSeverity, { bg: string; text: string; 
 };
 
 export function getCategoryLabel(category: string): string {
-  return CATEGORY_LABELS[category] || category;
+  return CATEGORY_GROUP_LABELS[category] || CATEGORY_LABELS[category] || formatUnknownCategory(category);
+}
+
+export function getCategoryDescription(category: string): string {
+  return CATEGORY_GROUP_DESCRIPTIONS[category] || "Notifications";
 }
 
 export function getSeverityColors(severity: NotificationSeverity) {
   return SEVERITY_COLORS[severity] || SEVERITY_COLORS.INFO;
+}
+
+export function getCategoriesForGroup(groupKey: string): NotificationCategory[] {
+  return NOTIFICATION_CATEGORY_GROUPS.find((group) => group.key === groupKey)?.categories || [];
+}
+
+export function notifyNotificationBadgeRefresh(): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.dispatchEvent(new CustomEvent(NOTIFICATION_BADGE_REFRESH_EVENT));
+}
+
+function formatUnknownCategory(category: string): string {
+  return category
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
 }
 
 function normalizeNotification(raw: Record<string, unknown>): NotificationItem {
@@ -122,11 +209,6 @@ function normalizeNotification(raw: Record<string, unknown>): NotificationItem {
 async function fetchNotifications(
   filters: NotificationFilters = {},
 ): Promise<PaginatedNotifications> {
-  const accessToken = getAccessToken();
-  if (!accessToken) {
-    throw new Error("Veuillez vous reconnecter.");
-  }
-
   const params = new URLSearchParams();
   if (filters.category) params.set("category", filters.category);
   if (filters.pharmacy) params.set("pharmacy", filters.pharmacy);
@@ -137,10 +219,9 @@ async function fetchNotifications(
   const queryString = params.toString();
   const path = "/api/notifications/" + (queryString ? "?" + queryString : "");
 
-  const response = await apiFetch(apiBaseUrl.replace(/\/$/, "") + path, {
+  const response = await authenticatedFetch(apiBaseUrl.replace(/\/$/, "") + path, {
     cache: "no-store",
     headers: {
-      Authorization: "Bearer " + accessToken,
       Accept: "application/json",
     },
   });
@@ -173,16 +254,10 @@ export async function getNotifications(
 }
 
 export async function getUnreadNotificationCount(): Promise<number> {
-  const accessToken = getAccessToken();
-  if (!accessToken) {
-    return 0;
-  }
-
   try {
-    const response = await apiFetch(apiBaseUrl.replace(/\/$/, "") + "/api/notifications/unread-count/", {
+    const response = await authenticatedFetch(apiBaseUrl.replace(/\/$/, "") + "/api/notifications/unread-count/", {
       cache: "no-store",
       headers: {
-        Authorization: "Bearer " + accessToken,
         Accept: "application/json",
       },
     });
@@ -200,19 +275,26 @@ export async function getUnreadNotificationCount(): Promise<number> {
   }
 }
 
-export async function getUnreadNotificationSummary(): Promise<NotificationUnreadSummary> {
-  const accessToken = getAccessToken();
-  if (!accessToken) {
-    return { total: 0, groups: {} };
+export async function getNotificationCount(filters: NotificationFilters = {}): Promise<number> {
+  const result = await getNotifications({ ...filters, page_size: "1" });
+  return result.count;
+}
+
+export async function getUnreadNotificationCountForPharmacy(pharmacy: string): Promise<number> {
+  if (!pharmacy) {
+    return 0;
   }
 
+  return getNotificationCount({ pharmacy, is_read: false });
+}
+
+export async function getUnreadNotificationSummary(): Promise<NotificationUnreadSummary> {
   try {
-    const response = await apiFetch(
+    const response = await authenticatedFetch(
       apiBaseUrl.replace(/\/$/, "") + "/api/notifications/unread-summary/",
       {
         cache: "no-store",
         headers: {
-          Authorization: "Bearer " + accessToken,
           Accept: "application/json",
         },
       },
@@ -237,18 +319,12 @@ export async function getUnreadNotificationSummary(): Promise<NotificationUnread
 }
 
 export async function markNotificationAsRead(reference: string): Promise<void> {
-  const accessToken = getAccessToken();
-  if (!accessToken) {
-    throw new Error("Veuillez vous reconnecter.");
-  }
-
-  const response = await apiFetch(
+  const response = await authenticatedFetch(
     apiBaseUrl.replace(/\/$/, "") + "/api/notifications/" + reference + "/read/",
     {
       method: "POST",
       cache: "no-store",
       headers: {
-        Authorization: "Bearer " + accessToken,
         Accept: "application/json",
       },
     },
@@ -259,28 +335,24 @@ export async function markNotificationAsRead(reference: string): Promise<void> {
     const data = parseJsonResponse(responseText);
     throw new Error(getApiErrorMessage(data, "Impossible de marquer la notification comme lue."));
   }
+
+  notifyNotificationBadgeRefresh();
 }
 
 export async function markAllNotificationsAsRead(options?: {
   category?: string;
   pharmacy?: string;
 }): Promise<{ marked_count: number }> {
-  const accessToken = getAccessToken();
-  if (!accessToken) {
-    throw new Error("Veuillez vous reconnecter.");
-  }
-
   const body: Record<string, string> = {};
   if (options?.category) body.category = options.category;
   if (options?.pharmacy) body.pharmacy = options.pharmacy;
 
-  const response = await apiFetch(
+  const response = await authenticatedFetch(
     apiBaseUrl.replace(/\/$/, "") + "/api/notifications/read-all/",
     {
       method: "POST",
       cache: "no-store",
       headers: {
-        Authorization: "Bearer " + accessToken,
         Accept: "application/json",
         "Content-Type": "application/json",
       },
@@ -297,6 +369,8 @@ export async function markAllNotificationsAsRead(options?: {
   const responseText = await response.text();
   const data = parseJsonResponse(responseText);
   const record = data as Record<string, unknown>;
+
+  notifyNotificationBadgeRefresh();
 
   return { marked_count: Number(record.marked_count ?? 0) };
 }

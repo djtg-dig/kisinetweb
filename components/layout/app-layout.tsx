@@ -10,7 +10,10 @@ import {
   type ReportFeatureKey,
   type ReportFeatures,
 } from "@/lib/api/reports";
-import { getUnreadNotificationCount } from "@/lib/api/notifications";
+import {
+  NOTIFICATION_BADGE_REFRESH_EVENT,
+  getUnreadNotificationCount,
+} from "@/lib/api/notifications";
 import {
   clearActivePharmacyId,
   getAccessToken,
@@ -119,10 +122,14 @@ export function AppLayout({ children, pharmacyId, permissions: initialPermission
     }
 
     loadUnreadCount();
+    // Les pages notifications declenchent cet evenement apres lecture afin que
+    // le badge de la navbar reste aligne avec le backend sans state global.
+    window.addEventListener(NOTIFICATION_BADGE_REFRESH_EVENT, loadUnreadCount);
     const interval = setInterval(loadUnreadCount, 60000);
 
     return () => {
       isMounted = false;
+      window.removeEventListener(NOTIFICATION_BADGE_REFRESH_EVENT, loadUnreadCount);
       clearInterval(interval);
     };
   }, [pharmacyId]);
@@ -460,19 +467,27 @@ function NavLink({
   badgeCount?: number;
   children: React.ReactNode;
 }) {
+  const isNotificationLink = icon === "bell";
+  const notificationCount = badgeCount && badgeCount > 99 ? "99+" : badgeCount;
+  const accessibleLabel =
+    isNotificationLink && badgeCount && badgeCount > 0
+      ? "Notifications (" + notificationCount + " non lues)"
+      : children;
+
   if (!enabled) {
     return (
       <span
         aria-disabled="true"
+        aria-label={typeof accessibleLabel === "string" ? accessibleLabel : undefined}
         className="inline-flex shrink-0 cursor-not-allowed items-center gap-2 rounded-md border border-slate-200 bg-slate-100 px-3 py-2 text-slate-400"
         role="link"
         title={disabledNavTitle}
       >
-        {icon === "bell" && <BellIcon className="h-4 w-4" />}
-        {children}
-        {icon === "bell" && badgeCount !== undefined && badgeCount > 0 && (
-          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary-600 px-1.5 text-xs font-semibold text-white">
-            {badgeCount > 99 ? "99+" : badgeCount}
+        {isNotificationLink && <BellIcon className="h-4 w-4" />}
+        <span className={isNotificationLink ? "sr-only" : ""}>{children}</span>
+        {isNotificationLink && badgeCount !== undefined && badgeCount > 0 && (
+          <span aria-hidden="true" className="text-xs font-semibold">
+            ({notificationCount})
           </span>
         )}
       </span>
@@ -482,15 +497,16 @@ function NavLink({
   return (
     <a
       href={href}
+      aria-label={typeof accessibleLabel === "string" ? accessibleLabel : undefined}
       className={`inline-flex shrink-0 items-center gap-2 rounded-md px-3 py-2 transition hover:bg-primary-50 hover:text-primary-700 ${
         isActive ? "bg-primary-50 text-primary-700" : ""
       }`}
     >
-      {icon === "bell" && <BellIcon className="h-4 w-4" />}
-      {children}
-      {icon === "bell" && badgeCount !== undefined && badgeCount > 0 && (
-        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary-600 px-1.5 text-xs font-semibold text-white">
-          {badgeCount > 99 ? "99+" : badgeCount}
+      {isNotificationLink && <BellIcon className="h-4 w-4" />}
+      <span className={isNotificationLink ? "sr-only" : ""}>{children}</span>
+      {isNotificationLink && badgeCount !== undefined && badgeCount > 0 && (
+        <span aria-hidden="true" className="text-xs font-semibold">
+          ({notificationCount})
         </span>
       )}
     </a>

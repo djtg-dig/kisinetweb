@@ -146,6 +146,7 @@ export function NotificationItemCard({ notification, onMarkAsRead }: Notificatio
   const relativeTime = formatRelativeTime(notification.created_at);
   const fullDate = formatFullDate(notification.created_at);
   const isUnread = !notification.is_read;
+  const actionLabel = getActionLabel(notification);
 
   async function handleClick() {
     if (isUnread) {
@@ -234,7 +235,7 @@ export function NotificationItemCard({ notification, onMarkAsRead }: Notificatio
 
             {notification.action_url && (
               <span className="ml-auto text-xs font-medium text-primary-600 opacity-0 transition-opacity group-hover:opacity-100 dark:text-primary-400">
-                Voir les détails
+                {actionLabel}
               </span>
             )}
           </div>
@@ -252,4 +253,20 @@ export function NotificationItemCard({ notification, onMarkAsRead }: Notificatio
       )}
     </article>
   );
+}
+
+function getActionLabel(notification: NotificationItemType) {
+  if (notification.category.includes("PRODUCT") || notification.category.includes("STOCK")) {
+    return "Voir le produit";
+  }
+
+  if (notification.category.includes("PAYMENT")) {
+    return "Voir le paiement";
+  }
+
+  if (notification.category.includes("SUBSCRIPTION") || notification.category.includes("AI_CREDIT")) {
+    return "Voir l'abonnement";
+  }
+
+  return "Voir les détails";
 }

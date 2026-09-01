@@ -1547,6 +1547,10 @@ côté agrégateur sur `POST /api/webhook/`.
 
 Le backend fournit un système de notifications centralisé pour Kisinet. Le frontend consume les endpoints:
 
+Toutes les requêtes notifications passent par `authenticatedFetch` afin d'ajouter
+le header `Authorization: Bearer <access_token>` et de rafraîchir automatiquement
+le JWT avant de rejouer une requête expirée.
+
 | Usage frontend | Méthode et URL | Auth |
 | --- | --- | --- |
 | Liste notifications | `GET /api/notifications/` | Oui |
@@ -1581,6 +1585,12 @@ Le backend fournit un système de notifications centralisé pour Kisinet. Le fro
   - `read_at` : date de lecture (ou `null`) ;
   - `created_at` : date de création.
 - **Comportement frontend** : la page notifications affiche les notifications avec filtrage par catégorie, statut de lecture et pharmacie. Chaque notification non lue affiche un indicateur visuel.
+- **Page pharmacie** : `/app/pharmacies/[pharmacyId]/notifications` transmet toujours
+  `pharmacy=<pharmacyId>` pour ne pas mélanger les notifications globales personnelles
+  avec les événements de la pharmacie courante.
+- **Compteurs de page** : les totaux `Toutes`, `Non lues` et `Lues` sont lus via ce
+  même endpoint avec `page_size=1`, afin d'utiliser le champ paginé `count` sans
+  charger l'historique complet.
 
 ### GET /api/notifications/unread-count/
 
@@ -1590,14 +1600,22 @@ Le backend fournit un système de notifications centralisé pour Kisinet. Le fro
 - **Service frontend** : `getUnreadNotificationCount()` dans `lib/api/notifications`
 - **Authentification** : requise.
 - **Réponse attendue (200)** : `{ "count": number }`
-- **Comportement frontend** : le badge de la navbar affiche ce compteur. Si `count > 99`, afficher "99+".
+- **Comportement frontend** : le badge de la navbar pharmacie affiche ce compteur
+  global utilisateur. Si `count = 0`, aucun badge n'est rendu. Si `count > 99`,
+  afficher `99+`.
+- **Synchronisation** : après `markNotificationAsRead` ou `markAllNotificationsAsRead`,
+  le service notifications déclenche un événement navigateur local
+  `kisinet:notifications_refresh`; `AppLayout` recharge alors ce compteur.
+- **Limite backend actuelle** : cet endpoint ne prend pas de paramètre `pharmacy`.
+  Le badge navbar reste donc global utilisateur tant que le backend ne fournit pas
+  un compteur non lu filtrable par pharmacie.
 
 ### GET /api/notifications/unread-summary/
 
 - **Objectif** : récupérer le résumé des notifications non lues groupées par catégorie.
 - **Méthode HTTP** : `GET`
 - **URL** : `/api/notifications/unread-summary/`
-- **Page frontend** : `/app/pharmacies/[pharmacyId]/notifications`
+- **Page frontend** : future page globale `/app/notifications` ou usage global.
 - **Service frontend** : `getUnreadNotificationSummary()` dans `lib/api/notifications`
 - **Authentification** : requise.
 - **Réponse attendue (200)** :
@@ -1612,7 +1630,14 @@ Le backend fournit un système de notifications centralisé pour Kisinet. Le fro
     }
   }
   ```
-- **Comportement frontend** : les cartes résumé en haut de la page notifications affichent ces décomptes par catégorie.
+- **Comportement frontend** : le service reste disponible pour une page globale
+  utilisateur. La page pharmacie ne l'utilise pas pour ses cartes, car le backend
+  ne filtre pas encore ce résumé par `pharmacy`.
+- **Cartes page pharmacie** : les groupes `payments`, `commissions`, `products` et
+  `ai_credits` sont alignés sur les groupes backend connus, mais leurs compteurs
+  sont calculés par des appels paginés `GET /api/notifications/?pharmacy=...&category=...&is_read=false&page_size=1`.
+  Cette stratégie évite d'afficher des notifications globales dans une page
+  spécifique à une pharmacie.
 
 ### POST /api/notifications/{reference}/read/
 
@@ -1624,7 +1649,10 @@ Le backend fournit un système de notifications centralisé pour Kisinet. Le fro
 - **Authentification** : requise.
 - **Payload** : aucun corps requis.
 - **Réponse attendue (200)** : `{ "detail": "Notification marquée comme lue." }`
-- **Comportement frontend** : après succès, mettre à jour localement la notification, décrémenter le compteur et revalider les données.
+- **Comportement frontend** : après succès, mettre à jour localement la notification,
+  décrémenter les compteurs de la page, recharger les métadonnées et déclencher la
+  revalidation du badge navbar. Si la notification possède `action_url`, la
+  navigation Next.js est lancée après la tentative de lecture.
 
 ### POST /api/notifications/read-all/
 
@@ -1638,7 +1666,10 @@ Le backend fournit un système de notifications centralisé pour Kisinet. Le fro
   - `category` : ne marquer comme lues que les notifications de cette catégorie ;
   - `pharmacy` : ne marquer comme lues que les notifications de cette pharmacie.
 - **Réponse attendue (200)** : `{ "detail": "X notification(s) marquée(s) comme lue(s).", "marked_count": X }`
-- **Comportement frontend** : après succès, réinitialiser le compteur à 0 et marquer toutes les notifications visuellement comme lues.
+- **Comportement frontend** : sur la page pharmacie, envoyer `pharmacy=<pharmacyId>`
+  dans le payload pour limiter l'action aux notifications de la pharmacie courante.
+  Après succès, les notifications affichées sont marquées comme lues, les compteurs
+  et cartes de la page sont rechargés, puis le badge navbar est revalidé.
 
 ### Catégories de notifications
 

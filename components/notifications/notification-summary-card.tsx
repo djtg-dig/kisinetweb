@@ -1,6 +1,6 @@
 "use client";
 
-import { getCategoryLabel } from "@/lib/api/notifications";
+import { getCategoryDescription, getCategoryLabel } from "@/lib/api/notifications";
 
 type NotificationSummaryCardProps = {
   category: string;
@@ -12,6 +12,7 @@ type NotificationSummaryCardProps = {
 
 function SummaryIcon({ category }: { category: string }) {
   const iconClass = "h-5 w-5";
+  const normalizedCategory = category.toLowerCase();
 
   if (category === "all" || category === "Toutes") {
     return (
@@ -30,7 +31,7 @@ function SummaryIcon({ category }: { category: string }) {
     );
   }
 
-  if (category.includes("AI_CREDIT")) {
+  if (category.includes("AI_CREDIT") || normalizedCategory.includes("ai_credits")) {
     return (
       <svg
         className={iconClass}
@@ -47,7 +48,12 @@ function SummaryIcon({ category }: { category: string }) {
     );
   }
 
-  if (category.includes("PRODUCT") || category.includes("STOCK") || category.includes("Produits")) {
+  if (
+    category.includes("PRODUCT") ||
+    category.includes("STOCK") ||
+    category.includes("Produits") ||
+    normalizedCategory.includes("products")
+  ) {
     return (
       <svg
         className={iconClass}
@@ -65,7 +71,12 @@ function SummaryIcon({ category }: { category: string }) {
     );
   }
 
-  if (category.includes("PAYMENT") || category.includes("PAIEMENT") || category.includes("Paiements")) {
+  if (
+    category.includes("PAYMENT") ||
+    category.includes("PAIEMENT") ||
+    category.includes("Paiements") ||
+    normalizedCategory.includes("payments")
+  ) {
     return (
       <svg
         className={iconClass}
@@ -82,7 +93,12 @@ function SummaryIcon({ category }: { category: string }) {
     );
   }
 
-  if (category.includes("COMMISSION") || category.includes("Retraits") || category.includes("Commission")) {
+  if (
+    category.includes("COMMISSION") ||
+    category.includes("Retraits") ||
+    category.includes("Commission") ||
+    normalizedCategory.includes("commissions")
+  ) {
     return (
       <svg
         className={iconClass}
@@ -144,6 +160,7 @@ export function NotificationSummaryCard({
 }: NotificationSummaryCardProps) {
   const displayLabel = isAll ? "Toutes" : getCategoryLabel(category);
   const displayCount = count > 99 ? "99+" : count;
+  const description = isAll ? "Notifications" : getCategoryDescription(category);
 
   return (
     <button
@@ -173,9 +190,7 @@ export function NotificationSummaryCard({
       </div>
       <div className={`flex items-center gap-1.5 ${isActive ? "text-primary-700" : "text-app-muted"}`}>
         <SummaryIcon category={category} />
-        <span className="text-xs">
-          {isAll ? "Notifications" : "non lues"}
-        </span>
+        <span className="text-xs">{description}</span>
       </div>
     </button>
   );

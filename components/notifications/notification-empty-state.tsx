@@ -4,19 +4,27 @@ import type { NotificationFilterValue } from "./notification-filters";
 
 type NotificationEmptyStateProps = {
   filter: NotificationFilterValue;
+  hasCategoryFilter?: boolean;
 };
 
-export function NotificationEmptyState({ filter }: NotificationEmptyStateProps) {
-  const isFiltered = filter === "unread" || filter === "read";
+export function NotificationEmptyState({
+  filter,
+  hasCategoryFilter = false,
+}: NotificationEmptyStateProps) {
+  const isFiltered = hasCategoryFilter || filter === "unread" || filter === "read";
 
   const title = isFiltered
-    ? filter === "unread"
+    ? hasCategoryFilter
+      ? "Aucune notification dans cette catégorie"
+      : filter === "unread"
       ? "Aucune notification non lue"
       : "Aucune notification lue"
     : "Aucune notification";
 
   const description = isFiltered
-    ? filter === "unread"
+    ? hasCategoryFilter
+      ? "Les événements de cette catégorie apparaîtront ici dès qu'ils existeront."
+      : filter === "unread"
       ? "Vous avez consulté toutes vos notifications."
       : "Vous n'avez pas encore de notification lue."
     : "Les événements importants concernant cette pharmacie apparaîtront ici.";
