@@ -89,6 +89,88 @@ export type AdminPharmaciesPage = {
   results: AdminPharmacy[];
 };
 
+export type AdminPharmacyDocument = {
+  id: number;
+  document_type: string;
+  document_type_display: string;
+  title: string;
+  document_number: string;
+  file: string;
+  issued_at: string | null;
+  expires_at: string | null;
+  issuing_authority: string;
+  verification_status: string;
+  verification_status_display: string;
+  verification_note: string;
+  verified_at: string | null;
+  verified_by_email: string | null;
+  is_active: boolean;
+  is_expired: boolean;
+  download_url: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AdminPharmacySubscription = {
+  reference: string;
+  plan_code: string;
+  plan_name: string;
+  status: string;
+  duration_months: number;
+  discount_percentage: string;
+  total_amount: string;
+  starts_at: string;
+  trial_starts_at: string | null;
+  trial_ends_at: string | null;
+  expires_at: string | null;
+  auto_renew: boolean;
+  is_trial_active: boolean;
+  is_active: boolean;
+};
+
+export type AdminPharmacyDetail = {
+  id: number;
+  reference: string;
+  name: string;
+  slug: string;
+  email: string;
+  phone_number: string;
+  devise: string;
+  owner_id: string;
+  owner_reference: string;
+  owner_email: string;
+  owner_first_name: string;
+  owner_last_name: string;
+  owner_phone_number: string | null;
+  owner_is_active: boolean;
+  owner_is_staff: boolean;
+  owner_date_joined: string;
+  owner_last_login: string | null;
+  invited_by_id: string | null;
+  invited_by_reference: string | null;
+  invited_by_email: string | null;
+  address_id: number;
+  address_country: string;
+  address_country_iso2: string;
+  address_country_phone_code: string;
+  address_city_or_province: string;
+  address_neighborhood: string;
+  address_street: string;
+  address_complement: string;
+  address_postal_code: string;
+  address_proximite_transports: string;
+  address_formatted_address: string;
+  address_latitude: string | null;
+  address_longitude: string | null;
+  members_count: number;
+  active_members_count: number;
+  documents: AdminPharmacyDocument[];
+  subscription: AdminPharmacySubscription | null;
+  is_archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type AdminSubscription = {
   id: number;
   reference: string;
@@ -685,6 +767,12 @@ export async function getAdminPharmacies({
   }
   return fetchAdminJson<AdminPharmaciesPage>(
     "/api/admin/pharmacies/" + (params.toString() ? "?" + params.toString() : ""),
+  );
+}
+
+export async function getAdminPharmacy(pharmacyId: string): Promise<AdminPharmacyDetail> {
+  return fetchAdminJson<AdminPharmacyDetail>(
+    "/api/admin/pharmacies/" + encodeURIComponent(pharmacyId) + "/",
   );
 }
 

@@ -1564,7 +1564,7 @@ le JWT avant de rejouer une requête expirée.
 - **Objectif** : lister les notifications de l'utilisateur connecté.
 - **Méthode HTTP** : `GET`
 - **URL** : `/api/notifications/`
-- **Page frontend** : `/app/pharmacies/[pharmacyId]/notifications`
+- **Pages frontend** : `/app/pharmacies/[pharmacyId]/notifications`, `/app/compte`
 - **Service frontend** : `getNotifications(filters)` dans `lib/api/notifications`
 - **Authentification** : requise avec `Authorization: Bearer <access_token>`.
 - **Paramètres query** :
@@ -1589,9 +1589,14 @@ le JWT avant de rejouer une requête expirée.
   `pharmacy=<pharmacyId>` pour ne pas mélanger les notifications globales personnelles
   avec les événements de la pharmacie courante. Une notification dont
   `pharmacy_reference = null` ne doit pas apparaître sur cette page.
-- **Compteurs de page** : les totaux `Toutes`, `Non lues` et `Lues` sont lus via ce
-  même endpoint avec `page_size=1`, afin d'utiliser le champ paginé `count` sans
-  charger l'historique complet.
+- **Page compte** : `/app/compte` affiche un espace de notifications personnelles
+  pour `COMMISSION_RECEIVED`, `WITHDRAWAL_*` et `SYSTEM`. Comme l'API ne fournit
+  pas encore de filtre query `pharmacy=null`, le frontend interroge uniquement ces
+  catégories personnelles, puis exclut toute notification dont `pharmacy_reference`
+  n'est pas `null`.
+- **Compteurs de page pharmacie** : les totaux `Toutes`, `Non lues` et `Lues`
+  sont lus via ce même endpoint avec `page_size=1`, afin d'utiliser le champ
+  paginé `count` sans charger l'historique complet.
 
 ### GET /api/notifications/unread-count/
 
@@ -1649,7 +1654,7 @@ le JWT avant de rejouer une requête expirée.
 - **Objectif** : marquer une notification spécifique comme lue.
 - **Méthode HTTP** : `POST`
 - **URL** : `/api/notifications/{reference}/read/`
-- **Page frontend** : `/app/pharmacies/[pharmacyId]/notifications`
+- **Pages frontend** : `/app/pharmacies/[pharmacyId]/notifications`, `/app/compte`
 - **Service frontend** : `markNotificationAsRead(reference)` dans `lib/api/notifications`
 - **Authentification** : requise.
 - **Payload** : aucun corps requis.
@@ -1658,6 +1663,9 @@ le JWT avant de rejouer une requête expirée.
   décrémenter les compteurs de la page, recharger les métadonnées et déclencher la
   revalidation du badge navbar. Si la notification possède `action_url`, la
   navigation Next.js est lancée après la tentative de lecture.
+- **Page compte** : la lecture reste individuelle; aucun bouton global
+  “tout marquer comme lu” n'est affiché tant que le backend ne permet pas de cibler
+  explicitement `pharmacy=null`.
 
 ### POST /api/notifications/read-all/
 
@@ -1682,6 +1690,10 @@ La route `/app/pharmacies/[pharmacyId]/notifications` est strictement limitée a
 contexte pharmacie. La règle principale n'est pas la catégorie seule: la
 notification doit être rattachée à la pharmacie courante via
 `pharmacy_reference = <pharmacyId>`.
+
+Les notifications personnelles et globales du compte sont affichées dans
+`/app/compte`, rubrique `Notifications personnelles`, uniquement lorsqu'elles ne
+sont rattachées à aucune pharmacie (`pharmacy_reference = null`).
 
 | Type | Page pharmacie |
 |------|----------------|

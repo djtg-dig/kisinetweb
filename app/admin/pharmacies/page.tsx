@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
 import { getAdminPharmacies, type AdminPharmacy } from "@/lib/api/admin";
@@ -23,7 +24,7 @@ type PharmacyColumn = {
   key: keyof AdminPharmacy;
   label: string;
   className?: string;
-  render?: (pharmacy: AdminPharmacy) => string | number | ReactNode;
+  render?: (pharmacy: AdminPharmacy, router: ReturnType<typeof useRouter>) => string | number | ReactNode;
 };
 
 const emptyFilters: PharmacyFilters = {
@@ -37,51 +38,67 @@ const emptyFilters: PharmacyFilters = {
   hasPhone: "",
 };
 
-const pharmacyColumns: PharmacyColumn[] = [
-  { key: "id", label: "ID", className: "font-mono text-[11px] text-app-muted" },
-  { key: "reference", label: "Référence", className: "font-semibold text-app-text" },
-  { key: "name", label: "Nom", className: "max-w-[220px] truncate text-app-text" },
-  { key: "devise", label: "Devise" },
-  { key: "slug", label: "Slug", className: "max-w-[180px] truncate" },
-  { key: "email", label: "Email", className: "max-w-[220px] truncate" },
-  { key: "phone_number", label: "Téléphone" },
-  { key: "owner_id", label: "ID propriétaire", className: "font-mono text-[11px]" },
-  { key: "owner_reference", label: "Réf. propriétaire" },
-  { key: "owner_email", label: "Email propriétaire", className: "max-w-[220px] truncate" },
-  { key: "owner_first_name", label: "Prénom propriétaire" },
-  { key: "owner_last_name", label: "Nom propriétaire" },
-  { key: "invited_by_id", label: "ID parrain", className: "font-mono text-[11px]" },
-  { key: "invited_by_reference", label: "Réf. parrain" },
-  { key: "invited_by_email", label: "Email parrain", className: "max-w-[220px] truncate" },
-  { key: "address_id", label: "ID adresse", className: "font-mono text-[11px]" },
-  { key: "country", label: "Pays" },
-  { key: "country_phone_code", label: "Indicatif" },
-  { key: "city_or_province", label: "Ville / Province" },
-  { key: "neighborhood", label: "Quartier" },
-  { key: "street", label: "Rue" },
-  { key: "complement_adresse", label: "Complément", className: "max-w-[220px] truncate" },
-  { key: "postal_code", label: "Code postal" },
-  { key: "proximite_transports", label: "Transports", className: "max-w-[240px] truncate" },
-  { key: "formatted_address", label: "Adresse formatée", className: "max-w-[280px] truncate" },
-  { key: "latitude", label: "Latitude" },
-  { key: "longitude", label: "Longitude" },
-  { key: "members_count", label: "Membres" },
-  { key: "active_members_count", label: "Membres actifs" },
-  {
-    key: "is_archived_at",
-    label: "Archivée",
-    render: (pharmacy) => <ArchiveBadge value={Boolean(pharmacy.is_archived_at)} />,
-  },
-  {
-    key: "is_archived_at",
-    label: "Date archivage",
-    render: (pharmacy) => formatDate(pharmacy.is_archived_at),
-  },
-  { key: "created_at", label: "Création", render: (pharmacy) => formatDate(pharmacy.created_at) },
-  { key: "updated_at", label: "Mise à jour", render: (pharmacy) => formatDate(pharmacy.updated_at) },
-];
+function getPharmacyColumns(router: ReturnType<typeof useRouter>): PharmacyColumn[] {
+  return [
+    { key: "id", label: "ID", className: "font-mono text-[11px] text-app-muted" },
+    { key: "reference", label: "Référence", className: "font-semibold text-app-text" },
+    { key: "name", label: "Nom", className: "max-w-[220px] truncate text-app-text" },
+    { key: "devise", label: "Devise" },
+    { key: "slug", label: "Slug", className: "max-w-[180px] truncate" },
+    { key: "email", label: "Email", className: "max-w-[220px] truncate" },
+    { key: "phone_number", label: "Téléphone" },
+    { key: "owner_id", label: "ID propriétaire", className: "font-mono text-[11px]" },
+    { key: "owner_reference", label: "Réf. propriétaire" },
+    { key: "owner_email", label: "Email propriétaire", className: "max-w-[220px] truncate" },
+    { key: "owner_first_name", label: "Prénom propriétaire" },
+    { key: "owner_last_name", label: "Nom propriétaire" },
+    { key: "invited_by_id", label: "ID parrain", className: "font-mono text-[11px]" },
+    { key: "invited_by_reference", label: "Réf. parrain" },
+    { key: "invited_by_email", label: "Email parrain", className: "max-w-[220px] truncate" },
+    { key: "address_id", label: "ID adresse", className: "font-mono text-[11px]" },
+    { key: "country", label: "Pays" },
+    { key: "country_phone_code", label: "Indicatif" },
+    { key: "city_or_province", label: "Ville / Province" },
+    { key: "neighborhood", label: "Quartier" },
+    { key: "street", label: "Rue" },
+    { key: "complement_adresse", label: "Complément", className: "max-w-[220px] truncate" },
+    { key: "postal_code", label: "Code postal" },
+    { key: "proximite_transports", label: "Transports", className: "max-w-[240px] truncate" },
+    { key: "formatted_address", label: "Adresse formatée", className: "max-w-[280px] truncate" },
+    { key: "latitude", label: "Latitude" },
+    { key: "longitude", label: "Longitude" },
+    { key: "members_count", label: "Membres" },
+    { key: "active_members_count", label: "Membres actifs" },
+    {
+      key: "is_archived_at",
+      label: "Archivée",
+      render: (pharmacy) => <ArchiveBadge value={Boolean(pharmacy.is_archived_at)} />,
+    },
+    {
+      key: "is_archived_at",
+      label: "Date archivage",
+      render: (pharmacy) => formatDate(pharmacy.is_archived_at),
+    },
+    { key: "created_at", label: "Création", render: (pharmacy) => formatDate(pharmacy.created_at) },
+    { key: "updated_at", label: "Mise à jour", render: (pharmacy) => formatDate(pharmacy.updated_at) },
+    {
+      key: "reference",
+      label: "Actions",
+      render: (pharmacy, r) => (
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => r.push("/admin/pharmacies/" + pharmacy.reference)}
+        >
+          Détail
+        </Button>
+      ),
+    },
+  ];
+}
 
 export default function AdminPharmaciesPage() {
+  const router = useRouter();
   const [state, setState] = useState<PageState>("loading");
   const [pharmacies, setPharmacies] = useState<AdminPharmacy[]>([]);
   const [count, setCount] = useState(0);
@@ -92,6 +109,8 @@ export default function AdminPharmaciesPage() {
   const [hasPreviousPage, setHasPreviousPage] = useState(false);
   const [refreshIndex, setRefreshIndex] = useState(0);
   const [message, setMessage] = useState("");
+
+  const pharmacyColumns = getPharmacyColumns(router);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -273,7 +292,7 @@ export default function AdminPharmaciesPage() {
                         key={`${column.key}-${index}`}
                       >
                         {column.render
-                          ? column.render(pharmacy)
+                          ? column.render(pharmacy, router)
                           : formatValue(pharmacy[column.key])}
                       </td>
                     ))}

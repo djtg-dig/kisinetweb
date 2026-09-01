@@ -2,21 +2,72 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
+import {
+  NotificationEmptyState,
+  NotificationFilters,
+  NotificationList,
+  NotificationLoadingState,
+  type NotificationFilterValue,
+} from "@/components/notifications";
 import { LinkButton } from "@/components/ui/link-button";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
+import { ToastMessage } from "@/components/ui/toast";
 import { getAccountProfile, getUserPharmacies, type AccountProfile, type PharmacySummary } from "@/lib/api";
+import {
+  getNotifications,
+  markNotificationAsRead,
+  type NotificationCategory,
+  type NotificationItem,
+} from "@/lib/api/notifications";
 import {
   getReferralOverview,
   type ReferralWalletSummary,
 } from "@/lib/api/referrals";
 
 type PageState = "loading" | "error" | "ready";
+type PersonalNotificationGroup = "all" | "commissions" | "withdrawals" | "system";
+
+type ToastState = {
+  tone: "success" | "error" | "warning";
+  text: string;
+  key: number;
+} | null;
+
+const PERSONAL_NOTIFICATION_CATEGORIES: NotificationCategory[] = [
+  "COMMISSION_RECEIVED",
+  "WITHDRAWAL_REQUESTED",
+  "WITHDRAWAL_APPROVED",
+  "WITHDRAWAL_REJECTED",
+  "WITHDRAWAL_PAID",
+  "SYSTEM",
+];
+
+const PERSONAL_NOTIFICATION_GROUPS: {
+  key: PersonalNotificationGroup;
+  label: string;
+  categories: NotificationCategory[];
+}[] = [
+  { key: "all", label: "Toutes", categories: PERSONAL_NOTIFICATION_CATEGORIES },
+  { key: "commissions", label: "Commissions", categories: ["COMMISSION_RECEIVED"] },
+  {
+    key: "withdrawals",
+    label: "Retraits",
+    categories: [
+      "WITHDRAWAL_REQUESTED",
+      "WITHDRAWAL_APPROVED",
+      "WITHDRAWAL_REJECTED",
+      "WITHDRAWAL_PAID",
+    ],
+  },
+  { key: "system", label: "Système", categories: ["SYSTEM"] },
+];
 
 /**
  * Page "Mon compte" accessible via /app/compte.
  * Regroupe trois rubriques :
  * - Mes infos personnelles
  * - Parrainage
+ * - Notifications personnelles
  * - Statistiques
  */
 export default function AccountPage() {
@@ -26,6 +77,7 @@ export default function AccountPage() {
   const [pharmacies, setPharmacies] = useState<PharmacySummary[]>([]);
   // Soldes du parrainage (portefeuilles)
   const [wallets, setWallets] = useState<ReferralWalletSummary[]>([]);
+  const [toast, setToast] = useState<ToastState>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -66,6 +118,12 @@ export default function AccountPage() {
 
   return (
     <MainLayout>
+      {toast && (
+        <ToastMessage key={toast.key} tone={toast.tone} onClose={() => setToast(null)}>
+          {toast.text}
+        </ToastMessage>
+      )}
+
       {/* En-tête de la page */}
       <section className="border-b border-app-border bg-app-surface">
         <div className="mx-auto flex max-w-6xl flex-col gap-5 px-4 py-8 sm:px-6 lg:px-8">
@@ -107,6 +165,9 @@ export default function AccountPage() {
 
               {/* Rubrique 2 : Parrainage (aperçu du solde) */}
               <ReferralSection wallets={wallets} />
+
+              {/* Rubrique 3 : Notifications personnelles et globales du compte */}
+              <PersonalNotificationsSection onToast={setToast} />
             </section>
 
             {/* Colonne latérale : statistiques */}
@@ -215,7 +276,155 @@ function ReferralSection({ wallets }: { wallets: ReferralWalletSummary[] }) {
 }
 
 // ──────────────────────────────────────────────────
-// Rubrique 3 : Statistiques
+// Rubrique 3 : Notifications personnelles
+// ──────────────────────────────────────────────────
+
+function PersonalNotificationsSection({ onToast }: { onToast: (toast: ToastState) => void }) {
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [state, setState] = useState<PageState>("loading");
+  const [activeFilter, setActiveFilter] = useState<NotificationFilterValue>("all");
+  const [activeGroup, setActiveGroup] = useState<PersonalNotificationGroup>("all");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadPersonalNotifications() {
+      setState("loading");
+
+      try {
+        const groups = PERSONAL_NOTIFICATION_GROUPS.find((group) => group.key === activeGroup);
+        const categories = groups?.categories || PERSONAL_NOTIFICATION_CATEGORIES;
+        const isRead =
+          activeFilter === "unread" ? false : activeFilter === "read" ? true : undefined;
+
+        // L'API ne fournit pas encore de filtre `pharmacy=null`; on limite donc
+        // la requete aux categories personnelles puis on exclut les notifications pharmacie.
+        const responses = await Promise.all(
+          categories.map((category) =>
+            getNotifications({
+              category,
+              is_read: isRead,
+              page: "1",
+              page_size: "20",
+            }),
+          ),
+        );
+        const personalNotifications = dedupeNotifications(
+          responses.flatMap((response) => response.results),
+        )
+          .filter((notification) => notification.pharmacy_reference === null)
+          .sort(
+            (first, second) =>
+              new Date(second.created_at).getTime() - new Date(first.created_at).getTime(),
+          );
+
+        if (!isMounted) return;
+        setNotifications(personalNotifications);
+        setState("ready");
+      } catch {
+        if (!isMounted) return;
+        setState("error");
+        onToast({
+          tone: "error",
+          text: "Impossible de charger les notifications personnelles.",
+          key: Date.now(),
+        });
+      }
+    }
+
+    loadPersonalNotifications();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeFilter, activeGroup, onToast]);
+
+  const unreadCount = notifications.filter((notification) => !notification.is_read).length;
+  const readCount = notifications.filter((notification) => notification.is_read).length;
+
+  async function handleMarkAsRead(reference: string) {
+    try {
+      await markNotificationAsRead(reference);
+      setNotifications((previous) =>
+        previous.map((notification) =>
+          notification.reference === reference
+            ? { ...notification, is_read: true, read_at: new Date().toISOString() }
+            : notification,
+        ),
+      );
+    } catch {
+      onToast({
+        tone: "error",
+        text: "Impossible de marquer cette notification comme lue.",
+        key: Date.now(),
+      });
+    }
+  }
+
+  return (
+    <section className="rounded-lg border border-app-border bg-app-card p-6 shadow-sm">
+      <p className="text-sm font-semibold text-primary-700">Notifications personnelles</p>
+      <h2 className="mt-2 text-xl font-bold text-app-text">Commissions et retraits</h2>
+      <p className="mt-3 text-sm leading-6 text-app-muted">
+        Retrouvez ici les notifications globales de votre compte, sans les événements des pharmacies.
+      </p>
+
+      <div className="mt-5 flex flex-wrap gap-2">
+        {PERSONAL_NOTIFICATION_GROUPS.map((group) => {
+          const isActive = activeGroup === group.key;
+
+          return (
+            <button
+              key={group.key}
+              type="button"
+              onClick={() => setActiveGroup(group.key)}
+              className={`rounded-md border px-3 py-2 text-sm font-semibold transition hover:border-primary-300 hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-200 ${
+                isActive
+                  ? "border-primary-300 bg-primary-50 text-primary-700"
+                  : "border-app-border bg-app-surface text-app-muted"
+              }`}
+            >
+              {group.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-4">
+        <NotificationFilters
+          activeFilter={activeFilter}
+          onFilterChange={setActiveFilter}
+          unreadCount={unreadCount}
+          readCount={readCount}
+        />
+      </div>
+
+      <div className="mt-5">
+        {state === "loading" && <NotificationLoadingState />}
+        {state === "error" && (
+          <p className="rounded-md border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
+            Impossible de charger les notifications personnelles.
+          </p>
+        )}
+        {state === "ready" && notifications.length === 0 && (
+          <NotificationEmptyState filter={activeFilter} hasCategoryFilter={activeGroup !== "all"} />
+        )}
+        {state === "ready" && notifications.length > 0 && (
+          <NotificationList
+            notifications={notifications}
+            onMarkAsRead={handleMarkAsRead}
+            hasNextPage={false}
+            isLoadingMore={false}
+            onLoadMore={() => undefined}
+          />
+        )}
+      </div>
+    </section>
+  );
+}
+
+// ──────────────────────────────────────────────────
+// Rubrique 4 : Statistiques
 // ──────────────────────────────────────────────────
 
 function StatisticsSection({
@@ -347,4 +556,10 @@ function formatRelativeDate(value: string) {
 
   const diffYears = Math.floor(diffDays / 365);
   return `Il y a ${diffYears} an${diffYears > 1 ? "s" : ""}`;
+}
+
+function dedupeNotifications(notifications: NotificationItem[]) {
+  return Array.from(
+    new Map(notifications.map((notification) => [notification.reference, notification])).values(),
+  );
 }
