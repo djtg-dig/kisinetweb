@@ -110,6 +110,17 @@ export type UpdatePharmacyInput = {
   address?: UpdatePharmacyAddressInput;
 };
 
+// Largeurs supportées par le backend pour les rouleaux thermiques POS.
+export type ReceiptPaperWidth = 58 | 80;
+
+export type PharmacyGeneralSettings = {
+  receiptPaperWidth: ReceiptPaperWidth;
+};
+
+export type UpdatePharmacyGeneralSettingsInput = {
+  receiptPaperWidth: ReceiptPaperWidth;
+};
+
 export type CreatePharmacyInput = {
   name: string;
   email?: string;
@@ -664,6 +675,16 @@ function normalizePharmacyDetail(item: UnknownRecord): PharmacyDetail {
     isArchivedAt: getText(item.is_archived_at) ?? null,
     createdAt: getText(item.created_at),
     updatedAt: getText(item.updated_at),
+  };
+}
+
+function normalizePharmacyGeneralSettings(item: UnknownRecord): PharmacyGeneralSettings {
+  const width = Number(item.receipt_paper_width);
+
+  // Repli défensif : l'API valide déjà 58/80, mais l'UI garde 80 si une
+  // réponse inattendue arrive afin de ne pas rendre le formulaire incohérent.
+  return {
+    receiptPaperWidth: width === 58 ? 58 : 80,
   };
 }
 
@@ -1637,6 +1658,33 @@ export async function updatePharmacy(
   );
 
   return normalizePharmacyDetail((data || {}) as UnknownRecord);
+}
+
+export async function getPharmacyGeneralSettings(
+  pharmacyId: string,
+): Promise<PharmacyGeneralSettings> {
+  const data = await fetchApiJson<unknown>(
+    "/api/pharmacies/" + pharmacyId + "/general-settings/",
+    "Impossible de charger les paramètres généraux de la pharmacie.",
+  );
+
+  return normalizePharmacyGeneralSettings((data || {}) as UnknownRecord);
+}
+
+export async function updatePharmacyGeneralSettings(
+  pharmacyId: string,
+  input: UpdatePharmacyGeneralSettingsInput,
+): Promise<PharmacyGeneralSettings> {
+  // Seul le champ modifiable est envoyé : la pharmacie et les dates restent
+  // contrôlées par le backend.
+  const data = await sendApiJson<unknown>(
+    "/api/pharmacies/" + pharmacyId + "/general-settings/",
+    "PATCH",
+    "Impossible de modifier les paramètres généraux de la pharmacie.",
+    { receipt_paper_width: input.receiptPaperWidth },
+  );
+
+  return normalizePharmacyGeneralSettings((data || {}) as UnknownRecord);
 }
 
 export async function getPharmacyMembers(pharmacyId: string): Promise<PharmacyMember[]> {

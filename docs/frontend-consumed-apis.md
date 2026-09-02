@@ -306,6 +306,8 @@ agrégateur n'est appelée pour le moment.
 - `POST /api/pharmacies/`
 - `GET /api/pharmacies/{pharmacy_id}/`
 - `PUT /api/pharmacies/{pharmacy_id}/`
+- `GET /api/pharmacies/{pharmacy_id}/general-settings/`
+- `PATCH /api/pharmacies/{pharmacy_id}/general-settings/`
 - `GET /api/pharmacies/countries/`
 - `GET /api/pharmacies/cities-or-provinces/` (paramètre `country` requis : indicatif, ISO2 ou id)
 - `GET /api/pharmacies/{pharmacy_id}/permissions/`
@@ -1239,6 +1241,40 @@ Content-Type: application/json
 - **Erreurs possibles** : `400 Bad Request`, `401 Unauthorized`, `403 Forbidden`,
   `404 Not Found`.
 
+### GET /api/pharmacies/{pharmacy_id}/general-settings/
+
+- **Objectif** : charger les préférences générales d'une pharmacie, notamment
+  la largeur du papier thermique POS.
+- **Méthode HTTP** : `GET`
+- **URL** : `/api/pharmacies/{pharmacy_id}/general-settings/`
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/settings/general`
+- **Service frontend** : `getPharmacyGeneralSettings(pharmacyId)` dans `lib/api`
+- **Authentification** : requise avec `Authorization: Bearer <access_token>`.
+- **Permission backend** : propriétaire ou `pharmacy_view` dans cette pharmacie.
+- **Réponse attendue (200)** : `{ "receipt_paper_width": 58 }` ou
+  `{ "receipt_paper_width": 80 }`.
+- **Signification** : `receipt_paper_width` représente la largeur du papier
+  thermique POS en millimètres. Valeurs autorisées : `58` ou `80`.
+- **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden`, `404 Not Found`.
+
+### PATCH /api/pharmacies/{pharmacy_id}/general-settings/
+
+- **Objectif** : modifier les préférences générales d'une pharmacie.
+- **Méthode HTTP** : `PATCH`
+- **URL** : `/api/pharmacies/{pharmacy_id}/general-settings/`
+- **Page frontend** : `/app/pharmacies/[pharmacyId]/settings/general`
+- **Service frontend** : `updatePharmacyGeneralSettings(pharmacyId, input)` dans
+  `lib/api`
+- **Authentification** : requise avec `Authorization: Bearer <access_token>`.
+- **Permission backend** : propriétaire ou `pharmacy_update` dans cette pharmacie.
+- **Corps envoyé** : uniquement le champ modifiable
+  `{ "receipt_paper_width": 58 }` ou `{ "receipt_paper_width": 80 }`.
+- **Réponse attendue (200)** : `{ "receipt_paper_width": 58 }` ou
+  `{ "receipt_paper_width": 80 }`.
+- **Validation** : toute valeur autre que `58` ou `80` retourne `400 Bad Request`.
+- **Erreurs possibles** : `400 Bad Request`, `401 Unauthorized`,
+  `403 Forbidden`, `404 Not Found`.
+
 ## Permissions et dashboard
 
 ### GET /api/pharmacies/{pharmacy_id}/permissions/
@@ -1252,6 +1288,8 @@ Content-Type: application/json
   `/app/pharmacies/[pharmacyId]/products/create`,
   `/app/pharmacies/[pharmacyId]/invoices`,
   `/app/pharmacies/[pharmacyId]/reports`,
+  `/app/pharmacies/[pharmacyId]/settings`,
+  `/app/pharmacies/[pharmacyId]/settings/general`,
   `/app/pharmacies/[pharmacyId]/settings/human-resources`
 - **Service frontend** : `getPharmacyPermissions(pharmacyId)` dans `lib/api`
 - **Réponse attendue (200)** : objet dont les clés sont les permissions (ex.

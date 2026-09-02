@@ -1,8 +1,28 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { LoadingBubble } from "@/components/ui/loading-bubble";
+import { getPharmacyPermissions, type PharmacyPermissions } from "@/lib/api";
+
 type PharmacySettingsPageProps = {
   params: Promise<{ pharmacyId: string }>;
 };
 
-const settingsCards = [
+type SettingsCard = {
+  title: string;
+  description: string;
+  path: string;
+  permission?: keyof PharmacyPermissions;
+};
+
+const settingsCards: SettingsCard[] = [
+  {
+    title: "Paramètres généraux",
+    description:
+      "Configurer les préférences générales de la pharmacie, notamment l’impression des tickets et factures.",
+    path: "/settings/general",
+    permission: "pharmacy_view",
+  },
   {
     title: "Détails de la  Pharmacie",
     description:
@@ -18,7 +38,7 @@ const settingsCards = [
   {
     title: "Paramètres de l’application",
     description:
-      "Configurer les préférences de fonctionnement de l’espace pharmacie.",
+      "Configurer le comportement et les fonctionnalités propres à l’application Kisinet pour cette pharmacie.",
     path: "/settings/application",
   },
   {
@@ -29,13 +49,62 @@ const settingsCards = [
   },
 ];
 
-export default async function PharmacySettingsPage({ params }: PharmacySettingsPageProps) {
-  const { pharmacyId } = await params;
+export default function PharmacySettingsPage({ params }: PharmacySettingsPageProps) {
+  const [pharmacyId, setPharmacyId] = useState("");
+  const [permissions, setPermissions] = useState<PharmacyPermissions>({});
+  const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
+
+  useEffect(() => {
+    async function readParams() {
+      const resolvedParams = await params;
+      setPharmacyId(resolvedParams.pharmacyId);
+    }
+
+    readParams();
+  }, [params]);
+
+  useEffect(() => {
+    if (!pharmacyId) {
+      return;
+    }
+
+    let isCurrent = true;
+
+    async function loadPermissions() {
+      setIsLoadingPermissions(true);
+      try {
+        // Les permissions du backend décident quelles cartes sensibles sont visibles.
+        const currentPermissions = await getPharmacyPermissions(pharmacyId);
+        if (isCurrent) {
+          setPermissions(currentPermissions);
+        }
+      } catch {
+        // En cas d'échec, on masque les cartes protégées sans bloquer les autres liens.
+        if (isCurrent) {
+          setPermissions({});
+        }
+      } finally {
+        if (isCurrent) {
+          setIsLoadingPermissions(false);
+        }
+      }
+    }
+
+    loadPermissions();
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [pharmacyId]);
+
   const basePath = "/app/pharmacies/" + pharmacyId;
   // L'espace personnel utilise le profil connecté ; le paramètre `user` reste
   // accepté en repli mais n'est plus requis (la page résout l'utilisateur
   // courant via /api/accounts/me/).
   const mySpacePath = "/settings/me";
+  const visibleCards = settingsCards.filter((card: SettingsCard) => {
+    return !card.permission || Boolean(permissions[card.permission]);
+  });
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -48,7 +117,13 @@ export default async function PharmacySettingsPage({ params }: PharmacySettingsP
       </header>
 
       <section className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {settingsCards.map((card) => (
+        {isLoadingPermissions && (
+          <div className="rounded-lg border border-app-border bg-app-card p-5 shadow-sm">
+            <LoadingBubble label="Chargement des permissions" className="min-h-[120px]" />
+          </div>
+        )}
+
+        {!isLoadingPermissions && visibleCards.map((card) => (
           // Carte paramètre : lien cliquable mis en évidence (survol, focus, indice « Accéder »)
           <a
             key={card.path}
