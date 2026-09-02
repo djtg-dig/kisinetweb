@@ -109,6 +109,11 @@ export type InvoicePaymentResult = {
     change_amount?: string;
     payment_method?: string;
     status?: string;
+    transaction_reference?: string;
+    received_by_email?: string;
+    notes?: string;
+    paid_at?: string;
+    updated_at?: string;
   };
 };
 

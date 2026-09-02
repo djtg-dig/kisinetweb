@@ -1,0 +1,54 @@
+@media print {
+  @page {
+    margin: 0;
+    size: auto;
+  }
+
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    background: #fff !important;
+    visibility: hidden !important;
+    width: 100%;
+    height: auto;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  #invoice-print-root,
+  #invoice-print-root * {
+    visibility: visible !important;
+  }
+
+  #invoice-print-root {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    background: #fff !important;
+  }
+
+  #invoice-print-root .ticket-80mm {
+    width: 76mm;
+  }
+
+  #invoice-print-root .ticket-58mm {
+    width: 54mm;
+  }
+
+  #invoice-print-root svg {
+    max-width: 100% !important;
+    overflow: visible;
+  }
+
+  .toast-container,
+  [role="status"],
+  [role="alert"] {
+    display: none !important;
+  }
+}

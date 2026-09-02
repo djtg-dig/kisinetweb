@@ -6,19 +6,24 @@ import { LinkButton } from "@/components/ui/link-button";
 import {
   getPharmacyDetail,
   getPharmacyPermissions,
+  getPharmacyGeneralSettings,
   type PharmacyPermissions,
 } from "@/lib/api";
 import {
   createInvoicePayment,
+  getInvoiceDetail,
   getInvoiceMetadata,
   getPharmacyInvoices,
   type Invoice,
+  type InvoiceDetail,
   type InvoiceFilters,
   type InvoiceStatusOption,
   type InvoicePaymentStatus,
   type InvoiceSummary,
 } from "@/lib/api/invoices";
 import { SALES_CHOICES_STORAGE_KEY, type SalesChoiceOption } from "@/lib/api/sales-choices";
+import { PrintableInvoiceReceipt, type PrintReceiptData } from "@/components/invoices/PrintableInvoiceReceipt";
+import "@/components/invoices/invoice-receipt.css";
 
 type InvoicesPageProps = {
   params: Promise<{ pharmacyId: string }>;
@@ -75,6 +80,7 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
   const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
   const [feedback, setFeedback] = useState<FeedbackMessage | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [printReceiptData, setPrintReceiptData] = useState<PrintReceiptData | null>(null);
 
   useEffect(() => {
     let isCurrent = true;
@@ -283,16 +289,64 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
           pharmacyId={pharmacyId}
           currency={currency}
           onClose={() => setPaymentInvoice(null)}
-          onSuccess={(statusCode, shouldPrint) => {
+          onSuccess={(
+            statusCode: number,
+            shouldPrint: boolean,
+            paymentData?: {
+              reference?: string;
+              amount?: string;
+              amount_received?: string;
+              change_amount?: string;
+              payment_method?: string;
+              received_by_email?: string;
+              paid_at?: string;
+            }
+          ) => {
             setPaymentInvoice(null);
             setFeedback({
               tone: "success",
               text: "Paiement enregistré avec succès.",
             });
             setReloadKey((key) => key + 1);
-            // L'impression utilise le navigateur et ne change aucun échange frontend/backend.
-            if (shouldPrint) {
-              window.setTimeout(() => window.print(), 100);
+
+            if (shouldPrint && paymentData) {
+              getInvoiceDetail(pharmacyId, paymentInvoice.reference)
+                .then((invoiceDetail) => {
+                  return getPharmacyGeneralSettings(pharmacyId)
+                    .then((settings) => ({
+                      invoice: invoiceDetail,
+                      pharmacy: { name: pharmacyName },
+                      currency: currency,
+                      receiptPaperWidth: settings.receiptPaperWidth,
+                      paymentInfo: {
+                        reference: paymentData.reference || "",
+                        amount: paymentData.amount || "0",
+                        amountReceived: paymentData.amount_received || "0",
+                        changeAmount: paymentData.change_amount || "0",
+                        paymentMethod: paymentData.payment_method || "CASH",
+                        paidAt: paymentData.paid_at || new Date().toISOString(),
+                        cashierEmail: paymentData.received_by_email,
+                      },
+                    }))
+                    .catch(() => ({
+                      invoice: invoiceDetail,
+                      pharmacy: { name: pharmacyName },
+                      currency: currency,
+                      receiptPaperWidth: 80 as const,
+                      paymentInfo: {
+                        reference: paymentData.reference || "",
+                        amount: paymentData.amount || "0",
+                        amountReceived: paymentData.amount_received || "0",
+                        changeAmount: paymentData.change_amount || "0",
+                        paymentMethod: paymentData.payment_method || "CASH",
+                        paidAt: paymentData.paid_at || new Date().toISOString(),
+                        cashierEmail: paymentData.received_by_email,
+                      },
+                    }));
+                })
+                .then((printData) => {
+                  setPrintReceiptData(printData);
+                });
             }
           }}
         />
@@ -303,6 +357,11 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
           {feedback.text}
         </ToastMessage>
       )}
+
+      <PrintableInvoiceReceipt
+        data={printReceiptData}
+        onPrintComplete={() => setPrintReceiptData(null)}
+      />
     </div>
   );
 }
@@ -707,7 +766,19 @@ function InvoicePaymentDialog({
   pharmacyId: string;
   currency: string;
   onClose: () => void;
-  onSuccess: (statusCode: number, printAfterPayment: boolean) => void;
+  onSuccess: (
+    statusCode: number,
+    printAfterPayment: boolean,
+    paymentData?: {
+      reference?: string;
+      amount?: string;
+      amount_received?: string;
+      change_amount?: string;
+      payment_method?: string;
+      received_by_email?: string;
+      paid_at?: string;
+    }
+  ) => void;
 }) {
   const remainingAmount = Math.max(invoice.remainingAmount, 0);
   const [amountReceived, setAmountReceived] = useState(formatPaymentInput(remainingAmount));
@@ -758,7 +829,7 @@ function InvoicePaymentDialog({
         transaction_reference: transactionReference,
       });
 
-      onSuccess(result.statusCode, shouldPrintAfterPayment);
+      onSuccess(result.statusCode, shouldPrintAfterPayment, result.payment);
     } catch (error) {
       setErrorMessage(
         error instanceof Error
