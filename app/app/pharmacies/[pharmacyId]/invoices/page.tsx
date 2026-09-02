@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/ui/link-button";
 import {
@@ -283,13 +283,17 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
           pharmacyId={pharmacyId}
           currency={currency}
           onClose={() => setPaymentInvoice(null)}
-          onSuccess={(statusCode) => {
+          onSuccess={(statusCode, shouldPrint) => {
             setPaymentInvoice(null);
             setFeedback({
               tone: "success",
               text: "Paiement enregistré avec succès.",
             });
             setReloadKey((key) => key + 1);
+            // L'impression utilise le navigateur et ne change aucun échange frontend/backend.
+            if (shouldPrint) {
+              window.setTimeout(() => window.print(), 100);
+            }
           }}
         />
       )}
@@ -586,39 +590,43 @@ function InvoiceActions({
     invoice.paymentStatus !== "OVERPAID" &&
     invoice.paymentStatus !== "CANCELED" &&
     invoice.paymentStatus !== "DRAFT";
+  const canShowCancelPlaceholder =
+    canCancel && invoice.paymentStatus !== "PAID" && invoice.paymentStatus !== "CANCELED";
+
+  function handleAction(event: ChangeEvent<HTMLSelectElement>) {
+    const action = event.target.value;
+    event.target.value = "";
+
+    // Consultation simple : elle conserve l'ouverture de la modale existante.
+    if (action === "view") {
+      onSelect(invoice);
+    }
+
+    // Encaissement simple : il ouvre la modale de paiement existante.
+    if (action === "collect") {
+      onCollect(invoice);
+    }
+  }
 
   return (
-    <div className={compact ? "flex flex-col gap-2 sm:flex-row" : "flex justify-end gap-2"}>
-      <button
-        type="button"
-        onClick={() => onSelect(invoice)}
-        className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-app-border bg-app-card text-app-text transition hover:bg-primary-50 focus:outline-none focus:ring-4 focus:ring-primary-100"
-        title="Voir le détail"
-        aria-label={"Voir le détail de la facture " + invoice.reference}
+    <div className={compact ? "w-full" : "flex justify-end"}>
+      <select
+        defaultValue=""
+        onChange={handleAction}
+        aria-label={"Actions pour la facture " + invoice.reference}
+        className="min-h-10 w-full rounded-md border border-app-border bg-app-background px-3 text-sm font-semibold text-app-text outline-none transition focus:border-primary-600 focus:ring-4 focus:ring-primary-100 lg:ml-auto lg:max-w-[190px]"
       >
-        <EyeIcon className="h-4 w-4" />
-      </button>
-      {canCollectPayment && (
-        <button
-          type="button"
-          onClick={() => onCollect(invoice)}
-          className="inline-flex min-h-10 items-center justify-center rounded-md bg-primary-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary-700 focus:outline-none focus:ring-4 focus:ring-primary-200"
-          title="Encaisser cette facture"
-          aria-label={"Encaisser la facture " + invoice.reference}
-        >
+        <option value="">Actions</option>
+        <option value="view">Voir le détail</option>
+        <option value="collect" disabled={!canCollectPayment}>
           Encaisser
-        </button>
-      )}
-      {canCancel && invoice.paymentStatus !== "PAID" && invoice.paymentStatus !== "CANCELED" && (
-        <span
-          className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-app-border bg-app-surface text-app-muted"
-          title="Annulation à connecter"
-          aria-label={"Annulation à connecter pour la facture " + invoice.reference}
-          role="img"
-        >
-          <CancelIcon className="h-4 w-4" />
-        </span>
-      )}
+        </option>
+        {canShowCancelPlaceholder && (
+          <option value="cancel" disabled>
+            Annulation à connecter
+          </option>
+        )}
+      </select>
     </div>
   );
 }
@@ -699,7 +707,7 @@ function InvoicePaymentDialog({
   pharmacyId: string;
   currency: string;
   onClose: () => void;
-  onSuccess: (statusCode: number) => void;
+  onSuccess: (statusCode: number, printAfterPayment: boolean) => void;
 }) {
   const remainingAmount = Math.max(invoice.remainingAmount, 0);
   const [amountReceived, setAmountReceived] = useState(formatPaymentInput(remainingAmount));
@@ -717,6 +725,11 @@ function InvoicePaymentDialog({
     event.preventDefault();
     setErrorMessage("");
 
+    // Le bouton submit choisi indique si l'impression doit suivre l'encaissement.
+    const submitter = (event.nativeEvent as SubmitEvent).submitter;
+    const shouldPrintAfterPayment =
+      submitter instanceof HTMLButtonElement &&
+      submitter.dataset.printAfterPayment === "true";
     const receivedValue = amountReceived.trim()
       ? parsePaymentNumber(amountReceived)
       : remainingAmount;
@@ -745,7 +758,7 @@ function InvoicePaymentDialog({
         transaction_reference: transactionReference,
       });
 
-      onSuccess(result.statusCode);
+      onSuccess(result.statusCode, shouldPrintAfterPayment);
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -824,8 +837,16 @@ function InvoicePaymentDialog({
           <Button type="button" variant="secondary" onClick={onClose} disabled={submitting}>
             Annuler
           </Button>
+          <Button
+            type="submit"
+            variant="secondary"
+            data-print-after-payment="true"
+            disabled={submitting}
+          >
+            {submitting ? "Encaissement..." : "Encaisser & imprimer"}
+          </Button>
           <Button type="submit" disabled={submitting}>
-            {submitting ? "Encaissement..." : "Enregistrer le paiement"}
+            {submitting ? "Encaissement..." : "Encaisser"}
           </Button>
         </div>
       </form>
@@ -992,43 +1013,6 @@ function ReadOnlyPaymentValue({ label, value }: { label: string; value: string }
         {value}
       </div>
     </div>
-  );
-}
-
-function EyeIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
-  );
-}
-
-function CancelIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <circle cx="12" cy="12" r="9" />
-      <path d="m15 9-6 6" />
-      <path d="m9 9 6 6" />
-    </svg>
   );
 }
 

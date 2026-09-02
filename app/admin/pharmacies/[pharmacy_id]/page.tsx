@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
-import { getAdminPharmacy, type AdminPharmacyDetail } from "@/lib/api/admin";
+import { getAdminPharmacy, fetchAdminJson, type AdminPharmacyDetail, type AdminPharmacyDocument } from "@/lib/api/admin";
 
 type PageState = "loading" | "ready" | "error";
 
@@ -16,6 +16,7 @@ export default function AdminPharmacyDetailPage() {
   const [state, setState] = useState<PageState>("loading");
   const [pharmacy, setPharmacy] = useState<AdminPharmacyDetail | null>(null);
   const [message, setMessage] = useState("");
+  const [downloadingDocId, setDownloadingDocId] = useState<number | null>(null);
 
   useEffect(() => {
     let isCurrent = true;
@@ -48,6 +49,18 @@ export default function AdminPharmacyDetailPage() {
       isCurrent = false;
     };
   }, [pharmacyId]);
+
+  async function handleDownloadDocument(doc: AdminPharmacyDocument) {
+    setDownloadingDocId(doc.id);
+    try {
+      const data = await fetchAdminJson<{ url: string; expires_in: number }>(doc.download_url);
+      window.open(data.url, "_blank");
+    } catch (error) {
+      alert("Impossible de télécharger le document: " + (error instanceof Error ? error.message : "Erreur inconnue"));
+    } finally {
+      setDownloadingDocId(null);
+    }
+  }
 
   return (
     <section className="space-y-4">
@@ -177,23 +190,48 @@ export default function AdminPharmacyDetailPage() {
             ) : (
               <div className="mt-4 space-y-4">
                 {pharmacy.documents.map((doc) => (
-                  <div key={doc.id} className="rounded-lg border border-app-border p-4">
-                    <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-4">
-                      <DetailField label="Type" value={doc.document_type_display} />
-                      <DetailField label="Numéro" value={doc.document_number || "-"} />
-                      <DetailField label="Autorité" value={doc.issuing_authority || "-"} />
-                      <DetailField label="Statut" value={doc.verification_status_display} />
-                      <DetailField label="Émis le" value={doc.issued_at ? doc.issued_at : "-"} />
-                      <DetailField label="Expire le" value={doc.expires_at ? doc.expires_at : "-"} />
-                      <DetailField label="Expiré" value={doc.is_expired ? "Oui" : "Non"} />
-                      <DetailField label="Actif" value={doc.is_active ? "Oui" : "Non"} />
-                      <DetailField label="Vérifié par" value={doc.verified_by_email || "-"} />
-                      <DetailField label="Vérifié le" value={doc.verified_at ? formatDate(doc.verified_at) : "-"} />
+                  <div
+                    key={doc.id}
+                    className="cursor-pointer rounded-lg border border-app-border p-4 transition hover:border-primary-400 hover:shadow-md"
+                    onClick={() => handleDownloadDocument(doc)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => e.key === "Enter" && handleDownloadDocument(doc)}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 grid gap-2 md:grid-cols-2 lg:grid-cols-4">
+                        <DetailField label="Type" value={doc.document_type_display} />
+                        <DetailField label="Numéro" value={doc.document_number || "-"} />
+                        <DetailField label="Autorité" value={doc.issuing_authority || "-"} />
+                        <StatusBadge status={doc.verification_status} label={doc.verification_status_display} />
+                        <DetailField label="Émis le" value={doc.issued_at ? doc.issued_at : "-"} />
+                        <DetailField label="Expire le" value={doc.expires_at ? doc.expires_at : "-"} />
+                        <DetailField label="Expiré" value={doc.is_expired ? "Oui" : "Non"} />
+                        <DetailField label="Actif" value={doc.is_active ? "Oui" : "Non"} />
+                        <DetailField label="Vérifié par" value={doc.verified_by_email || "-"} />
+                        <DetailField label="Vérifié le" value={doc.verified_at ? formatDate(doc.verified_at) : "-"} />
+                      </div>
+                      <div className="ml-4 flex flex-col items-end gap-2">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownloadDocument(doc);
+                          }}
+                          disabled={downloadingDocId === doc.id}
+                        >
+                          {downloadingDocId === doc.id ? "Téléchargement..." : "Télécharger"}
+                        </Button>
+                        {doc.title && (
+                          <p className="text-xs text-app-muted">{doc.title}</p>
+                        )}
+                      </div>
                     </div>
                     {doc.verification_note && (
-                      <div className="mt-2">
-                        <p className="text-xs font-semibold text-app-muted">Note:</p>
-                        <p className="text-sm text-app-text">{doc.verification_note}</p>
+                      <div className="mt-3 border-t border-app-border pt-3">
+                        <p className="text-xs font-semibold text-app-muted">Note de vérification:</p>
+                        <p className="mt-1 text-sm text-app-text">{doc.verification_note}</p>
                       </div>
                     )}
                   </div>
@@ -220,6 +258,25 @@ function DetailField({
     <div>
       <p className="text-xs font-semibold uppercase text-app-muted">{label}</p>
       <p className={`mt-1 text-sm text-app-text ${className}`}>{value || "-"}</p>
+    </div>
+  );
+}
+
+function StatusBadge({ status, label }: { status: string; label: string }) {
+  const colors: Record<string, string> = {
+    PENDING: "bg-yellow-50 text-yellow-700",
+    VERIFIED: "bg-emerald-50 text-emerald-700",
+    REJECTED: "bg-red-50 text-red-700",
+    EXPIRED: "bg-gray-50 text-gray-700",
+  };
+  const colorClass = colors[status] || "bg-gray-50 text-gray-700";
+
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase text-app-muted">Statut</p>
+      <span className={`mt-1 inline-flex rounded-md px-2.5 py-1 text-xs font-bold ${colorClass}`}>
+        {label}
+      </span>
     </div>
   );
 }
