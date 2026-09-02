@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
 import { ToastMessage } from "@/components/ui/toast";
 import {
+  canUpdatePharmacyGeneralSettings,
+  canViewPharmacyGeneralSettings,
   getPharmacyGeneralSettings,
   getPharmacyPermissions,
   updatePharmacyGeneralSettings,
@@ -17,7 +19,7 @@ type GeneralSettingsPageProps = {
   params: Promise<{ pharmacyId: string }>;
 };
 
-type PageState = "loading" | "ready" | "error";
+type PageState = "loading" | "ready" | "forbidden" | "error";
 
 type ToastState = {
   tone: "success" | "error";
@@ -81,7 +83,8 @@ export default function GeneralSettingsPage({ params }: GeneralSettingsPageProps
         setPermissions(currentPermissions);
         setSettings(currentSettings);
         setSelectedWidth(currentSettings.receiptPaperWidth);
-        setState("ready");
+        // general_settings_update permet implicitement de consulter la page.
+        setState(canViewPharmacyGeneralSettings(currentPermissions) ? "ready" : "forbidden");
       } catch (error) {
         if (!isCurrent) {
           return;
@@ -104,7 +107,7 @@ export default function GeneralSettingsPage({ params }: GeneralSettingsPageProps
   }, [pharmacyId]);
 
   const basePath = "/app/pharmacies/" + pharmacyId;
-  const canEdit = Boolean(permissions.pharmacy_update);
+  const canEdit = canUpdatePharmacyGeneralSettings(permissions);
   const hasChanged = Boolean(settings && settings.receiptPaperWidth !== selectedWidth);
 
   async function saveSettings() {
@@ -178,6 +181,15 @@ export default function GeneralSettingsPage({ params }: GeneralSettingsPageProps
         <section className="mt-6 rounded-lg border border-red-200 bg-red-50 p-5">
           <p className="font-semibold text-red-700">Impossible de charger les paramètres</p>
           <p className="mt-2 text-sm text-red-700">{errorMessage}</p>
+        </section>
+      )}
+
+      {state === "forbidden" && (
+        <section className="mt-6 rounded-lg border border-app-border bg-app-card p-8 text-center">
+          <h2 className="text-lg font-bold text-app-text">Accès refusé</h2>
+          <p className="mt-2 text-sm leading-6 text-app-muted">
+            Vous n'avez pas la permission de consulter les paramètres généraux.
+          </p>
         </section>
       )}
 

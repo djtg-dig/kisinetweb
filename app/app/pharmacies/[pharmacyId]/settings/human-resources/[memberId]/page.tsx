@@ -50,6 +50,14 @@ const permissionGroups = [
     ],
   },
   {
+    // Permissions dédiées à la consultation et à la modification des réglages généraux.
+    title: "Paramètres généraux",
+    permissions: [
+      ["general_settings_view", "Voir les paramètres généraux"],
+      ["general_settings_update", "Modifier les paramètres généraux"],
+    ],
+  },
+  {
     title: "Produits, stock et ventes",
     permissions: [
       ["product_view", "Voir les produits"],

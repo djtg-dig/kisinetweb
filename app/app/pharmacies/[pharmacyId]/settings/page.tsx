@@ -2,7 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
-import { getPharmacyPermissions, type PharmacyPermissions } from "@/lib/api";
+import {
+  canViewPharmacyGeneralSettings,
+  getPharmacyPermissions,
+  type PharmacyPermissions,
+} from "@/lib/api";
 
 type PharmacySettingsPageProps = {
   params: Promise<{ pharmacyId: string }>;
@@ -12,7 +16,7 @@ type SettingsCard = {
   title: string;
   description: string;
   path: string;
-  permission?: keyof PharmacyPermissions;
+  canView?: (permissions: PharmacyPermissions) => boolean;
 };
 
 const settingsCards: SettingsCard[] = [
@@ -21,7 +25,7 @@ const settingsCards: SettingsCard[] = [
     description:
       "Configurer les préférences générales de la pharmacie, notamment l’impression des tickets et factures.",
     path: "/settings/general",
-    permission: "pharmacy_view",
+    canView: canViewPharmacyGeneralSettings,
   },
   {
     title: "Détails de la  Pharmacie",
@@ -103,7 +107,7 @@ export default function PharmacySettingsPage({ params }: PharmacySettingsPagePro
   // courant via /api/accounts/me/).
   const mySpacePath = "/settings/me";
   const visibleCards = settingsCards.filter((card: SettingsCard) => {
-    return !card.permission || Boolean(permissions[card.permission]);
+    return !card.canView || card.canView(permissions);
   });
 
   return (

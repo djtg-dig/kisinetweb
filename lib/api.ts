@@ -314,6 +314,8 @@ export type PharmacyPermissions = {
   report_ai_view?: boolean;
   pharmacy_legal_document_view?: boolean;
   pharmacy_legal_document_manage?: boolean;
+  general_settings_view?: boolean;
+  general_settings_update?: boolean;
 };
 
 export type PharmacyMemberRole = "OWNER" | "MANAGER" | "PHARMACIST" | "EMPLOYEE";
@@ -1615,6 +1617,16 @@ export async function getPharmacyPermissions(pharmacyId: string): Promise<Pharma
   return Object.fromEntries(
     Object.entries(record).map(([key, value]) => [key, Boolean(value)]),
   ) as PharmacyPermissions;
+}
+
+export function canViewPharmacyGeneralSettings(permissions: PharmacyPermissions): boolean {
+  // Modifier les paramètres généraux donne aussi le droit de les consulter.
+  return Boolean(permissions.general_settings_view || permissions.general_settings_update);
+}
+
+export function canUpdatePharmacyGeneralSettings(permissions: PharmacyPermissions): boolean {
+  // La modification des paramètres généraux ne dépend pas de pharmacy_update.
+  return Boolean(permissions.general_settings_update);
 }
 
 export async function getPharmacyDetail(pharmacyId: string): Promise<PharmacyDetail> {

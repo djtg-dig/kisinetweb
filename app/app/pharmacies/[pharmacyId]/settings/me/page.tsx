@@ -67,6 +67,14 @@ const permissionGroups = [
     ],
   },
   {
+    // Permissions dédiées à la consultation et à la modification des réglages généraux.
+    title: "Paramètres généraux",
+    permissions: [
+      ["general_settings_view", "Voir les paramètres généraux"],
+      ["general_settings_update", "Modifier les paramètres généraux"],
+    ],
+  },
+  {
     title: "Rapports",
     permissions: [
       ["report_view", "Voir les rapports"],
