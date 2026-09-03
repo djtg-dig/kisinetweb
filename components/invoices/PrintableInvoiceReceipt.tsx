@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import JsBarcode from "jsbarcode";
 
 type PrintReceiptData = {
@@ -12,6 +13,7 @@ type PrintReceiptData = {
     discountAmount: number;
     totalAmount: number;
     paidAmount: number;
+    remainingAmount: number;
     changeAmount: number;
     createdAt: string;
     items: Array<{
@@ -108,6 +110,8 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
 function TicketContent({ data }: { data: PrintReceiptData }) {
   const is58mm = data.receiptPaperWidth === 58;
   const currencyCode = data.currency || "USD";
+  // Le reste a payer vient de la facture metier rechargee apres succes backend.
+  const remainingAmount = Math.max(data.invoice.remainingAmount, 0);
 
   const paperClass = is58mm ? "ticket-58mm" : "ticket-80mm";
 
@@ -262,6 +266,10 @@ function TicketContent({ data }: { data: PrintReceiptData }) {
               <span>Payé</span>
               <span>{formatMoney(Number(data.paymentInfo.amountReceived), currencyCode)}</span>
             </div>
+            <div style={totalRowStyle}>
+              <span>Reste à payer</span>
+              <span>{formatMoney(remainingAmount, currencyCode)}</span>
+            </div>
             {data.invoice.changeAmount > 0 && (
               <div style={totalRowStyle}>
                 <span>Monnaie</span>
@@ -295,6 +303,12 @@ function TicketContent({ data }: { data: PrintReceiptData }) {
 
 export function PrintableInvoiceReceipt({ data, onPrintComplete }: PrintableInvoiceReceiptProps) {
   const hasPrinted = useRef(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    // Le portail utilise document.body uniquement apres le montage cote navigateur.
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!data || hasPrinted.current) {
@@ -303,25 +317,38 @@ export function PrintableInvoiceReceipt({ data, onPrintComplete }: PrintableInvo
 
     hasPrinted.current = true;
 
-    const timer = setTimeout(() => {
-      window.print();
-      setTimeout(() => {
-        hasPrinted.current = false;
-        onPrintComplete();
-      }, 500);
-    }, 300);
+    // Deux frames garantissent que le ticket cache est monte avant l'ouverture de l'aperçu.
+    let firstFrame = 0;
+    let secondFrame = 0;
+    const handleAfterPrint = () => {
+      hasPrinted.current = false;
+      onPrintComplete();
+    };
 
-    return () => clearTimeout(timer);
+    window.addEventListener("afterprint", handleAfterPrint, { once: true });
+
+    firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        window.print();
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      window.cancelAnimationFrame(secondFrame);
+      window.removeEventListener("afterprint", handleAfterPrint);
+    };
   }, [data, onPrintComplete]);
 
-  if (!data) {
+  if (!data || !isMounted) {
     return null;
   }
 
-  return (
-    <div id="invoice-print-root">
+  return createPortal(
+    <div id="invoice-print-root" aria-hidden="true">
       <TicketContent data={data} />
-    </div>
+    </div>,
+    document.body,
   );
 }
 

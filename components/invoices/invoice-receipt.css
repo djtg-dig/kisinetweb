@@ -1,3 +1,16 @@
+@media screen {
+  /* Le ticket reste calculable dans le DOM, mais il ne pollue jamais la page normale. */
+  #invoice-print-root {
+    position: fixed;
+    left: -10000px;
+    top: 0;
+    width: auto;
+    height: auto;
+    overflow: hidden;
+    visibility: hidden;
+  }
+}
+
 @media print {
   @page {
     margin: 0;
@@ -9,13 +22,13 @@
     margin: 0;
     padding: 0;
     background: #fff !important;
-    visibility: hidden !important;
     width: 100%;
     height: auto;
   }
 
-  body * {
-    visibility: hidden !important;
+  body > *:not(#invoice-print-root) {
+    /* Le reste de l'application sort du flux print pour eviter les pages vides. */
+    display: none !important;
   }
 
   #invoice-print-root,
@@ -24,9 +37,10 @@
   }
 
   #invoice-print-root {
-    position: absolute;
-    left: 0;
-    top: 0;
+    /* Au print, seul le ticket est replace dans la zone imprimable. */
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
     width: 100%;
     margin: 0;
     padding: 0;
