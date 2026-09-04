@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
     const response = await signedBackendFetch({
       path: "/api/admin/auth/login/",
       method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
 

@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
     if (response.ok) {
       const data = await response.json();
-      return NextResponse.json({ authenticated: true, admin: data });
+      return NextResponse.json({ authenticated: true, admin: data.admin ?? data });
     }
 
     if (response.status === 401 && refreshToken) {
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
 
         if (retryResponse.ok) {
           const data = await retryResponse.json();
-          const response = NextResponse.json({ authenticated: true, admin: data });
+          const response = NextResponse.json({ authenticated: true, admin: data.admin ?? data });
           setAdminCookies(response, refreshed.newAccessToken, refreshed.newRefreshToken);
           return response;
         }
@@ -63,6 +63,7 @@ async function tryRefreshTokens(refreshToken: string): Promise<RefreshResult> {
     const response = await signedBackendFetch({
       path: "/api/admin/auth/refresh/",
       method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ refresh: refreshToken }),
     });
 

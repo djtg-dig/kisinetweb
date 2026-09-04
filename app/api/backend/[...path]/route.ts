@@ -44,14 +44,15 @@ async function proxyBackendRequest(request: NextRequest, context: RouteContext):
     const adminAccessToken = request.cookies.get(ADMIN_ACCESS_COOKIE_NAME)?.value;
     const adminRefreshToken = request.cookies.get(ADMIN_REFRESH_COOKIE_NAME)?.value;
 
-    const accessToken = userAccessToken || adminAccessToken;
-    const refreshToken = userAccessToken ? userRefreshToken : adminRefreshToken;
+    const isAdminRequest = backendPath.startsWith("/api/admin/");
+    const accessToken = isAdminRequest ? adminAccessToken : userAccessToken;
+    const refreshToken = isAdminRequest ? adminRefreshToken : userRefreshToken;
 
     if (!accessToken) {
       return NextResponse.json({ detail: "Non authentifié." }, { status: 401 });
     }
 
-    const isAdminSession = Boolean(adminAccessToken);
+    const isAdminSession = isAdminRequest;
 
     const body = method === "GET" || method === "HEAD" ? null : await request.arrayBuffer();
 
@@ -134,6 +135,7 @@ async function tryRefreshTokens(refreshToken: string, currentAccessToken: string
     const response = await signedBackendFetch({
       path: refreshPath,
       method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ refresh: refreshToken }),
       accessToken: currentAccessToken,
       cache: "no-store",
