@@ -1,31 +1,11 @@
 import { clearApiRequestCache } from "@/lib/api-request-cache";
-import { buildSafeAuthRedirect, readTokensFromHash, type AuthTokens } from "@/lib/auth-utils";
+import { buildSafeAuthRedirect } from "@/lib/auth-utils";
 
-export { buildSafeAuthRedirect, readTokensFromHash };
+export { buildSafeAuthRedirect };
 
 export const ACTIVE_PHARMACY_KEY = "kisinet:active_pharmacy_id";
 export const LAST_PHARMACY_KEY = ACTIVE_PHARMACY_KEY;
 export const AUTH_CHANGE_EVENT_KEY = "kisinet:auth_changed";
-
-export function saveTokens(tokens: AuthTokens) {
-  if (typeof window === "undefined") {
-    return;
-  }
-  notifyAuthChanged();
-}
-
-export function saveTokensFromUrlHash() {
-  if (typeof window === "undefined" || !window.location.hash) {
-    return false;
-  }
-  const tokens = readTokensFromHash(window.location.hash);
-  if (!tokens) {
-    return false;
-  }
-  saveTokens(tokens);
-  window.history.replaceState(null, "", window.location.pathname + window.location.search);
-  return true;
-}
 
 export function getAccessToken() {
   return "";

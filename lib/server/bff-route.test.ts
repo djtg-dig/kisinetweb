@@ -12,10 +12,15 @@ type CapturedFetch = {
   body: BodyInit | null | undefined;
 };
 
+type MockCookies = {
+  get: (name: string) => { value: string } | undefined;
+};
+
 type TestRequest = {
   method: string;
   headers: Headers;
   nextUrl: URL;
+  cookies: MockCookies;
   arrayBuffer: () => Promise<ArrayBuffer>;
 };
 
@@ -28,13 +33,20 @@ async function loadRoute() {
   return import("@/app/api/backend/[...path]/route");
 }
 
-function makeRequest(method: string, url: string, body = new Uint8Array()): TestRequest {
+function makeRequest(method: string, url: string, body = new Uint8Array(), cookies: Record<string, string> = {}): TestRequest {
   const bodyCopy = new Uint8Array(body);
+  const cookieStore: Map<string, string> = new Map(Object.entries(cookies));
 
   return {
     method,
     headers: new Headers(),
     nextUrl: new URL(url),
+    cookies: {
+      get: (name: string) => {
+        const value = cookieStore.get(name);
+        return value !== undefined ? { value } : undefined;
+      },
+    },
     arrayBuffer: async () =>
       bodyCopy.buffer.slice(bodyCopy.byteOffset, bodyCopy.byteOffset + bodyCopy.byteLength),
   };
@@ -60,10 +72,11 @@ function bodyToBuffer(body: BodyInit | null | undefined): Buffer {
   throw new Error("Body inattendu dans le test.");
 }
 
-function mockBackend(responseFactory: () => Response | Promise<Response>) {
+function mockBackend(responseFactory: (url: string) => Response | Promise<Response>) {
   const calls: CapturedFetch[] = [];
 
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const urlStr = input instanceof URL ? input.href : String(input);
     calls.push({
       url: input instanceof URL ? input : new URL(String(input)),
       method: init?.method ?? "GET",
@@ -71,17 +84,19 @@ function mockBackend(responseFactory: () => Response | Promise<Response>) {
       body: init?.body,
     });
 
-    return responseFactory();
+    return responseFactory(urlStr);
   }) as typeof fetch;
 
   return calls;
 }
 
 describe("BFF /api/backend route handler", () => {
+  const VALID_COOKIES = { kisinet_access: "test-access-token", kisinet_refresh: "test-refresh-token" };
+
   test("mappe /api/backend/api/pharmacies/ vers /api/pharmacies/", async () => {
     const route = await loadRoute();
     const calls = mockBackend(() => Response.json({ ok: true }, { status: 200 }));
-    const request = makeRequest("GET", "http://next.test/api/backend/api/pharmacies/?status=PAID&page=2");
+    const request = makeRequest("GET", "http://next.test/api/backend/api/pharmacies/?status=PAID&page=2", new Uint8Array(), VALID_COOKIES);
 
     const response = await route.GET(request as never, routeContext(["api", "pharmacies"]) as never);
 
@@ -103,7 +118,7 @@ describe("BFF /api/backend route handler", () => {
 
     for (const [method, handler, status] of handlers) {
       mockBackend(() => new Response(method === "HEAD" || status === 204 ? null : "body", { status }));
-      const request = makeRequest(method, "http://next.test/api/backend/api/pharmacies/");
+      const request = makeRequest(method, "http://next.test/api/backend/api/pharmacies/", new Uint8Array(), VALID_COOKIES);
       const response = await handler(request as never, routeContext(["api", "pharmacies"]) as never);
 
       assert.equal(response.status, status);
@@ -112,14 +127,14 @@ describe("BFF /api/backend route handler", () => {
 
   test("préserve les erreurs JSON utiles du backend", async () => {
     const route = await loadRoute();
-    const statuses = [400, 401, 403, 404, 422, 429, 500];
+    const statuses = [400, 403, 404, 422, 429, 500];
 
     for (const status of statuses) {
       mockBackend(() =>
         Response.json({ code: "backend_code", detail: "Erreur backend" }, { status }),
       );
       const response = await route.GET(
-        makeRequest("GET", "http://next.test/api/backend/api/test/") as never,
+        makeRequest("GET", "http://next.test/api/backend/api/test/", new Uint8Array(), VALID_COOKIES) as never,
         routeContext(["api", "test"]) as never,
       );
       const data = await response.json();
@@ -129,12 +144,17 @@ describe("BFF /api/backend route handler", () => {
     }
   });
 
-  test("ne forwarde pas les headers HMAC injectés par le navigateur", async () => {
+  test("lit l'access token depuis le cookie et ne fait pas confiance à Authorization navigateur", async () => {
     const route = await loadRoute();
     const calls = mockBackend(() => Response.json({ ok: true }));
-    const request = makeRequest("POST", "http://next.test/api/backend/api/sales/", new TextEncoder().encode("{}"));
+    const request = makeRequest(
+      "POST",
+      "http://next.test/api/backend/api/sales/",
+      new TextEncoder().encode("{}"),
+      { kisinet_access: "cookie-access-token" },
+    );
 
-    request.headers.set("Authorization", "Bearer user-token");
+    request.headers.set("Authorization", "Bearer browser-fake-token");
     request.headers.set("Content-Type", "application/json");
     HMAC_HEADER_NAMES.forEach((name) => request.headers.set(name, "attacker"));
 
@@ -142,7 +162,7 @@ describe("BFF /api/backend route handler", () => {
 
     const headers = calls[0]?.headers;
     assert.ok(headers);
-    assert.equal(headers.get("Authorization"), "Bearer user-token");
+    assert.equal(headers.get("Authorization"), "Bearer cookie-access-token");
     assert.equal(headers.get("Content-Type"), "application/json");
     assert.equal(headers.get("X-Kisinet-Client-Id"), "kisinet-web");
     assert.notEqual(headers.get("X-Kisinet-Timestamp"), "attacker");
@@ -170,7 +190,7 @@ describe("BFF /api/backend route handler", () => {
     for (const path of invalidCases) {
       const calls = mockBackend(() => Response.json({ ok: true }));
       const response = await route.GET(
-        makeRequest("GET", "http://next.test/api/backend/api/" + path.join("/") + "/") as never,
+        makeRequest("GET", "http://next.test/api/backend/api/" + path.join("/") + "/", new Uint8Array(), VALID_COOKIES) as never,
         routeContext(["api", ...path]) as never,
       );
 
@@ -207,7 +227,7 @@ describe("BFF /api/backend route handler", () => {
       );
 
       const response = await route.GET(
-        makeRequest("GET", "http://next.test/api/backend/api/export/") as never,
+        makeRequest("GET", "http://next.test/api/backend/api/export/", new Uint8Array(), VALID_COOKIES) as never,
         routeContext(["api", "export"]) as never,
       );
       const bytes = new Uint8Array(await response.arrayBuffer());
@@ -232,7 +252,7 @@ describe("BFF /api/backend route handler", () => {
         "",
       ].join("\r\n"),
     );
-    const request = makeRequest("POST", "http://next.test/api/backend/api/sales/vision/", multipart);
+    const request = makeRequest("POST", "http://next.test/api/backend/api/sales/vision/", multipart, VALID_COOKIES);
 
     request.headers.set("Content-Type", "multipart/form-data; boundary=kisinet-boundary");
     await route.POST(request as never, routeContext(["api", "sales", "vision"]) as never);
@@ -249,11 +269,11 @@ describe("BFF /api/backend route handler", () => {
     const calls = mockBackend(() => Response.json({ ok: true }));
 
     await route.GET(
-      makeRequest("GET", "http://next.test/api/backend/api/pharmacies/") as never,
+      makeRequest("GET", "http://next.test/api/backend/api/pharmacies/", new Uint8Array(), VALID_COOKIES) as never,
       routeContext(["api", "pharmacies"]) as never,
     );
     await route.GET(
-      makeRequest("GET", "http://next.test/api/backend/api/pharmacies/") as never,
+      makeRequest("GET", "http://next.test/api/backend/api/pharmacies/", new Uint8Array(), VALID_COOKIES) as never,
       routeContext(["api", "pharmacies"]) as never,
     );
 
