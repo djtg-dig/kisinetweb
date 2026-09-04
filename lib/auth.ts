@@ -1,5 +1,6 @@
 import { clearApiRequestCache } from "@/lib/api-request-cache";
 import { buildSafeAuthRedirect } from "@/lib/auth-utils";
+import { csrfFetch, getCsrfTokenFromCookie } from "@/lib/csrf-fetch";
 
 export { buildSafeAuthRedirect };
 
@@ -68,7 +69,7 @@ function notifyAuthChanged() {
 
 async function callServerLogout() {
   try {
-    await fetch("/api/auth/logout", {
+    await csrfFetch("/api/auth/logout", {
       method: "POST",
       cache: "no-store",
       keepalive: true,
@@ -76,4 +77,24 @@ async function callServerLogout() {
   } catch {
     // Best effort logout
   }
+}
+
+export async function ensureCsrfToken(): Promise<string | null> {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  let token = getCsrfTokenFromCookie();
+  if (!token) {
+    try {
+      const response = await fetch("/api/auth/csrf", {
+        credentials: "include",
+      });
+      if (response.ok) {
+        token = getCsrfTokenFromCookie();
+      }
+    } catch {
+      // Best effort
+    }
+  }
+  return token;
 }

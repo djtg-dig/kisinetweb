@@ -29,6 +29,7 @@ async function loadRoute() {
   process.env.KISINET_HMAC_CLIENT_ID = "kisinet-web";
   process.env.KISINET_HMAC_SIGNATURE_VERSION = "v1";
   process.env.KISINET_HMAC_SECRET = SECRET;
+  process.env.KISINET_APP_ORIGIN = "http://localhost:3000";
 
   return import("@/app/api/backend/[...path]/route");
 }
@@ -91,7 +92,12 @@ function mockBackend(responseFactory: (url: string) => Response | Promise<Respon
 }
 
 describe("BFF /api/backend route handler", () => {
-  const VALID_COOKIES = { kisinet_access: "test-access-token", kisinet_refresh: "test-refresh-token" };
+  const VALID_COOKIES = {
+    kisinet_access: "test-access-token",
+    kisinet_refresh: "test-refresh-token",
+    kisinet_csrf: "a".repeat(64),
+  };
+  const CSRF_HEADER_NAME = "X-Kisinet-CSRF";
 
   test("mappe /api/backend/api/pharmacies/ vers /api/pharmacies/", async () => {
     const route = await loadRoute();
@@ -108,17 +114,21 @@ describe("BFF /api/backend route handler", () => {
   test("supporte les méthodes principales avec les statuts backend", async () => {
     const route = await loadRoute();
     const handlers = [
-      ["GET", route.GET, 200],
-      ["POST", route.POST, 201],
-      ["PUT", route.PUT, 200],
-      ["PATCH", route.PATCH, 204],
-      ["DELETE", route.DELETE, 409],
-      ["HEAD", route.HEAD, 204],
+      ["GET", route.GET, 200, null],
+      ["POST", route.POST, 201, CSRF_HEADER_NAME],
+      ["PUT", route.PUT, 200, CSRF_HEADER_NAME],
+      ["PATCH", route.PATCH, 204, CSRF_HEADER_NAME],
+      ["DELETE", route.DELETE, 409, CSRF_HEADER_NAME],
+      ["HEAD", route.HEAD, 204, null],
     ] as const;
 
-    for (const [method, handler, status] of handlers) {
+    for (const [method, handler, status, csrfHeader] of handlers) {
       mockBackend(() => new Response(method === "HEAD" || status === 204 ? null : "body", { status }));
       const request = makeRequest(method, "http://next.test/api/backend/api/pharmacies/", new Uint8Array(), VALID_COOKIES);
+      if (csrfHeader) {
+        request.headers.set(csrfHeader, "a".repeat(64));
+        request.headers.set("origin", "http://localhost:3000");
+      }
       const response = await handler(request as never, routeContext(["api", "pharmacies"]) as never);
 
       assert.equal(response.status, status);
@@ -151,11 +161,13 @@ describe("BFF /api/backend route handler", () => {
       "POST",
       "http://next.test/api/backend/api/sales/",
       new TextEncoder().encode("{}"),
-      { kisinet_access: "cookie-access-token" },
+      { kisinet_access: "cookie-access-token", kisinet_refresh: "refresh-token", kisinet_csrf: "a".repeat(64) },
     );
 
     request.headers.set("Authorization", "Bearer browser-fake-token");
     request.headers.set("Content-Type", "application/json");
+    request.headers.set("origin", "http://localhost:3000");
+    request.headers.set(CSRF_HEADER_NAME, "a".repeat(64));
     HMAC_HEADER_NAMES.forEach((name) => request.headers.set(name, "attacker"));
 
     await route.POST(request as never, routeContext(["api", "sales"]) as never);
@@ -255,6 +267,8 @@ describe("BFF /api/backend route handler", () => {
     const request = makeRequest("POST", "http://next.test/api/backend/api/sales/vision/", multipart, VALID_COOKIES);
 
     request.headers.set("Content-Type", "multipart/form-data; boundary=kisinet-boundary");
+    request.headers.set("origin", "http://localhost:3000");
+    request.headers.set(CSRF_HEADER_NAME, "a".repeat(64));
     await route.POST(request as never, routeContext(["api", "sales", "vision"]) as never);
 
     const call = calls[0];

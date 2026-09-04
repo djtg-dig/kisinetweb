@@ -3,8 +3,24 @@ import "server-only";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { ACCESS_COOKIE_NAME, REFRESH_COOKIE_NAME } from "@/lib/server/cookies";
+import {
+  CSRF_HEADER_NAME,
+  createCsrfErrorResponse,
+  getCsrfToken,
+  validateCsrfToken,
+  validateOrigin,
+} from "@/lib/server/csrf";
 
 export async function POST(request: NextRequest) {
+  if (!validateOrigin(request)) {
+    return createCsrfErrorResponse();
+  }
+  const csrfCookie = getCsrfToken(request);
+  const csrfHeader = request.headers.get(CSRF_HEADER_NAME);
+  if (!validateCsrfToken(csrfCookie, csrfHeader)) {
+    return createCsrfErrorResponse();
+  }
+
   const refreshToken = request.cookies.get(REFRESH_COOKIE_NAME)?.value;
 
   if (refreshToken) {

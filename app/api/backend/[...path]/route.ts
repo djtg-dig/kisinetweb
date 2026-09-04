@@ -2,6 +2,14 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { filterResponseHeaders, signedBackendFetch } from "@/lib/server/backend-fetch";
 import { ACCESS_COOKIE_NAME, REFRESH_COOKIE_NAME } from "@/lib/server/cookies";
+import {
+  CSRF_HEADER_NAME,
+  createCsrfErrorResponse,
+  getCsrfToken,
+  isMutationMethod,
+  validateCsrfToken,
+  validateOrigin,
+} from "@/lib/server/csrf";
 
 type RouteContext = {
   params: Promise<{ path?: string[] }>;
@@ -13,6 +21,17 @@ async function proxyBackendRequest(request: NextRequest, context: RouteContext):
   const method = request.method.toUpperCase();
   if (!SUPPORTED_METHODS.includes(method as (typeof SUPPORTED_METHODS)[number])) {
     return NextResponse.json({ detail: "Méthode non supportée par le BFF." }, { status: 405 });
+  }
+
+  if (isMutationMethod(method)) {
+    if (!validateOrigin(request)) {
+      return createCsrfErrorResponse();
+    }
+    const csrfCookie = getCsrfToken(request);
+    const csrfHeader = request.headers.get(CSRF_HEADER_NAME);
+    if (!validateCsrfToken(csrfCookie, csrfHeader)) {
+      return createCsrfErrorResponse();
+    }
   }
 
   try {

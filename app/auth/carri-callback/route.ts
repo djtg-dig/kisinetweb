@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { ACCESS_COOKIE_NAME, REFRESH_COOKIE_NAME } from "@/lib/server/cookies";
 import { carriAccountCallbackUrl } from "@/lib/server/backend-url";
+import { generateCsrfToken, CSRF_COOKIE_NAME } from "@/lib/server/csrf";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -62,6 +63,16 @@ export async function GET(request: NextRequest) {
       httpOnly: true,
       path: "/",
       maxAge: 90 * 24 * 60 * 60,
+      sameSite: "lax",
+      secure: isProduction,
+    });
+
+    nextResponse.cookies.set({
+      name: CSRF_COOKIE_NAME,
+      value: generateCsrfToken(),
+      httpOnly: false,
+      path: "/",
+      maxAge: 60 * 60 * 24,
       sameSite: "lax",
       secure: isProduction,
     });
