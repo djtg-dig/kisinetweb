@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { filterResponseHeaders, signedBackendFetch } from "@/lib/server/backend-fetch";
 import { ACCESS_COOKIE_NAME, REFRESH_COOKIE_NAME } from "@/lib/server/cookies";
+import { ADMIN_ACCESS_COOKIE_NAME, ADMIN_REFRESH_COOKIE_NAME } from "@/lib/server/admin-cookies";
 import {
   CSRF_HEADER_NAME,
   createCsrfErrorResponse,
@@ -38,12 +39,19 @@ async function proxyBackendRequest(request: NextRequest, context: RouteContext):
     const params = await context.params;
     const backendPath = buildDjangoPath(params.path ?? [], request.nextUrl.search);
 
-    const accessToken = request.cookies.get(ACCESS_COOKIE_NAME)?.value;
-    const refreshToken = request.cookies.get(REFRESH_COOKIE_NAME)?.value;
+    const userAccessToken = request.cookies.get(ACCESS_COOKIE_NAME)?.value;
+    const userRefreshToken = request.cookies.get(REFRESH_COOKIE_NAME)?.value;
+    const adminAccessToken = request.cookies.get(ADMIN_ACCESS_COOKIE_NAME)?.value;
+    const adminRefreshToken = request.cookies.get(ADMIN_REFRESH_COOKIE_NAME)?.value;
+
+    const accessToken = userAccessToken || adminAccessToken;
+    const refreshToken = userAccessToken ? userRefreshToken : adminRefreshToken;
 
     if (!accessToken) {
       return NextResponse.json({ detail: "Non authentifié." }, { status: 401 });
     }
+
+    const isAdminSession = Boolean(adminAccessToken);
 
     const body = method === "GET" || method === "HEAD" ? null : await request.arrayBuffer();
 
@@ -56,7 +64,7 @@ async function proxyBackendRequest(request: NextRequest, context: RouteContext):
     });
 
     if (response.status === 401 && refreshToken) {
-      const refreshed = await tryRefreshTokens(refreshToken, accessToken);
+      const refreshed = await tryRefreshTokens(refreshToken, accessToken, isAdminSession);
       if (refreshed) {
         const retryResponse = await signedBackendFetch({
           path: backendPath,
@@ -73,19 +81,31 @@ async function proxyBackendRequest(request: NextRequest, context: RouteContext):
             statusText: retryResponse.statusText,
             headers: filterResponseHeaders(retryResponse.headers),
           });
-          setAuthCookies(nextResponse, refreshed.newAccessToken, refreshed.newRefreshToken || refreshToken);
+          if (isAdminSession) {
+            setAdminAuthCookies(nextResponse, refreshed.newAccessToken, refreshed.newRefreshToken || refreshToken);
+          } else {
+            setAuthCookies(nextResponse, refreshed.newAccessToken, refreshed.newRefreshToken || refreshToken);
+          }
           return nextResponse;
         }
 
         if (retryResponse.status === 401) {
           const errorResponse = NextResponse.json({ detail: "Session expirée." }, { status: 401 });
-          clearAuthCookies(errorResponse);
+          if (isAdminSession) {
+            clearAdminAuthCookies(errorResponse);
+          } else {
+            clearAuthCookies(errorResponse);
+          }
           return errorResponse;
         }
       }
 
       const errorResponse = NextResponse.json({ detail: "Session expirée." }, { status: 401 });
-      clearAuthCookies(errorResponse);
+      if (isAdminSession) {
+        clearAdminAuthCookies(errorResponse);
+      } else {
+        clearAuthCookies(errorResponse);
+      }
       return errorResponse;
     }
 
@@ -108,10 +128,11 @@ type RefreshResult = {
   newRefreshToken: string;
 } | null;
 
-async function tryRefreshTokens(refreshToken: string, currentAccessToken: string): Promise<RefreshResult> {
+async function tryRefreshTokens(refreshToken: string, currentAccessToken: string, isAdmin: boolean): Promise<RefreshResult> {
+  const refreshPath = isAdmin ? "/api/admin/auth/refresh/" : "/api/accounts/token/refresh/";
   try {
     const response = await signedBackendFetch({
-      path: "/api/accounts/token/refresh/",
+      path: refreshPath,
       method: "POST",
       body: JSON.stringify({ refresh: refreshToken }),
       accessToken: currentAccessToken,
@@ -167,6 +188,50 @@ function clearAuthCookies(response: NextResponse): void {
   });
   response.cookies.set({
     name: REFRESH_COOKIE_NAME,
+    value: "",
+    httpOnly: true,
+    path: "/",
+    maxAge: 0,
+    sameSite: "lax",
+    secure: isProduction,
+  });
+}
+
+function setAdminAuthCookies(response: NextResponse, accessToken: string, refreshToken: string): void {
+  const isProduction = process.env.NODE_ENV === "production";
+  response.cookies.set({
+    name: ADMIN_ACCESS_COOKIE_NAME,
+    value: accessToken,
+    httpOnly: true,
+    path: "/",
+    maxAge: 60 * 60,
+    sameSite: "lax",
+    secure: isProduction,
+  });
+  response.cookies.set({
+    name: ADMIN_REFRESH_COOKIE_NAME,
+    value: refreshToken,
+    httpOnly: true,
+    path: "/",
+    maxAge: 90 * 24 * 60 * 60,
+    sameSite: "lax",
+    secure: isProduction,
+  });
+}
+
+function clearAdminAuthCookies(response: NextResponse): void {
+  const isProduction = process.env.NODE_ENV === "production";
+  response.cookies.set({
+    name: ADMIN_ACCESS_COOKIE_NAME,
+    value: "",
+    httpOnly: true,
+    path: "/",
+    maxAge: 0,
+    sameSite: "lax",
+    secure: isProduction,
+  });
+  response.cookies.set({
+    name: ADMIN_REFRESH_COOKIE_NAME,
     value: "",
     httpOnly: true,
     path: "/",

@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse, type NextRequest } from "next/server";
 
-import { ACCESS_COOKIE_NAME, REFRESH_COOKIE_NAME } from "@/lib/server/cookies";
+import { ADMIN_ACCESS_COOKIE_NAME, ADMIN_REFRESH_COOKIE_NAME } from "@/lib/server/admin-cookies";
 import { signedBackendFetch } from "@/lib/server/backend-fetch";
 import {
   CSRF_HEADER_NAME,
@@ -22,20 +22,19 @@ export async function POST(request: NextRequest) {
     return createCsrfErrorResponse();
   }
 
-  const accessToken = request.cookies.get(ACCESS_COOKIE_NAME)?.value;
-  const refreshToken = request.cookies.get(REFRESH_COOKIE_NAME)?.value;
+  const accessToken = request.cookies.get(ADMIN_ACCESS_COOKIE_NAME)?.value;
+  const refreshToken = request.cookies.get(ADMIN_REFRESH_COOKIE_NAME)?.value;
 
   if (refreshToken) {
     try {
-      const body = JSON.stringify({ refresh: refreshToken });
       await signedBackendFetch({
-        path: "/api/accounts/logout/",
+        path: "/api/admin/auth/logout/",
         method: "POST",
-        body,
+        body: JSON.stringify({ refresh: refreshToken }),
         accessToken: accessToken || undefined,
       });
     } catch {
-      // Best effort logout - continue to clear cookies
+      // Best effort logout
     }
   }
 
@@ -43,7 +42,7 @@ export async function POST(request: NextRequest) {
   const isProduction = process.env.NODE_ENV === "production";
 
   nextResponse.cookies.set({
-    name: ACCESS_COOKIE_NAME,
+    name: ADMIN_ACCESS_COOKIE_NAME,
     value: "",
     httpOnly: true,
     path: "/",
@@ -53,7 +52,7 @@ export async function POST(request: NextRequest) {
   });
 
   nextResponse.cookies.set({
-    name: REFRESH_COOKIE_NAME,
+    name: ADMIN_REFRESH_COOKIE_NAME,
     value: "",
     httpOnly: true,
     path: "/",
