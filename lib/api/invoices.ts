@@ -1,4 +1,3 @@
-import { getAccessToken } from "@/lib/auth";
 import { apiBaseUrl } from "@/lib/carri-account";
 import { apiFetch } from "@/lib/api/request";
 
@@ -288,16 +287,10 @@ async function fetchInvoicesJson<T>(path: string): Promise<T> {
 }
 
 async function fetchInvoicesResponse(path: string, init: RequestInit = {}) {
-  const accessToken = getAccessToken();
-  if (!accessToken) {
-    throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
-  }
-
   return apiFetch(apiBaseUrl.replace(/\/$/, "") + path, {
     cache: "no-store",
     ...init,
     headers: {
-      Authorization: "Bearer " + accessToken,
       Accept: "application/json",
       ...(init.body ? { "Content-Type": "application/json" } : {}),
       ...init.headers,

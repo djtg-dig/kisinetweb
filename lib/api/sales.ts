@@ -5,7 +5,6 @@ import {
   type AccountProfile,
   type ProductSummary,
 } from "@/lib/api";
-import { getAccessToken } from "@/lib/auth";
 import { apiBaseUrl } from "@/lib/carri-account";
 import { ApiError } from "./errors";
 
@@ -132,11 +131,6 @@ export async function analyzePrescription(
   image: Blob,
   signal?: AbortSignal,
 ): Promise<DetectedMedication[]> {
-  const accessToken = getAccessToken();
-  if (!accessToken) {
-    throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
-  }
-
   const form = new FormData();
   form.append("pharmacy_reference", pharmacyId);
   form.append("image", image);
@@ -145,7 +139,6 @@ export async function analyzePrescription(
     method: "POST",
     cache: "no-store",
     headers: {
-      Authorization: "Bearer " + accessToken,
       Accept: "application/json",
     },
     body: form,
@@ -181,11 +174,6 @@ export async function uploadPrescriptionCapture(
   pharmacyId: string,
   image: Blob,
 ): Promise<void> {
-  const accessToken = getAccessToken();
-  if (!accessToken) {
-    return;
-  }
-
   const form = new FormData();
   form.append("pharmacy", pharmacyId);
   form.append("image", image);
@@ -196,7 +184,6 @@ export async function uploadPrescriptionCapture(
       method: "POST",
       cache: "no-store",
       headers: {
-        Authorization: "Bearer " + accessToken,
         Accept: "application/json",
       },
       body: form,
@@ -226,11 +213,6 @@ export async function uploadPrescriptionCapture(
 }
 
 export async function createSale(payload: CreateSalePayload): Promise<CreatedSale> {
-  const accessToken = getAccessToken();
-  if (!accessToken) {
-    throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
-  }
-
   const subtotal = payload.items.reduce(
     (total, item) => total + item.unitPrice * item.quantity,
     0,
@@ -257,7 +239,6 @@ export async function createSale(payload: CreateSalePayload): Promise<CreatedSal
     method: "POST",
     cache: "no-store",
     headers: {
-      Authorization: "Bearer " + accessToken,
       Accept: "application/json",
       "Content-Type": "application/json",
     },

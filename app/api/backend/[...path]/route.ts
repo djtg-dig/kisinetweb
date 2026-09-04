@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { filterResponseHeaders, signedBackendFetch } from "@/lib/server/backend-fetch";
-import { ACCESS_COOKIE_NAME } from "@/lib/server/cookies";
+import { ACCESS_COOKIE_NAME, REFRESH_COOKIE_NAME } from "@/lib/server/cookies";
 
 type RouteContext = {
   params: Promise<{ path?: string[] }>;
@@ -18,8 +18,16 @@ async function proxyBackendRequest(request: NextRequest, context: RouteContext):
   try {
     const params = await context.params;
     const backendPath = buildDjangoPath(params.path ?? [], request.nextUrl.search);
+
+    const accessToken = request.cookies.get(ACCESS_COOKIE_NAME)?.value;
+    const refreshToken = request.cookies.get(REFRESH_COOKIE_NAME)?.value;
+
+    if (!accessToken) {
+      return NextResponse.json({ detail: "Non authentifié." }, { status: 401 });
+    }
+
     const body = method === "GET" || method === "HEAD" ? null : await request.arrayBuffer();
-    const accessToken = readAccessToken(request);
+
     const response = await signedBackendFetch({
       path: backendPath,
       method,
@@ -27,6 +35,40 @@ async function proxyBackendRequest(request: NextRequest, context: RouteContext):
       body,
       accessToken,
     });
+
+    if (response.status === 401 && refreshToken) {
+      const refreshed = await tryRefreshTokens(refreshToken, accessToken);
+      if (refreshed) {
+        const retryResponse = await signedBackendFetch({
+          path: backendPath,
+          method,
+          headers: request.headers,
+          body,
+          accessToken: refreshed.newAccessToken,
+        });
+
+        if (retryResponse.ok) {
+          const bodyBytes = await retryResponse.arrayBuffer();
+          const nextResponse = new NextResponse(bodyBytes, {
+            status: retryResponse.status,
+            statusText: retryResponse.statusText,
+            headers: filterResponseHeaders(retryResponse.headers),
+          });
+          setAuthCookies(nextResponse, refreshed.newAccessToken, refreshed.newRefreshToken || refreshToken);
+          return nextResponse;
+        }
+
+        if (retryResponse.status === 401) {
+          const errorResponse = NextResponse.json({ detail: "Session expirée." }, { status: 401 });
+          clearAuthCookies(errorResponse);
+          return errorResponse;
+        }
+      }
+
+      const errorResponse = NextResponse.json({ detail: "Session expirée." }, { status: 401 });
+      clearAuthCookies(errorResponse);
+      return errorResponse;
+    }
 
     if (process.env.NODE_ENV !== "production") {
       console.info("[BFF] " + method + " " + backendPath + " -> " + response.status);
@@ -40,6 +82,79 @@ async function proxyBackendRequest(request: NextRequest, context: RouteContext):
   } catch {
     return NextResponse.json({ detail: "Requête backend invalide ou indisponible." }, { status: 502 });
   }
+}
+
+type RefreshResult = {
+  newAccessToken: string;
+  newRefreshToken: string;
+} | null;
+
+async function tryRefreshTokens(refreshToken: string, currentAccessToken: string): Promise<RefreshResult> {
+  try {
+    const response = await signedBackendFetch({
+      path: "/api/accounts/token/refresh/",
+      method: "POST",
+      body: JSON.stringify({ refresh: refreshToken }),
+      accessToken: currentAccessToken,
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    return {
+      newAccessToken: data.access,
+      newRefreshToken: data.refresh || refreshToken,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function setAuthCookies(response: NextResponse, accessToken: string, refreshToken: string): void {
+  const isProduction = process.env.NODE_ENV === "production";
+  response.cookies.set({
+    name: ACCESS_COOKIE_NAME,
+    value: accessToken,
+    httpOnly: true,
+    path: "/",
+    maxAge: 60 * 60,
+    sameSite: "lax",
+    secure: isProduction,
+  });
+  response.cookies.set({
+    name: REFRESH_COOKIE_NAME,
+    value: refreshToken,
+    httpOnly: true,
+    path: "/",
+    maxAge: 90 * 24 * 60 * 60,
+    sameSite: "lax",
+    secure: isProduction,
+  });
+}
+
+function clearAuthCookies(response: NextResponse): void {
+  const isProduction = process.env.NODE_ENV === "production";
+  response.cookies.set({
+    name: ACCESS_COOKIE_NAME,
+    value: "",
+    httpOnly: true,
+    path: "/",
+    maxAge: 0,
+    sameSite: "lax",
+    secure: isProduction,
+  });
+  response.cookies.set({
+    name: REFRESH_COOKIE_NAME,
+    value: "",
+    httpOnly: true,
+    path: "/",
+    maxAge: 0,
+    sameSite: "lax",
+    secure: isProduction,
+  });
 }
 
 function buildDjangoPath(parts: string[], search: string): string {
@@ -72,16 +187,6 @@ function assertSafePathSegment(part: string): string {
   }
 
   return part;
-}
-
-function readAccessToken(request: NextRequest): string {
-  const cookieToken = request.cookies?.get?.(ACCESS_COOKIE_NAME)?.value;
-  if (cookieToken) {
-    return cookieToken;
-  }
-  const authorization = request.headers.get("authorization") ?? "";
-  const prefix = "Bearer ";
-  return authorization.startsWith(prefix) ? authorization.slice(prefix.length) : "";
 }
 
 export const GET = proxyBackendRequest;

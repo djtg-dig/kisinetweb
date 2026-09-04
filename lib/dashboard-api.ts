@@ -1,5 +1,4 @@
 import { apiFetch } from "@/lib/api/request";
-import { getAccessToken } from "@/lib/auth";
 import { dedupeRequest } from "@/lib/api-request-cache";
 import { apiBaseUrl } from "@/lib/carri-account";
 import {
@@ -101,16 +100,10 @@ type ApiActivity = {
 };
 
 async function fetchDashboardJson<T>(path: string): Promise<T> {
-  const accessToken = getAccessToken();
-  if (!accessToken) {
-    throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
-  }
-
-  return dedupeRequest("auth:" + accessToken + ":GET:" + path, async () => {
+  return dedupeRequest("dashboard:GET:" + path, async () => {
     const response = await apiFetch(apiBaseUrl.replace(/\/$/, "") + path, {
       cache: "no-store",
       headers: {
-        Authorization: "Bearer " + accessToken,
         Accept: "application/json",
       },
     });

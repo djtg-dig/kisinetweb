@@ -1,4 +1,3 @@
-import { getAccessToken } from "@/lib/auth";
 import { authenticatedFetch } from "@/lib/api";
 import { apiBaseUrl } from "@/lib/carri-account";
 
@@ -684,11 +683,6 @@ async function fetchBillingJson<T>(
   fallbackMessage: string,
   init: RequestInit = {},
 ): Promise<T> {
-  const accessToken = getAccessToken();
-  if (!accessToken) {
-    throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
-  }
-
   const response = await authenticatedFetch(
     apiBaseUrl.replace(/\/$/, "") + path,
     {

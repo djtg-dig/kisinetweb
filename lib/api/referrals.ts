@@ -1,5 +1,4 @@
 import { apiFetch } from "@/lib/api/request";
-import { getAccessToken } from "@/lib/auth";
 import { apiBaseUrl } from "@/lib/carri-account";
 
 export type ReferralWalletSummary = {
@@ -188,16 +187,10 @@ export async function createReferralWithdrawal(
 }
 
 async function fetchReferralJson<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const accessToken = getAccessToken();
-  if (!accessToken) {
-    throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
-  }
-
   const response = await apiFetch(apiBaseUrl.replace(/\/$/, "") + path, {
     cache: "no-store",
     ...init,
     headers: {
-      Authorization: "Bearer " + accessToken,
       Accept: "application/json",
       ...(init.body ? { "Content-Type": "application/json" } : {}),
       ...init.headers,

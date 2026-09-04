@@ -1,5 +1,3 @@
-import { getAccessToken, getRefreshToken, logout } from "@/lib/auth";
-import { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY } from "@/lib/auth";
 import { dedupeRequest } from "@/lib/api-request-cache";
 import { apiBaseUrl } from "@/lib/carri-account";
 import { apiFetch } from "@/lib/api/request";
@@ -381,84 +379,7 @@ export type PublicPharmacyFilterOptions = {
 
 type UnknownRecord = Record<string, unknown>;
 
-// ──────────────────────────────────────────────────
-// Gestion du refresh token automatique
-// ──────────────────────────────────────────────────
-
-// Promesse partagée du refresh en cours. Elle sert de verrou single-flight :
-// dès qu'un refresh démarre, tous les appelants concurrents se branchent dessus
-// au lieu de lancer leur propre requête `/api/accounts/token/refresh/`. Elle est
-// assignée de façon synchrone (avant tout `await`) afin qu'aucun second appel
-// ne puisse créer un refresh concurrent. `isRefreshing` n'est plus nécessaire.
-let refreshPromise: Promise<boolean> | null = null;
-
-async function refreshAccessTokenIfNeeded(): Promise<boolean> {
-  // Un refresh est déjà en cours : on rejoint la même promesse. Cela empêche
-  // plusieurs POST /token/refresh/ simultanés, qui avec ROTATE_REFRESH_TOKENS +
-  // BLACKLIST_AFTER_ROTATION feraient échouer le second (refresh déjà blacklisté)
-  // et déclencheraient un logout intempestif.
-  if (refreshPromise) {
-    return refreshPromise;
-  }
-
-  // La promesse est créée immédiatement (synchrone) ; le corps asynchrone ne
-  // tourne qu'une seule fois. `finally` ne la nettoie qu'après résolution.
-  refreshPromise = performTokenRefresh();
-
-  try {
-    return await refreshPromise;
-  } finally {
-    refreshPromise = null;
-  }
-}
-
-// Corps réel du refresh. Single-flight : appelé une seule fois à la fois grâce
-// au verrou `refreshPromise` ci-dessus.
-async function performTokenRefresh(): Promise<boolean> {
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) {
-    return false;
-  }
-
-  try {
-    const response = await apiFetch(
-      apiBaseUrl.replace(/\/$/, "") + "/api/accounts/token/refresh/",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({ refresh: refreshToken }),
-      },
-    );
-
-    if (!response.ok) {
-      return false;
-    }
-
-    const data = await response.json();
-    if (!data?.access) {
-      return false;
-    }
-
-    // Nouveau access token (obligatoire). Le refresh token tourné par le backend
-    // (ROTATE_REFRESH_TOKENS) est stocké si présent, sinon l'ancien reste valide.
-    localStorage.setItem(ACCESS_TOKEN_KEY, data.access);
-    if (data.refresh) {
-      localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh);
-    }
-
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-// Erreur levée quand la session est invalidée (token absent, expiré ou refusé
-// même après tentative de refresh). On expose un message clair et stable afin
-// que l'interface puisse proposer une reconnexion à la place d'un message
-// brut du backend (ex. « Given token not valid for any token type »).
+// Erreur levée quand la session est invalidée (token absent, expiré ou refusé).
 export class ApiAuthError extends Error {
   constructor() {
     super("Votre session a expiré. Veuillez vous reconnecter.");
@@ -477,52 +398,20 @@ export async function authenticatedFetch(
   input: RequestInfo,
   init?: RequestInit,
 ): Promise<Response> {
-  const accessToken = getAccessToken();
-  if (!accessToken) {
-    throw new ApiAuthError();
-  }
-
   const headers = new Headers(init?.headers);
-  headers.set("Authorization", "Bearer " + accessToken);
+  headers.delete("Authorization");
 
-  let response = await apiFetch(input, {
+  const response = await apiFetch(input, {
     ...init,
     headers,
   });
 
-  // 403 signifie "authentifié mais non autorisé" : aucune reconnexion automatique.
   if (isAuthorizationDeniedStatus(response.status)) {
     throw new ApiAuthorizationError();
   }
 
-  // 401 signifie "session invalide/expirée" : tenter un refresh puis rejouer.
   if (isSessionExpiredStatus(response.status)) {
-    const originalAccessToken = accessToken;
-    const refreshed = await refreshAccessTokenIfNeeded();
-    const currentAccessToken = getAccessToken();
-
-    // On rejoue la requête initiale avec le token (éventuellement renouvelé)
-    // une seule fois. Le refresh est single-flight : un appel concurrent rejoint
-    // la même promesse et ne déclenche pas son propre logout intempestif.
-    if (refreshed || currentAccessToken !== originalAccessToken) {
-      const newToken = currentAccessToken || originalAccessToken;
-      headers.set("Authorization", "Bearer " + newToken);
-      response = await apiFetch(input, {
-        ...init,
-        headers,
-      });
-    }
-
-    // 401 persistant APRÈS le refresh partagé et le retry : la session est
-    // réellement invalidée. On lève une erreur claire au lieu de renvoyer le
-    // message brut de l'API (ex. « Given token not valid for any token type »).
-    if (isSessionExpiredStatus(response.status)) {
-      logout();
-      throw new ApiAuthError();
-    }
-    if (isAuthorizationDeniedStatus(response.status)) {
-      throw new ApiAuthorizationError();
-    }
+    throw new ApiAuthError();
   }
 
   return response;
@@ -835,12 +724,7 @@ function normalizeOptionsWithMeta(
 
 export async function getUserPharmacies(): Promise<PharmacySummary[]> {
   // API reelle du backend Kisinet: GET /api/pharmacies/
-  const accessToken = getAccessToken();
-  if (!accessToken) {
-    throw new ApiAuthError();
-  }
-
-  return dedupeRequest("auth:" + accessToken + ":GET:/api/pharmacies/", async () => {
+  return dedupeRequest("GET:/api/pharmacies/", async () => {
     const response = await authenticatedFetch(apiBaseUrl.replace(/\/$/, "") + "/api/pharmacies/", {
       cache: "no-store",
       headers: {
@@ -879,12 +763,7 @@ export async function getUserPharmacies(): Promise<PharmacySummary[]> {
 }
 
 async function fetchApiJson<T>(path: string, fallbackMessage: string): Promise<T> {
-  const accessToken = getAccessToken();
-  if (!accessToken) {
-    throw new ApiAuthError();
-  }
-
-  return dedupeRequest("auth:" + accessToken + ":GET:" + path, async () => {
+  return dedupeRequest("GET:" + path, async () => {
     const response = await authenticatedFetch(apiBaseUrl.replace(/\/$/, "") + path, {
       cache: "no-store",
       headers: {
@@ -924,11 +803,6 @@ async function fetchPublicApiJson<T>(path: string, fallbackMessage: string): Pro
 }
 
 async function postApiJson<T>(path: string, fallbackMessage: string): Promise<T> {
-  const accessToken = getAccessToken();
-  if (!accessToken) {
-    throw new ApiAuthError();
-  }
-
   const response = await authenticatedFetch(apiBaseUrl.replace(/\/$/, "") + path, {
     method: "POST",
     cache: "no-store",
@@ -952,11 +826,6 @@ async function postJson<T>(
   fallbackMessage: string,
   body?: unknown,
 ): Promise<T> {
-  const accessToken = getAccessToken();
-  if (!accessToken) {
-    throw new ApiAuthError();
-  }
-
   const response = await authenticatedFetch(apiBaseUrl.replace(/\/$/, "") + path, {
     method: "POST",
     cache: "no-store",
@@ -983,11 +852,6 @@ async function sendApiJson<T>(
   fallbackMessage: string,
   body?: unknown,
 ): Promise<T> {
-  const accessToken = getAccessToken();
-  if (!accessToken) {
-    throw new ApiAuthError();
-  }
-
   const headers: HeadersInit = {
     Accept: "application/json",
   };
@@ -1860,11 +1724,6 @@ export async function createPharmacyLegalDocument(
   if (input.expires_at) formData.append("expires_at", input.expires_at);
   if (input.issuing_authority) formData.append("issuing_authority", input.issuing_authority);
 
-  const accessToken = getAccessToken();
-  if (!accessToken) {
-    throw new ApiAuthError();
-  }
-
   const response = await authenticatedFetch(
     apiBaseUrl.replace(/\/$/, "") + "/api/pharmacies/" + pharmacyId + "/legal-documents/",
     {
@@ -1872,7 +1731,6 @@ export async function createPharmacyLegalDocument(
       cache: "no-store",
       headers: {
         Accept: "application/json",
-        Authorization: "Bearer " + accessToken,
       },
       body: formData,
     },
@@ -1904,11 +1762,6 @@ export async function updatePharmacyLegalDocument(
     formData.append("issuing_authority", input.issuing_authority);
   if (input.is_active !== undefined) formData.append("is_active", String(input.is_active));
 
-  const accessToken = getAccessToken();
-  if (!accessToken) {
-    throw new ApiAuthError();
-  }
-
   const response = await authenticatedFetch(
     apiBaseUrl.replace(/\/$/, "") + "/api/pharmacies/" + pharmacyId + "/legal-documents/" + documentId + "/",
     {
@@ -1916,7 +1769,6 @@ export async function updatePharmacyLegalDocument(
       cache: "no-store",
       headers: {
         Accept: "application/json",
-        Authorization: "Bearer " + accessToken,
       },
       body: formData,
     },
@@ -1933,11 +1785,6 @@ export async function updatePharmacyLegalDocument(
 }
 
 export async function deletePharmacyLegalDocument(pharmacyId: string, documentId: number) {
-  const accessToken = getAccessToken();
-  if (!accessToken) {
-    throw new ApiAuthError();
-  }
-
   const response = await authenticatedFetch(
     apiBaseUrl.replace(/\/$/, "") + "/api/pharmacies/" + pharmacyId + "/legal-documents/" + documentId + "/",
     {
@@ -1945,7 +1792,6 @@ export async function deletePharmacyLegalDocument(pharmacyId: string, documentId
       cache: "no-store",
       headers: {
         Accept: "application/json",
-        Authorization: "Bearer " + accessToken,
       },
     },
   );
@@ -1961,11 +1807,6 @@ export async function getPharmacyLegalDocumentDownloadUrl(
   pharmacyId: string,
   documentId: number,
 ): Promise<{ url: string }> {
-  const accessToken = getAccessToken();
-  if (!accessToken) {
-    throw new ApiAuthError();
-  }
-
   const response = await authenticatedFetch(
     apiBaseUrl.replace(/\/$/, "") + "/api/pharmacies/" + pharmacyId + "/legal-documents/" + documentId + "/download/",
     {
@@ -1973,7 +1814,6 @@ export async function getPharmacyLegalDocumentDownloadUrl(
       cache: "no-store",
       headers: {
         Accept: "application/json",
-        Authorization: "Bearer " + accessToken,
       },
     },
   );
@@ -2048,11 +1888,6 @@ export function parseJsonResponse(responseText: string) {
 }
 
 export async function createPharmacy(input: CreatePharmacyInput): Promise<PharmacySummary> {
-  const accessToken = getAccessToken();
-  if (!accessToken) {
-    throw new ApiAuthError();
-  }
-
   const adresse = {
     country: input.country,
     city_or_province: input.cityOrProvince || undefined,
@@ -2100,11 +1935,6 @@ export async function createPharmacy(input: CreatePharmacyInput): Promise<Pharma
 export async function createPharmacyJoinRequest(
   input: CreatePharmacyJoinRequestInput,
 ): Promise<PharmacyJoinRequestSummary> {
-  const accessToken = getAccessToken();
-  if (!accessToken) {
-    throw new ApiAuthError();
-  }
-
   const payload = {
     pharmacy: input.pharmacy,
     requested_role: input.requestedRole || "EMPLOYEE",

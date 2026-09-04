@@ -1,5 +1,4 @@
 import { apiFetch } from "@/lib/api/request";
-import { getAccessToken } from "@/lib/auth";
 import { apiBaseUrl } from "@/lib/carri-account";
 import { getApiErrorMessage, parseJsonResponse, type ProductFilters } from "@/lib/api";
 
@@ -140,11 +139,6 @@ export async function createProduct(
   pharmacyId: string,
   values: ProductFormValues,
 ): Promise<Product> {
-  const accessToken = getAccessToken();
-  if (!accessToken) {
-    throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
-  }
-
   const payload: CreateProductPayload = {
     pharmacy_reference: pharmacyId,
     name: values.name.trim(),
@@ -181,7 +175,6 @@ export async function createProduct(
     method: "POST",
     cache: "no-store",
     headers: {
-      Authorization: "Bearer " + accessToken,
       Accept: "application/json",
       "Content-Type": "application/json",
     },
@@ -206,11 +199,6 @@ export async function getProductDetail(
   pharmacyId: string,
   reference: string,
 ): Promise<Product> {
-  const accessToken = getAccessToken();
-  if (!accessToken) {
-    throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
-  }
-
   const params = new URLSearchParams({ pharmacy_reference: pharmacyId });
   const url =
     apiBaseUrl.replace(/\/$/, "") + "/api/products/" + reference + "/?" + params.toString();
@@ -218,7 +206,6 @@ export async function getProductDetail(
   const response = await apiFetch(url, {
     cache: "no-store",
     headers: {
-      Authorization: "Bearer " + accessToken,
       Accept: "application/json",
     },
   });
@@ -241,11 +228,6 @@ export async function deleteProduct(
   pharmacyId: string,
   reference: string,
 ): Promise<void> {
-  const accessToken = getAccessToken();
-  if (!accessToken) {
-    throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
-  }
-
   const params = new URLSearchParams({ pharmacy_reference: pharmacyId });
   const url =
     apiBaseUrl.replace(/\/$/, "") + "/api/products/" + reference + "/?" + params.toString();
@@ -254,7 +236,6 @@ export async function deleteProduct(
     method: "DELETE",
     cache: "no-store",
     headers: {
-      Authorization: "Bearer " + accessToken,
       Accept: "application/json",
     },
   });
@@ -276,11 +257,6 @@ export async function updateProduct(
   reference: string,
   values: ProductFormValues,
 ): Promise<Product> {
-  const accessToken = getAccessToken();
-  if (!accessToken) {
-    throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
-  }
-
   // PATCH partiel: on n'envoie que les champs renseignés. Les dates sont
   // envoyées en chaîne pour définir une valeur, ou en null pour l'effacer.
   const payload: Record<string, unknown> = {
@@ -322,7 +298,6 @@ export async function updateProduct(
     method: "PATCH",
     cache: "no-store",
     headers: {
-      Authorization: "Bearer " + accessToken,
       Accept: "application/json",
       "Content-Type": "application/json",
     },
@@ -404,11 +379,6 @@ export async function downloadProductExport(
   format: ProductExportFormat,
   filters: ProductFilters = {},
 ): Promise<string> {
-  const accessToken = getAccessToken();
-  if (!accessToken) {
-    throw new Error("Session introuvable. Reconnectez-vous avec Carri Account.");
-  }
-
   const params = new URLSearchParams({ pharmacy_reference: pharmacyId });
   appendProductExportFilters(params, filters);
 
@@ -418,7 +388,6 @@ export async function downloadProductExport(
     {
       cache: "no-store",
       headers: {
-        Authorization: "Bearer " + accessToken,
         // L'endpoint renvoie le vrai Content-Type du fichier; `*/*` laisse
         // aussi le backend retourner une erreur JSON lisible en cas de 403.
         Accept: "*/*",
