@@ -16,11 +16,10 @@ import {
 } from "@/lib/api/notifications";
 import {
   clearActivePharmacyId,
-  getAccessToken,
   logout,
   setActivePharmacyId,
-  subscribeToAuthChanges,
 } from "@/lib/auth";
+import { useSession } from "@/lib/hooks/use-session";
 
 type AppLayoutProps = {
   children: React.ReactNode;
@@ -56,6 +55,7 @@ export function AppLayout({ children, pharmacyId, permissions: initialPermission
   const [isMounted, setIsMounted] = useState(false);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const router = useRouter();
+  const { authenticated, loading: sessionLoading } = useSession();
 
   useEffect(() => {
     setIsMounted(true);
@@ -63,14 +63,15 @@ export function AppLayout({ children, pharmacyId, permissions: initialPermission
 
   useEffect(() => {
     function redirectIfSessionClosed() {
-      if (!getAccessToken()) {
+      if (!authenticated) {
         router.replace("/");
       }
     }
 
-    redirectIfSessionClosed();
-    return subscribeToAuthChanges(redirectIfSessionClosed);
-  }, [router]);
+    if (!sessionLoading) {
+      redirectIfSessionClosed();
+    }
+  }, [authenticated, sessionLoading, router]);
 
   useEffect(() => {
     if (!pharmacyId) return;

@@ -7,14 +7,6 @@ export const ACTIVE_PHARMACY_KEY = "kisinet:active_pharmacy_id";
 export const LAST_PHARMACY_KEY = ACTIVE_PHARMACY_KEY;
 export const AUTH_CHANGE_EVENT_KEY = "kisinet:auth_changed";
 
-export function getAccessToken() {
-  return "";
-}
-
-export function getRefreshToken() {
-  return "";
-}
-
 export function getActivePharmacyId() {
   if (typeof window === "undefined") {
     return "";

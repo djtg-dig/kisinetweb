@@ -24,10 +24,10 @@ import {
 } from "@/lib/api";
 import { carriAccountLoginUrl } from "@/lib/carri-account";
 import {
-  getAccessToken,
   getActivePharmacyId,
   setActivePharmacyId,
 } from "@/lib/auth";
+import { useSession } from "@/lib/hooks/use-session";
 
 type PageState = "loading" | "error" | "ready";
 type PharmacyState = "idle" | "unauthenticated" | "loading" | "error" | "empty" | "ready";
@@ -67,6 +67,7 @@ export default function PlanDetailPage() {
   const [paymentMessage, setPaymentMessage] = useState("");
   const [checkoutUrl, setCheckoutUrl] = useState("");
   const [activePayment, setActivePayment] = useState<PharmacySubscriptionPayment | null>(null);
+  const { authenticated } = useSession();
 
   // Nombre d'utilisateurs actifs a inclure dans l'abonnement (modele seat-based).
   const [userCountInput, setUserCountInput] = useState("1");
@@ -119,7 +120,7 @@ export default function PlanDetailPage() {
     let isMounted = true;
 
     async function loadPharmacies() {
-      if (!getAccessToken()) {
+      if (!authenticated) {
         setPharmacyState("unauthenticated");
         return;
       }
@@ -158,7 +159,7 @@ export default function PlanDetailPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [authenticated]);
 
   const selectedPharmacy =
     pharmacies.find((pharmacy) => pharmacy.id === selectedPharmacyId) || null;

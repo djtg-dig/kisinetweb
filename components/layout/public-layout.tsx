@@ -8,11 +8,11 @@ import { ThemeSwitcher } from "@/components/theme/theme-switcher";
 import { getUserPharmacies, type PharmacySummary } from "@/lib/api";
 import { carriAccountLoginUrl } from "@/lib/carri-account";
 import {
-  getAccessToken,
   getActivePharmacyId,
   logout,
   subscribeToAuthChanges,
 } from "@/lib/auth";
+import { useSession } from "@/lib/hooks/use-session";
 
 type PublicLayoutProps = {
   children: React.ReactNode;
@@ -34,6 +34,7 @@ const navLinks = [
 
 export function PublicLayout({ children, activePharmacy = null, userData: initialUserData }: PublicLayoutProps) {
   const [isMounted, setIsMounted] = useState(false);
+  const { authenticated } = useSession();
   const [userMenu, setUserMenu] = useState<{
     isLoggedIn: boolean;
     contextPharmacy: PharmacySummary | null;
@@ -52,9 +53,7 @@ export function PublicLayout({ children, activePharmacy = null, userData: initia
     let isMounted = true;
 
     async function loadUserMenu() {
-      const accessToken = getAccessToken();
-
-      if (!accessToken) {
+      if (!authenticated) {
         if (isMounted) {
           setUserMenu({ isLoggedIn: false, contextPharmacy: null });
         }
@@ -63,9 +62,9 @@ export function PublicLayout({ children, activePharmacy = null, userData: initia
 
       if (activePharmacy || initialUserData?.contextPharmacy) {
         if (isMounted) {
-          setUserMenu({ 
-            isLoggedIn: true, 
-            contextPharmacy: activePharmacy ?? initialUserData?.contextPharmacy ?? null 
+          setUserMenu({
+            isLoggedIn: true,
+            contextPharmacy: activePharmacy ?? initialUserData?.contextPharmacy ?? null
           });
         }
         return;
@@ -74,7 +73,7 @@ export function PublicLayout({ children, activePharmacy = null, userData: initia
       try {
         const pharmacies = await getUserPharmacies();
         if (!isMounted) return;
-        
+
         const lastPharmacyId = getActivePharmacyId();
         const lastPharmacy = pharmacies.find(
           (pharmacy) => pharmacy.id === lastPharmacyId,
@@ -98,7 +97,7 @@ export function PublicLayout({ children, activePharmacy = null, userData: initia
       isMounted = false;
       unsubscribe();
     };
-  }, [activePharmacy, initialUserData?.contextPharmacy]);
+  }, [authenticated, activePharmacy, initialUserData?.contextPharmacy]);
 
   useEffect(() => {
     function closeMenuOnOutsideClick(event: MouseEvent) {

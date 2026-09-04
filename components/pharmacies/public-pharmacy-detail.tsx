@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { JoinRequestModal } from "@/components/pharmacies/join-request-modal";
 import type { PharmacySummary } from "@/lib/api";
-import { getAccessToken } from "@/lib/auth";
+import { useSession } from "@/lib/hooks/use-session";
 
 type PublicPharmacyDetailProps = {
   pharmacy: PharmacySummary;
@@ -12,6 +12,7 @@ type PublicPharmacyDetailProps = {
 export function PublicPharmacyDetail({ pharmacy }: PublicPharmacyDetailProps) {
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
   const [loginToast, setLoginToast] = useState("");
+  const { authenticated } = useSession();
 
   useEffect(() => {
     if (!loginToast) {
@@ -26,7 +27,7 @@ export function PublicPharmacyDetail({ pharmacy }: PublicPharmacyDetailProps) {
   }, [loginToast]);
 
   function openJoinRequest() {
-    if (!getAccessToken()) {
+    if (!authenticated) {
       setLoginToast("Veuillez d'abord vous connecter.");
       return;
     }

@@ -19,11 +19,11 @@ import {
   type ReferralPayoutAccount,
 } from "@/lib/api/referrals";
 import {
-  getAccessToken,
   getActivePharmacyId,
   logout,
 } from "@/lib/auth";
 import { carriAccountLoginUrl } from "@/lib/carri-account";
+import { useSession } from "@/lib/hooks/use-session";
 
 type PageState = "loading" | "anonymous" | "ready";
 
@@ -34,11 +34,11 @@ export default function AccountSettingsPage() {
   const [pharmacyCount, setPharmacyCount] = useState(0);
   const [pharmacyLoadMessage, setPharmacyLoadMessage] = useState("");
   const [payoutAccounts, setPayoutAccounts] = useState<ReferralPayoutAccount[]>([]);
+  const { authenticated } = useSession();
 
   useEffect(() => {
     async function loadSettingsContext() {
-      const accessToken = getAccessToken();
-      if (!accessToken) {
+      if (!authenticated) {
         setState("anonymous");
         return;
       }

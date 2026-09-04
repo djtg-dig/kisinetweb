@@ -1,36 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getAccessToken, getActivePharmacyId } from "@/lib/auth";
+import { useSession } from "@/lib/hooks/use-session";
+import { getActivePharmacyId } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/ui/link-button";
 
-type PrimaryAction = {
-  href: string;
-  label: string;
-};
-
 export function NotFoundActions() {
-  const [primaryAction, setPrimaryAction] = useState<PrimaryAction>({
-    href: "/",
-    label: "Retour à l'accueil",
-  });
+  const { authenticated, loading } = useSession();
 
-  useEffect(() => {
-    const accessToken = getAccessToken();
-
-    if (!accessToken) {
-      return;
+  const getPrimaryAction = () => {
+    if (loading || !authenticated) {
+      return { href: "/", label: "Retour à l'accueil" };
     }
 
     const activePharmacyId = getActivePharmacyId();
-    setPrimaryAction({
+    return {
       href: activePharmacyId
         ? "/app/pharmacies/" + activePharmacyId + "/dashboard"
         : "/app/select-pharmacy",
       label: "Retour au tableau de bord",
-    });
-  }, []);
+    };
+  };
+
+  const primaryAction = getPrimaryAction();
 
   function goBack() {
     window.history.back();

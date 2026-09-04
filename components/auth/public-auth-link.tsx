@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { LinkButton } from "@/components/ui/link-button";
+import { useSession } from "@/lib/hooks/use-session";
 import { carriAccountLoginUrl } from "@/lib/carri-account";
-import { getAccessToken } from "@/lib/auth";
+import { LinkButton } from "@/components/ui/link-button";
 
 type PublicAuthLinkProps = {
   children: React.ReactNode;
@@ -20,19 +19,23 @@ export function PublicAuthLink({
   loggedInLabel = "Ouvrir Kisinet",
   variant = "primary",
 }: PublicAuthLinkProps) {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const { authenticated, loading } = useSession();
 
-  useEffect(() => {
-    setIsLoggedIn(Boolean(getAccessToken()));
-  }, []);
+  if (loading) {
+    return (
+      <LinkButton href={carriAccountLoginUrl} variant={variant} className={className}>
+        {children}
+      </LinkButton>
+    );
+  }
 
   return (
     <LinkButton
-      href={isLoggedIn ? loggedInHref : carriAccountLoginUrl}
+      href={authenticated ? loggedInHref : carriAccountLoginUrl}
       variant={variant}
       className={className}
     >
-      {isLoggedIn ? loggedInLabel : children}
+      {authenticated ? loggedInLabel : children}
     </LinkButton>
   );
 }
