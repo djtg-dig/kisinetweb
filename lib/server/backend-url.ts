@@ -6,3 +6,6 @@ export const backendServerBaseUrl =
 
 export const carriAccountBackendLoginUrl =
   backendServerBaseUrl.replace(/\/$/, "") + "/api/carri-account/login/";
+
+export const carriAccountCallbackUrl =
+  backendServerBaseUrl.replace(/\/$/, "") + "/api/carri-account/callback/";

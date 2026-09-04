@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { filterResponseHeaders, signedBackendFetch } from "@/lib/server/backend-fetch";
+import { ACCESS_COOKIE_NAME } from "@/lib/server/cookies";
 
 type RouteContext = {
   params: Promise<{ path?: string[] }>;
@@ -18,7 +19,7 @@ async function proxyBackendRequest(request: NextRequest, context: RouteContext):
     const params = await context.params;
     const backendPath = buildDjangoPath(params.path ?? [], request.nextUrl.search);
     const body = method === "GET" || method === "HEAD" ? null : await request.arrayBuffer();
-    const accessToken = readBearerToken(request.headers);
+    const accessToken = readAccessToken(request);
     const response = await signedBackendFetch({
       path: backendPath,
       method,
@@ -73,11 +74,13 @@ function assertSafePathSegment(part: string): string {
   return part;
 }
 
-function readBearerToken(headers: Headers): string {
-  const authorization = headers.get("authorization") ?? "";
+function readAccessToken(request: NextRequest): string {
+  const cookieToken = request.cookies?.get?.(ACCESS_COOKIE_NAME)?.value;
+  if (cookieToken) {
+    return cookieToken;
+  }
+  const authorization = request.headers.get("authorization") ?? "";
   const prefix = "Bearer ";
-
-  // Le header complet n'est jamais journalisé ; seul le token est relayé côté serveur.
   return authorization.startsWith(prefix) ? authorization.slice(prefix.length) : "";
 }
 
