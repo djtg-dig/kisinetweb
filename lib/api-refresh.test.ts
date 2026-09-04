@@ -13,10 +13,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-// Base utilisée par le frontend (doit être définie AVANT l'import des modules
-// métier, car `apiBaseUrl` est évalué à la lecture du module).
-const API_BASE = "http://test.local/api";
-process.env.NEXT_PUBLIC_API_BASE_URL = API_BASE;
+// Base same-origin utilisée par le frontend avant signature HMAC dans le BFF.
+const API_BASE = "/api/backend/api";
 
 const ACCESS_KEY = "kisinet:access_token";
 const REFRESH_KEY = "kisinet:refresh_token";
@@ -57,8 +55,7 @@ type FetchCall = { url: string; body: unknown; auth: string };
 const fetchCalls: FetchCall[] = [];
 let apiFetchImpl: (url: string, init: { body?: string; headers?: Record<string, string> | Headers }) => Promise<MockResponse>;
 
-// Les modules sont chargés dynamiquement APRÈS la configuration des globals
-// afin que `apiBaseUrl` capte `NEXT_PUBLIC_API_BASE_URL`.
+// Les modules sont chargés dynamiquement APRÈS la configuration des globals.
 let authenticatedFetch: (input: string, init: { method?: string; headers?: Record<string, string> }) => Promise<MockResponse>;
 let setRequestFetchImpl: (impl: typeof apiFetchImpl) => void;
 

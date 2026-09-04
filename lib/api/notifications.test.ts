@@ -6,11 +6,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-const API_BASE = "http://test.local";
+const API_BASE = "/api/backend";
 const ACCESS_KEY = "kisinet:access_token";
 const REFRESH_KEY = "kisinet:refresh_token";
 const REFRESH_URL = "/api/accounts/token/refresh/";
-process.env.NEXT_PUBLIC_API_BASE_URL = API_BASE;
 
 const store = new Map<string, string>();
 const localStorageMock = {
@@ -156,8 +155,8 @@ test("getNotifications transmet les filtres supportes par le backend", async () 
   });
 
   const request = capturedRequests[0];
-  const url = new URL(request.url);
-  assert.equal(url.pathname, "/api/notifications/");
+  const url = new URL(request.url, "http://test.local");
+  assert.equal(url.pathname, "/api/backend/api/notifications/");
   assert.equal(url.searchParams.get("category"), "PRODUCT_EXPIRATION");
   assert.equal(url.searchParams.get("pharmacy"), "PH12345678");
   assert.equal(url.searchParams.get("is_read"), "false");
@@ -178,7 +177,7 @@ test("getNotificationCount utilise une page legere pour lire count", async () =>
     is_read: true,
   });
 
-  const url = new URL(capturedRequests[0]!.url);
+  const url = new URL(capturedRequests[0]!.url, "http://test.local");
   assert.equal(count, 2);
   assert.equal(url.searchParams.get("pharmacy"), "PH12345678");
   assert.equal(url.searchParams.get("is_read"), "true");
@@ -193,9 +192,9 @@ test("getUnreadNotificationCount transmet le filtre pharmacie au backend", async
 
   const count = await notifications.getUnreadNotificationCount({ pharmacy: "PH12345678" });
 
-  const url = new URL(capturedRequests[0]!.url);
+  const url = new URL(capturedRequests[0]!.url, "http://test.local");
   assert.equal(count, 4);
-  assert.equal(url.pathname, "/api/notifications/unread-count/");
+  assert.equal(url.pathname, "/api/backend/api/notifications/unread-count/");
   assert.equal(url.searchParams.get("pharmacy"), "PH12345678");
 });
 
@@ -207,10 +206,10 @@ test("getUnreadNotificationSummary transmet le filtre pharmacie au backend", asy
 
   const summary = await notifications.getUnreadNotificationSummary({ pharmacy: "PH12345678" });
 
-  const url = new URL(capturedRequests[0]!.url);
+  const url = new URL(capturedRequests[0]!.url, "http://test.local");
   assert.equal(summary.total, 4);
   assert.equal(summary.groups.products, 3);
-  assert.equal(url.pathname, "/api/notifications/unread-summary/");
+  assert.equal(url.pathname, "/api/backend/api/notifications/unread-summary/");
   assert.equal(url.searchParams.get("pharmacy"), "PH12345678");
 });
 
@@ -224,7 +223,7 @@ test("markNotificationAsRead declenche le rafraichissement du badge", async () =
   await notifications.markNotificationAsRead("NT12345678");
 
   assert.equal(capturedRequests[0]?.method, "POST");
-  assert.equal(new URL(capturedRequests[0]!.url).pathname, "/api/notifications/NT12345678/read/");
+  assert.equal(new URL(capturedRequests[0]!.url, "http://localhost").pathname, "/api/backend/api/notifications/NT12345678/read/");
   assert.equal(lastDispatchedEvent, notifications.NOTIFICATION_BADGE_REFRESH_EVENT);
 });
 
@@ -239,7 +238,7 @@ test("markAllNotificationsAsRead envoie le filtre pharmacie au backend", async (
 
   const request = capturedRequests[0];
   assert.equal(request?.method, "POST");
-  assert.equal(new URL(request!.url).pathname, "/api/notifications/read-all/");
+  assert.equal(new URL(request!.url, "http://localhost").pathname, "/api/backend/api/notifications/read-all/");
   assert.deepEqual(JSON.parse(request!.body || "{}"), { pharmacy: "PH12345678" });
   assert.equal(lastDispatchedEvent, notifications.NOTIFICATION_BADGE_REFRESH_EVENT);
 });
@@ -255,7 +254,7 @@ test("getNotifications rafraichit le JWT expire puis rejoue la requete", async (
 
   assert.equal(capturedRequests.length, 3);
   assert.equal(capturedRequests[0]?.authorization, "Bearer access-expired");
-  assert.equal(new URL(capturedRequests[1]!.url).pathname, REFRESH_URL);
+  assert.equal(new URL(capturedRequests[1]!.url, "http://localhost").pathname, "/api/backend/api/accounts/token/refresh/");
   assert.equal(capturedRequests[2]?.authorization, "Bearer access-refreshed");
   assert.equal(store.get(ACCESS_KEY), "access-refreshed");
 });
