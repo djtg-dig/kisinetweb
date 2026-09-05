@@ -1,7 +1,7 @@
 import "server-only";
 
 import { NextResponse, type NextRequest } from "next/server";
-import { timingSafeEqual } from "crypto";
+import { timingSafeEqual, webcrypto } from "node:crypto";
 
 export const CSRF_COOKIE_NAME = "kisinet_csrf";
 export const CSRF_HEADER_NAME = "X-Kisinet-CSRF";
@@ -9,7 +9,7 @@ export const CSRF_TOKEN_LENGTH = 32;
 
 export function generateCsrfToken(): string {
   const bytes = new Uint8Array(CSRF_TOKEN_LENGTH);
-  crypto.getRandomValues(bytes);
+  webcrypto.getRandomValues(bytes);
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 

@@ -2,41 +2,42 @@ import "server-only";
 
 import { NextResponse, type NextRequest } from "next/server";
 
+import { signedBackendFetch } from "@/lib/server/backend-fetch";
 import { ACCESS_COOKIE_NAME, REFRESH_COOKIE_NAME } from "@/lib/server/cookies";
-import { carriAccountCallbackUrl } from "@/lib/server/backend-url";
 import { generateCsrfToken, CSRF_COOKIE_NAME } from "@/lib/server/csrf";
 
-export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams;
-  const code = searchParams.get("code");
-  const state = searchParams.get("state");
+const CARRI_HANDOFF_PATH = "/api/carri-account/handoff/consume/";
+const CARRI_HANDOFF_TTL_SECONDS = 120;
 
-  if (!code) {
-    return NextResponse.redirect(new URL("/auth/carri?error=no_code", request.url));
+type CarriHandoffPayload = {
+  access?: string;
+  refresh?: string;
+  user?: unknown;
+  carri_identity?: unknown;
+};
+
+export async function GET(request: NextRequest) {
+  const handoff = request.nextUrl.searchParams.get("handoff");
+
+  if (!handoff) {
+    return NextResponse.redirect(new URL("/auth/carri?error=no_handoff", request.url));
   }
 
   try {
-    const callbackUrl = new URL(carriAccountCallbackUrl);
-    callbackUrl.searchParams.set("code", code);
-    if (state) {
-      callbackUrl.searchParams.set("state", state);
-    }
-    callbackUrl.searchParams.set("carri_callback_mode", "json");
-
-    const response = await fetch(callbackUrl, {
-      method: "GET",
-      headers: {
-        Cookie: request.headers.get("cookie") || "",
-      },
-      credentials: "include",
+    const response = await signedBackendFetch({
+      path: CARRI_HANDOFF_PATH,
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ handoff }),
     });
 
     if (!response.ok) {
       return NextResponse.redirect(new URL("/auth/carri?error=callback_failed", request.url));
     }
 
-    const payload = await response.json();
-    const { access, refresh } = payload;
+    const payload = (await response.json()) as CarriHandoffPayload;
+    const access = typeof payload?.access === "string" ? payload.access : "";
+    const refresh = typeof payload?.refresh === "string" ? payload.refresh : "";
 
     if (!access || !refresh) {
       return NextResponse.redirect(new URL("/auth/carri?error=no_tokens", request.url));
@@ -76,6 +77,10 @@ export async function GET(request: NextRequest) {
       sameSite: "lax",
       secure: isProduction,
     });
+
+    // Le handoff est à usage unique côté backend ; on bloque aussi un éventuel
+    // rejeu via le navigateur pendant la fenêtre de tolérance serveur.
+    nextResponse.headers.set("Cache-Control", "no-store, max-age=" + CARRI_HANDOFF_TTL_SECONDS);
 
     return nextResponse;
   } catch {
