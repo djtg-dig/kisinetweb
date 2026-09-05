@@ -85,18 +85,16 @@ headers utiles sans lire systématiquement `response.json()`.
 
 ## JWT et refresh
 
-Les tokens utilisateur et admin restent dans `localStorage`. Les wrappers existants
-ajoutent `Authorization` côté navigateur vers le BFF, puis Next.js relaie ce JWT
+Les tokens utilisateur et admin restent exclusivement dans des cookies `HttpOnly`,
+`Secure` en production, `SameSite=Lax`. Le BFF Next.js relaie le JWT utilisateur
 vers Django avec HMAC. Le refresh JWT existant reste single-flight et repasse par
-`/api/backend/api/accounts/token/refresh/`.
+`/api/backend/api/accounts/token/refresh/` ou `/api/backend/api/admin/auth/refresh/`.
 
-Ce stockage est une dette de sécurité de session utilisateur en cas de faille XSS,
-mais ce n'est pas le même sujet que l'authentification du client applicatif :
+Aucun token ne doit jamais être stocké dans `localStorage`, `sessionStorage`,
+l'URL query, l'URL fragment, ou exposé au Client Components.
+
 HMAC authentifie `kisinet-web`, tandis que le JWT authentifie `request.user`.
-
-Une migration future recommandée est de stocker `access` et `refresh` en cookies
-HttpOnly, `Secure` en production, avec `SameSite` adapté. Cette migration devra
-être traitée séparément pour préserver le callback Carri Account.
+Les deux couches restent indépendantes et complémentaires.
 
 ## Uploads et downloads
 

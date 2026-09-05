@@ -16,13 +16,16 @@ est l'unique point frontend de démarrage et de retour d'authentification :
   qui redirige le navigateur vers `GET /api/carri-account/login/` côté backend
   Kisinet afin que les cookies de session Django portent le `code_verifier`
   PKCE jusqu'au callback OAuth ;
-- avec un fragment `#access=...&refresh=...`, elle stocke les tokens JWT Kisinet
-  en `localStorage`, nettoie immédiatement le fragment de l'URL, puis redirige
-  vers le paramètre `next` interne s'il existe, sinon `/app/select-pharmacy`.
+- le backend Kisinet gère ensuite le flux OAuth et, si
+  `CARRI_ACCOUNT_FRONTEND_SUCCESS_URL` est défini, redirige vers cette URL avec
+  `?handoff=<opaque>` (TTL court, usage unique). Le frontend appelle alors la
+  Route Handler Next `/auth/carri-callback`, qui consomme le handoff
+  serveur-à-serveur via `POST /api/carri-account/handoff/consume/` protégé par
+  HMAC. Les JWT sont ensuite posés exclusivement en cookies `HttpOnly` par le
+  BFF Next.js.
 
-PKCE, OpenID Connect Discovery, scopes, `id_token`, JWKS, `state`, callback
-OAuth et échange du code restent entièrement gérés par le backend Kisinet. Le
-frontend ne consomme ni ne stocke le `id_token` Kari Accounts.
+Aucun JWT n'est jamais placé dans l'URL, le fragment, `localStorage`,
+`sessionStorage` ou le HTML renvoyé au navigateur.
 
 Gestion des erreurs d'authentification utilisateur :
 
