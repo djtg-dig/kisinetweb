@@ -48,7 +48,9 @@ async function proxyBackendRequest(request: NextRequest, context: RouteContext):
     const accessToken = isAdminRequest ? adminAccessToken : userAccessToken;
     const refreshToken = isAdminRequest ? adminRefreshToken : userRefreshToken;
 
-    if (!accessToken) {
+    // Les endpoints admin nécessitent un jeton ; les endpoints publics/utilisateur
+    // peuvent être appelés sans jeton : Django appliquera lui-même les permissions.
+    if (!accessToken && isAdminRequest) {
       return NextResponse.json({ detail: "Non authentifié." }, { status: 401 });
     }
 
@@ -64,7 +66,7 @@ async function proxyBackendRequest(request: NextRequest, context: RouteContext):
       accessToken,
     });
 
-    if (response.status === 401 && refreshToken) {
+    if (response.status === 401 && refreshToken && accessToken) {
       const refreshed = await tryRefreshTokens(refreshToken, accessToken, isAdminSession);
       if (refreshed) {
         const retryResponse = await signedBackendFetch({
