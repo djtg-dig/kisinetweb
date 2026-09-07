@@ -10,6 +10,7 @@ import { WithdrawalDialog, withdrawalStatusLabel } from "@/components/referrals/
 import { carriAccountLoginUrl } from "@/lib/carri-account";
 import { formatAmount, formatPercent } from "@/lib/referrals/withdrawal-format";
 import { maskPhoneNumber } from "@/lib/referrals/withdrawal-display";
+import { evaluateWalletWithdrawability } from "@/lib/referrals/withdrawability";
 import {
   createReferralWithdrawal,
   getReferralPayoutAccounts,
@@ -134,21 +135,16 @@ export default function ReferralsPage() {
     [wallets],
   );
 
-  // Le bouton de retrait est désactivé dès que le solde disponible
-  // ne couvre pas le minimum requis (incluant les frais). Le backend
-  // reste la validation ultime : un clic forcé en dev sera de toute
-  // façon refusé par l'API.
-  const canWithdraw = useMemo(() => {
-    if (!activeWallet) {
-      return false;
-    }
-    const available = Number(activeWallet.available_balance);
-    const minimumRequired = Number(activeWallet.minimum_required_balance);
-    if (!Number.isFinite(available) || !Number.isFinite(minimumRequired)) {
-      return false;
-    }
-    return available >= minimumRequired;
-  }, [activeWallet]);
+  // Évaluation de la retirabilité du wallet actif. On délègue à un
+  // helper pur pour rendre la logique testable et pour distinguer
+  // clairement les raisons de désactivation (no_wallet, insufficient,
+  // missing_config). Le backend reste la validation comptable : un
+  // clic forcé en dev sera de toute façon refusé par l'API.
+  const withdrawability = useMemo(
+    () => evaluateWalletWithdrawability(activeWallet),
+    [activeWallet],
+  );
+  const canWithdraw = withdrawability.canWithdraw;
 
   async function handleWithdrawalSubmit(payload: {
     amount: string;
@@ -281,10 +277,47 @@ export default function ReferralsPage() {
                   </p>
                 )}
 
-                {!canWithdraw && activeWallet && (
-                  <p className="mt-4 rounded-md border border-app-border bg-app-surface px-4 py-3 text-sm text-app-muted">
-                    Votre solde est insuffisant pour effectuer un retrait.
-                  </p>
+                {(!canWithdraw && activeWallet &&
+                  withdrawability.reason === "insufficient_balance") && (
+                  <div className="mt-4 rounded-md border border-app-border bg-app-surface px-4 py-3 text-sm text-app-muted">
+                    <p className="font-semibold text-app-text">
+                      Solde insuffisant pour effectuer un retrait.
+                    </p>
+                    <p className="mt-1">
+                      Solde disponible :{" "}
+                      <span className="font-semibold text-app-text">
+                        {formatAmount(activeWallet.available_balance, activeWallet.currency)}
+                      </span>
+                    </p>
+                    <p className="mt-1">
+                      Solde minimum nécessaire :{" "}
+                      <span className="font-semibold text-app-text">
+                        {formatAmount(activeWallet.minimum_required_balance, activeWallet.currency)}
+                      </span>
+                    </p>
+                  </div>
+                )}
+
+                {(!canWithdraw && !activeWallet) && (
+                  <div className="mt-4 rounded-md border border-app-border bg-app-surface px-4 py-3 text-sm text-app-muted">
+                    <p className="font-semibold text-app-text">
+                      Aucun portefeuille de parrainage disponible pour le moment.
+                    </p>
+                    <p className="mt-1">
+                      Vos soldes apparaîtront ici après confirmation des abonnements payés par vos pharmacies parrainées.
+                    </p>
+                  </div>
+                )}
+
+                {withdrawability.reason === "missing_config" && (
+                  <div className="mt-4 rounded-md border border-app-border bg-app-surface px-4 py-3 text-sm text-app-muted">
+                    <p className="font-semibold text-app-text">
+                      Configuration de retrait indisponible.
+                    </p>
+                    <p className="mt-1">
+                      Le service de retrait est momentanément indisponible. Réessayez dans quelques instants.
+                    </p>
+                  </div>
                 )}
 
                 <Button

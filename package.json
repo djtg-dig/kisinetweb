@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test": "node --conditions react-server --import tsx --test lib/*.test.ts lib/api/*.test.ts lib/server/*.test.ts"
+    "test": "node --conditions react-server --import tsx --test $(find lib -name '*.test.ts' -type f | tr '\\n' ' ')"
   },
   "dependencies": {
     "@types/jsbarcode": "^3.11.4",
