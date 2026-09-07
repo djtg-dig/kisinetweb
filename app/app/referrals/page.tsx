@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
+import { ApiAuthError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/ui/link-button";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
@@ -85,6 +86,10 @@ export default function ReferralsPage() {
     try {
       applyReferralDashboard(await fetchReferralDashboard());
     } catch (error) {
+      if (error instanceof ApiAuthError) {
+        setPageState("anonymous");
+        return;
+      }
       setPageState("error");
       setMessage(
         error instanceof Error ? error.message : "Le parrainage n'est pas disponible pour le moment.",
@@ -105,13 +110,15 @@ export default function ReferralsPage() {
         if (!isMounted) {
           return;
         }
-        const errorMessage = error instanceof Error ? error.message : "";
-        if (errorMessage.toLowerCase().includes("session")) {
+        if (error instanceof ApiAuthError) {
+          // Session absente ou expirée : on bascule sur l'écran de
+          // connexion plutôt que d'afficher un message technique.
           setPageState("anonymous");
-        } else {
-          setPageState("error");
-          setMessage(errorMessage || "Le parrainage n'est pas disponible pour le moment.");
+          return;
         }
+        const errorMessage = error instanceof Error ? error.message : "";
+        setPageState("error");
+        setMessage(errorMessage || "Le parrainage n'est pas disponible pour le moment.");
       }
     }
 

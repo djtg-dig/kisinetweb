@@ -1,3 +1,4 @@
+import { ApiAuthError } from "@/lib/api";
 import { apiFetch } from "@/lib/api/request";
 import { apiBaseUrl } from "@/lib/carri-account";
 
@@ -224,6 +225,13 @@ async function fetchReferralJson<T>(path: string, init: RequestInit = {}): Promi
   const data = parseJson(responseText);
 
   if (!response.ok) {
+    // Toute réponse 401 signifie que la session est absente/expirée : on
+    // remonte l'erreur typée `ApiAuthError` pour que la page bascule sur
+    // l'état "anonymous" et n'affiche jamais le message Django brut
+    // "Authentication credentials were not provided." à l'utilisateur.
+    if (response.status === 401) {
+      throw new ApiAuthError();
+    }
     throw new Error(getApiErrorMessage(data, "Impossible de charger le parrainage."));
   }
 
