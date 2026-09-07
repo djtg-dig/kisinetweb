@@ -1563,22 +1563,85 @@ Payload envoyé depuis `/app/settings` pour configurer le compte de réception:
 }
 ```
 
-Payload envoyé depuis `/app/referrals` pour un retrait groupé:
+Payload envoyé depuis `/app/referrals` pour un retrait.
+
+> **Retrait libre** : les retraits sont initiés librement par
+> l'utilisateur. Après validation automatique (solde, frais, minimum,
+> maximum, destination), Kisinet réserve les fonds et soumet
+> immédiatement le payout à iKeePay. **Aucune approbation
+> administrative n'est requise.** Le statut normal observé après un
+> POST réussi est `PROCESSING` (En cours).
+
+Deux modes acceptés par le backend (le frontend doit en choisir un seul) :
+
+**Mode destination directe** (sans compte sauvegardé) :
 
 ```json
 {
-  "amount": "15.00",
+  "amount": "5.00",
+  "currency": "USD",
+  "country": "CD",
+  "phone_number": "+243 999 123 456",
+  "operator": "AIRTEL"
+}
+```
+
+**Mode compte sauvegardé** (réutilise un `ReferralPayoutAccount`) :
+
+```json
+{
+  "amount": "5.00",
   "currency": "USD",
   "payout_account_reference": "PAXXXXXXXX"
 }
 ```
 
-La page affiche les montants sous forme de chaînes décimales retournées par le
-backend: solde disponible, en attente, réservé, retiré, commissions récentes,
-retraits récents et pharmacies parrainées. Les coordonnées de destination sont
-configurées dans les paramètres globaux du compte utilisateur, pas dans l'espace
-pharmacie. Le webhook agrégateur reste une route backend uniquement, à configurer
-côté agrégateur sur `POST /api/webhook/`.
+Le frontend NE DOIT PAS envoyer `fee_rate`, `fee_amount` ou
+`total_reserved_amount` : ces valeurs sont recalculées par le backend
+depuis `BusinessConfig.referral_withdrawal_fee_rate`.
+
+Après création, le backend peut renvoyer `status` ∈ {`REQUESTED`,
+`PROCESSING`, `FAILED`} selon la réponse iKeePay. Le statut final
+`PAID` est confirmé par le webhook iKeePay et visible via le détail
+du retrait. La page `/app/referrals` affiche le libellé français
+correspondant :
+
+| Statut backend | Libellé UI | Signification |
+| -------------- | ---------- | ------------- |
+| `REQUESTED` | Préparation | État technique transitoire (très bref). Pas une attente d'approbation. |
+| `PROCESSING` | En cours | Payout soumis à iKeePay, confirmation finale en attente. |
+| `PAID` | Payé | Paiement confirmé par iKeePay. |
+| `FAILED` | Échec | iKeePay a refusé ou confirmé un échec ; wallet restitué. |
+| `CANCELLED` | Annulé | Annulation. |
+| `REJECTED` | Rejeté | Statut legacy, conservé pour rétrocompatibilité. |
+
+L'UI masque partiellement le numéro de téléphone dans l'historique
+pour respecter la confidentialité. Le bouton principal est
+« Retirer » (jamais « Demander », « Soumettre » ou « Envoyer la
+demande »). Le message de succès est :
+
+```text
+Votre retrait a été transmis.
+```
+
+et non « Votre demande a été envoyée ».
+
+La page affiche également, pour chaque devise du wallet, les champs
+de configuration renvoyés par `GET /api/paiements/referral-wallets/{currency}/summary/` :
+
+```json
+{
+  "available_balance": "10.00",
+  "withdrawal_fee_rate": "8.00",
+  "minimum_withdrawal_amount": "1.00",
+  "minimum_required_balance": "1.08",
+  "max_withdrawable_amount": "9.25"
+}
+```
+
+Le bouton de retrait est désactivé côté UI si
+`available_balance < minimum_required_balance` ; le backend reste la
+validation ultime.
 
 > Note : `{pharmacy_id}` dans les URLs pharmacies correspond à la **référence** publique
 > de la pharmacie (ex. `PH0UKUI3NQ`), jamais à l'identifiant interne. Le frontend utilise

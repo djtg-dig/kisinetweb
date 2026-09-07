@@ -5,7 +5,10 @@ import { MainLayout } from "@/components/layout/main-layout";
 import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/ui/link-button";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
+import { WithdrawalDialog, withdrawalStatusLabel } from "@/components/referrals/WithdrawalDialog";
 import { carriAccountLoginUrl } from "@/lib/carri-account";
+import { formatAmount, formatPercent } from "@/lib/referrals/withdrawal-format";
+import { maskPhoneNumber } from "@/lib/referrals/withdrawal-display";
 import {
   createReferralWithdrawal,
   getReferralPayoutAccounts,
@@ -43,16 +46,22 @@ async function fetchReferralDashboard() {
 export default function ReferralsPage() {
   const [pageState, setPageState] = useState<PageState>("loading");
   const [message, setMessage] = useState("");
+  // `messageKind` permet de styler différemment succès/erreur dans la
+  // carte de retrait sans réécrire le composant.
+  const [messageKind, setMessageKind] = useState<"info" | "success" | "error">("info");
   const [wallets, setWallets] = useState<ReferralWalletSummary[]>([]);
   const [commissions, setCommissions] = useState<ReferralCommission[]>([]);
   const [withdrawals, setWithdrawals] = useState<ReferralWithdrawal[]>([]);
   const [pharmacies, setPharmacies] = useState<ReferredPharmacy[]>([]);
   const [payoutAccounts, setPayoutAccounts] = useState<ReferralPayoutAccount[]>([]);
-  const [amount, setAmount] = useState("");
-  const [currency, setCurrency] = useState("USD");
-  const [payoutAccountReference, setPayoutAccountReference] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isWithdrawalModalOpen, setIsWithdrawalModalOpen] = useState(false);
+  // `lastWithdrawalRef` stocke la référence du dernier retrait créé
+  // pour afficher un message de confirmation dans la carte récapitulative.
+  const [lastWithdrawalRef, setLastWithdrawalRef] = useState<string | null>(null);
+  // `lastWithdrawalStatus` permet d'adapter le message ("Traitement en
+  // cours" si PROCESSING, etc.).
+  const [lastWithdrawalStatus, setLastWithdrawalStatus] = useState<string | null>(null);
 
   function applyReferralDashboard({
     overview,
@@ -66,8 +75,6 @@ export default function ReferralsPage() {
     setWithdrawals(withdrawalList);
     setPharmacies(referredList);
     setPayoutAccounts(payoutAccountList);
-    setCurrency((current) => overview[0]?.currency || current);
-    setPayoutAccountReference((current) => current || payoutAccountList[0]?.reference || "");
     setPageState("ready");
   }
 
@@ -116,43 +123,75 @@ export default function ReferralsPage() {
   }, []);
 
   const activeWallet = useMemo(
-    () => wallets.find((wallet) => wallet.currency === currency) || wallets[0] || null,
-    [currency, wallets],
-  );
-  const activePayoutAccounts = useMemo(
-    () =>
-      payoutAccounts.filter(
-        (account) => account.currency === currency && account.is_active,
-      ),
-    [currency, payoutAccounts],
+    () => wallets[0] || null,
+    [wallets],
   );
 
-  function handleWithdrawalCurrencyChange(nextCurrency: string) {
-    setCurrency(nextCurrency);
-    setPayoutAccountReference(
-      payoutAccounts.find(
-        (account) => account.currency === nextCurrency && account.is_active,
-      )?.reference || "",
-    );
-  }
+  // Le bouton de retrait est désactivé dès que le solde disponible
+  // ne couvre pas le minimum requis (incluant les frais). Le backend
+  // reste la validation ultime : un clic forcé en dev sera de toute
+  // façon refusé par l'API.
+  const canWithdraw = useMemo(() => {
+    if (!activeWallet) {
+      return false;
+    }
+    const available = Number(activeWallet.available_balance);
+    const minimumRequired = Number(activeWallet.minimum_required_balance);
+    if (!Number.isFinite(available) || !Number.isFinite(minimumRequired)) {
+      return false;
+    }
+    return available >= minimumRequired;
+  }, [activeWallet]);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function handleWithdrawalSubmit(payload: {
+    amount: string;
+    country: string;
+    phone_number: string;
+    operator: string;
+  }) {
     setIsSubmitting(true);
     setMessage("");
+    setMessageKind("info");
 
     try {
-      await createReferralWithdrawal({
-        amount,
-        currency,
-        payout_account_reference: payoutAccountReference,
+      const created = await createReferralWithdrawal({
+        amount: payload.amount,
+        currency: activeWallet ? activeWallet.currency : "USD",
+        country: payload.country,
+        phone_number: payload.phone_number,
+        operator: payload.operator,
       });
-      setAmount("");
-      applyReferralDashboard(await fetchReferralDashboard());
       setIsWithdrawalModalOpen(false);
-      setMessage("Demande de retrait enregistrée. Le montant est maintenant réservé.");
+      setLastWithdrawalRef(created.reference);
+      setLastWithdrawalStatus(created.status);
+      // On rafraîchit le dashboard pour récupérer le nouveau solde
+      // disponible (available_balance a été décrémenté de
+      // total_reserved_amount, pas de amount seul).
+      applyReferralDashboard(await fetchReferralDashboard());
+      // On choisit le ton du message en fonction du statut retourné :
+      // REQUESTED / PROCESSING -> info, PAID -> success, FAILED -> error.
+      const kind: "info" | "success" | "error" =
+        created.status === "PAID"
+          ? "success"
+          : created.status === "FAILED" || created.status === "REJECTED"
+            ? "error"
+            : "info";
+      setMessageKind(kind);
+      const statusLabel = withdrawalStatusLabel(created.status);
+      setMessage(
+        created.status === "PROCESSING"
+          ? `Votre retrait a été transmis. Référence : ${created.reference} — Retrait en cours de traitement.`
+          : created.status === "REQUESTED"
+            ? `Votre retrait a été transmis. Référence : ${created.reference} — Préparation en cours.`
+            : `Votre retrait (${created.reference}) est : ${statusLabel}.`,
+      );
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Impossible de créer le retrait.");
+      setMessageKind("error");
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Impossible de soumettre le retrait pour le moment. Veuillez réessayer.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -166,7 +205,7 @@ export default function ReferralsPage() {
             <p className="text-sm font-semibold text-primary-700">Compte</p>
             <h1 className="mt-2 text-3xl font-bold text-app-text">Parrainage</h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-app-muted">
-              Suivez vos commissions, votre solde disponible et vos demandes de retrait.
+              Suivez vos commissions, votre solde disponible et vos retraits.
             </p>
           </div>
         </div>
@@ -192,7 +231,6 @@ export default function ReferralsPage() {
         )}
 
         {pageState === "ready" && (
-          <>
           <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
             <section className="space-y-6">
               <WalletOverview wallets={wallets} />
@@ -205,25 +243,40 @@ export default function ReferralsPage() {
 
             <aside className="space-y-6">
               <section className="rounded-lg border border-app-border bg-app-card p-6 shadow-sm">
-                <p className="text-sm font-semibold text-primary-700">Retrait groupé</p>
-                <h2 className="mt-2 text-xl font-bold text-app-text">Demander un retrait</h2>
+                <p className="text-sm font-semibold text-primary-700">Retrait</p>
+                <h2 className="mt-2 text-xl font-bold text-app-text">Retirer mes commissions</h2>
 
                 {activeWallet && (
                   <p className="mt-3 text-sm text-app-muted">
-                    Disponible:{" "}
+                    Disponible :{" "}
                     <span className="font-semibold text-app-text">
-                      {activeWallet.available_balance} {activeWallet.currency}
+                      {formatAmount(activeWallet.available_balance, activeWallet.currency)}
                     </span>
                   </p>
                 )}
 
                 <p className="mt-4 text-sm leading-6 text-app-muted">
-                  Regroupez plusieurs commissions dans une seule demande pour réduire les frais de retrait.
+                  Regroupez plusieurs commissions dans un seul retrait. Le payout est envoyé automatiquement au provider ; aucune approbation manuelle n'est nécessaire.
                 </p>
 
                 {message && (
-                  <p className="mt-5 rounded-md border border-app-border bg-app-surface px-4 py-3 text-sm text-app-muted">
+                  <p
+                    className={
+                      "mt-5 rounded-md border border-app-border bg-app-surface px-4 py-3 text-sm " +
+                      (messageKind === "success"
+                        ? "text-emerald-700"
+                        : messageKind === "error"
+                          ? "text-red-700"
+                          : "text-app-muted")
+                    }
+                  >
                     {message}
+                  </p>
+                )}
+
+                {!canWithdraw && activeWallet && (
+                  <p className="mt-4 rounded-md border border-app-border bg-app-surface px-4 py-3 text-sm text-app-muted">
+                    Votre solde est insuffisant pour effectuer un retrait.
                   </p>
                 )}
 
@@ -231,159 +284,43 @@ export default function ReferralsPage() {
                   type="button"
                   onClick={() => {
                     setMessage("");
+                    setMessageKind("info");
+                    setLastWithdrawalRef(null);
+                    setLastWithdrawalStatus(null);
                     setIsWithdrawalModalOpen(true);
                   }}
+                  disabled={!canWithdraw}
                   className="mt-5 w-full"
                 >
-                  Demander un retrait
+                  Retirer
                 </Button>
               </section>
             </aside>
           </div>
-          {isWithdrawalModalOpen && (
-            <WithdrawalRequestDialog
-              activeWallet={activeWallet}
-              amount={amount}
-              currency={currency}
-              isSubmitting={isSubmitting}
-              message={message}
-              payoutAccountReference={payoutAccountReference}
-              payoutAccounts={activePayoutAccounts}
-              wallets={wallets}
-              onAmountChange={setAmount}
-              onClose={() => setIsWithdrawalModalOpen(false)}
-              onCurrencyChange={handleWithdrawalCurrencyChange}
-              onPayoutAccountChange={setPayoutAccountReference}
-              onSubmit={handleSubmit}
-            />
-          )}
-          </>
+        )}
+
+        <WithdrawalDialog
+          open={isWithdrawalModalOpen}
+          onClose={() => setIsWithdrawalModalOpen(false)}
+          wallet={activeWallet}
+          isSubmitting={isSubmitting}
+          message={messageKind === "error" ? message : ""}
+          onSubmit={handleWithdrawalSubmit}
+        />
+
+        {/* Référence du dernier retrait créé (utile aux tests/debug). */}
+        {lastWithdrawalRef && pageState === "ready" && (
+          <span data-testid="last-withdrawal-ref" className="sr-only">
+            {lastWithdrawalRef}
+          </span>
+        )}
+        {lastWithdrawalStatus && pageState === "ready" && (
+          <span data-testid="last-withdrawal-status" className="sr-only">
+            {lastWithdrawalStatus}
+          </span>
         )}
       </section>
     </MainLayout>
-  );
-}
-
-function WithdrawalRequestDialog({
-  activeWallet,
-  amount,
-  currency,
-  isSubmitting,
-  message,
-  payoutAccountReference,
-  payoutAccounts,
-  wallets,
-  onAmountChange,
-  onClose,
-  onCurrencyChange,
-  onPayoutAccountChange,
-  onSubmit,
-}: {
-  activeWallet: ReferralWalletSummary | null;
-  amount: string;
-  currency: string;
-  isSubmitting: boolean;
-  message: string;
-  payoutAccountReference: string;
-  payoutAccounts: ReferralPayoutAccount[];
-  wallets: ReferralWalletSummary[];
-  onAmountChange: (value: string) => void;
-  onClose: () => void;
-  onCurrencyChange: (value: string) => void;
-  onPayoutAccountChange: (value: string) => void;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-[1100] flex items-stretch justify-center bg-black/40 px-3 pb-3 pt-20 sm:items-center sm:px-4 sm:py-6 sm:pt-6">
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="withdrawal-dialog-title"
-        className="flex w-full max-w-xl flex-col overflow-hidden rounded-lg border border-app-border bg-app-card shadow-soft"
-      >
-        <div className="flex items-start justify-between gap-4 border-b border-app-border px-5 py-4">
-          <div>
-            <p className="text-sm font-semibold text-primary-700">Retrait groupé</p>
-            <h2 id="withdrawal-dialog-title" className="mt-1 text-xl font-bold text-app-text">
-              Demander un retrait
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-app-border bg-app-surface text-lg font-bold text-app-muted transition hover:bg-primary-50 focus:outline-none focus:ring-4 focus:ring-primary-100"
-            aria-label="Fermer"
-          >
-            ×
-          </button>
-        </div>
-
-        <form onSubmit={onSubmit} className="overflow-y-auto px-5 py-5">
-          {activeWallet && (
-            <p className="mb-5 rounded-md border border-app-border bg-app-surface px-4 py-3 text-sm text-app-muted">
-              Disponible:{" "}
-              <span className="font-semibold text-app-text">
-                {activeWallet.available_balance} {activeWallet.currency}
-              </span>
-            </p>
-          )}
-
-          <div className="space-y-4">
-            <label className="block text-sm font-semibold text-app-text">
-              Montant en USD
-              <input
-                value={amount}
-                onChange={(event) => onAmountChange(event.target.value)}
-                inputMode="decimal"
-                required
-                placeholder="15.00"
-                className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
-              />
-            </label>
-
-
-            <label className="block text-sm font-semibold text-app-text">
-              Compte de retrait
-              <select
-                value={payoutAccountReference}
-                onChange={(event) => onPayoutAccountChange(event.target.value)}
-                required
-                className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
-              >
-                <option value="">Sélectionner un compte</option>
-                {payoutAccounts.map((account) => (
-                  <option key={account.reference} value={account.reference}>
-                    {account.payment_method} · {account.operator || account.provider} ·{" "}
-                    {account.phone_number || account.account_name}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            {!payoutAccounts.length && (
-              <p className="rounded-md border border-app-border bg-app-surface px-4 py-3 text-sm text-app-muted">
-                Configurez d'abord un compte de retrait dans les paramètres du compte.
-              </p>
-            )}
-
-            {message && (
-              <p className="rounded-md border border-app-border bg-app-surface px-4 py-3 text-sm text-app-muted">
-                {message}
-              </p>
-            )}
-          </div>
-
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
-            <Button type="button" variant="secondary" onClick={onClose}>
-              Annuler
-            </Button>
-            <Button type="submit" disabled={isSubmitting || !payoutAccountReference}>
-              {isSubmitting ? "Enregistrement..." : "Demander le retrait"}
-            </Button>
-          </div>
-        </form>
-      </div>
-    </div>
   );
 }
 
@@ -460,15 +397,10 @@ function ReferralTables({
       <ListSection title="Retraits">
         {withdrawals.length ? (
           withdrawals.slice(0, 6).map((withdrawal) => (
-            <ListRow
-              key={withdrawal.reference}
-              title={withdrawal.reference}
-              meta={withdrawal.status + " · " + withdrawal.payment_method}
-              value={withdrawal.amount + " " + withdrawal.currency}
-            />
+            <WithdrawalRow key={withdrawal.reference} withdrawal={withdrawal} />
           ))
         ) : (
-          <EmptyLine label="Aucune demande de retrait." />
+          <EmptyLine label="Aucun retrait." />
         )}
       </ListSection>
 
@@ -499,6 +431,59 @@ function ReferralTables({
         )}
       </ListSection>
     </div>
+  );
+}
+
+// Ligne d'historique d'un retrait avec affichage de la décomposition
+// "Montant demandé / Frais / Total consommé" et masquage du numéro
+// de téléphone pour respecter la confidentialité.
+function WithdrawalRow({ withdrawal }: { withdrawal: ReferralWithdrawal }) {
+  const snapshot = (withdrawal.destination_snapshot || {}) as {
+    phone_number?: string;
+    country?: string;
+    operator?: string;
+  };
+  const feeAmount = withdrawal.fee_amount;
+  const totalReserved = withdrawal.total_reserved_amount;
+  const phoneLabel = snapshot.phone_number ? maskPhoneNumber(snapshot.phone_number) : "";
+
+  return (
+    <article className="py-3">
+      <header className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="font-semibold text-app-text">{withdrawal.reference}</p>
+          <p className="mt-1 text-sm text-app-muted">
+            {withdrawalStatusLabel(withdrawal.status)}
+            {snapshot.country ? " · " + snapshot.country : ""}
+            {snapshot.operator ? " · " + snapshot.operator : ""}
+            {phoneLabel ? " · " + phoneLabel : ""}
+          </p>
+        </div>
+        <p className="text-sm font-bold text-app-text">
+          {formatAmount(withdrawal.amount, withdrawal.currency)}
+        </p>
+      </header>
+      {(feeAmount || totalReserved) && (
+        <dl className="mt-2 grid grid-cols-3 gap-2 text-xs text-app-muted">
+          <div>
+            <dt className="font-semibold uppercase">Demandé</dt>
+            <dd className="font-bold text-app-text">{formatAmount(withdrawal.amount, withdrawal.currency)}</dd>
+          </div>
+          <div>
+            <dt className="font-semibold uppercase">Frais</dt>
+            <dd className="font-bold text-app-text">
+              {feeAmount ? formatAmount(feeAmount, withdrawal.currency) : "—"}
+            </dd>
+          </div>
+          <div>
+            <dt className="font-semibold uppercase">Total consommé</dt>
+            <dd className="font-bold text-app-text">
+              {totalReserved ? formatAmount(totalReserved, withdrawal.currency) : "—"}
+            </dd>
+          </div>
+        </dl>
+      )}
+    </article>
   );
 }
 

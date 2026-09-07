@@ -11,6 +11,12 @@ export type ReferralWalletSummary = {
   reversed_total: string;
   commissions_count: number;
   pending_withdrawals_count: number;
+  // Champs ajoutés par le backend pour piloter l'UI de retrait.
+  // Valeurs en chaînes Decimal (mêmes règles que les balances).
+  withdrawal_fee_rate: string;
+  minimum_withdrawal_amount: string;
+  max_withdrawable_amount: string;
+  minimum_required_balance: string;
 };
 
 export type ReferralWallet = {
@@ -79,6 +85,14 @@ export type ReferralWithdrawal = {
   requested_at: string;
   processing_at: string | null;
   paid_at: string | null;
+  // Champs ajoutés par le backend iKeePay (commission de retrait
+  // provisionnée + frais snapshotés). Tous optionnels car les anciens
+  // retraits n'ont pas ces champs.
+  fee_rate?: string;
+  fee_amount?: string;
+  total_reserved_amount?: string;
+  // Metadata brute du provider (peut contenir des champs internes).
+  provider_metadata?: Record<string, unknown>;
 };
 
 export type ReferralPayoutAccount = {
@@ -106,10 +120,20 @@ export type ReferralPayoutAccountPayload = {
   is_active?: boolean;
 };
 
+// Payload de création d'un retrait. Deux modes acceptés par le backend :
+//   - "compte sauvegardé" : fournir payout_account_reference
+//   - "destination directe" : fournir country, phone_number, operator
+// Les champs fee_rate / fee_amount / total_reserved_amount ne sont
+// JAMAIS envoyés : ce sont des valeurs backend (snapshotées par le
+// BusinessConfig) que le frontend NE doit pas calculer en source de
+// confiance.
 export type CreateReferralWithdrawalPayload = {
   amount: string;
   currency: string;
   payout_account_reference?: string;
+  country?: string;
+  phone_number?: string;
+  operator?: string;
 };
 
 export async function getReferralOverview(): Promise<ReferralWalletSummary[]> {
