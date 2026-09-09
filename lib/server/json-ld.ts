@@ -2,6 +2,68 @@ export function serializeJsonLd(data: unknown): string {
   return JSON.stringify(data).replace(/</g, "\\u003c");
 }
 
+const COUNTRY_ALPHA2: Record<string, string> = {
+  cd: "CD",
+  ci: "CI",
+  cm: "CM",
+  sn: "SN",
+  ga: "GA",
+  cg: "CG",
+  bf: "BF",
+  ml: "ML",
+  tg: "TG",
+  bj: "BJ",
+  ke: "KE",
+  ug: "UG",
+  tz: "TZ",
+  rw: "RW",
+  ng: "NG",
+  gh: "GH",
+  fr: "FR",
+};
+
+const COUNTRY_NAME_TO_ALPHA2: Record<string, string> = {
+  "rdc": "CD",
+  "rd congo": "CD",
+  "république démocratique du congo": "CD",
+  "democratic republic of the congo": "CD",
+  "côte d'ivoire": "CI",
+  "cameroun": "CM",
+  "sénégal": "SN",
+  "gabon": "GA",
+  "congo": "CG",
+  "burkina faso": "BF",
+  "mali": "ML",
+  "togo": "TG",
+  "bénin": "BJ",
+  "kenya": "KE",
+  "ouganda": "UG",
+  "tanzanie": "TZ",
+  "rwanda": "RW",
+  "nigeria": "NG",
+  "ghana": "GH",
+  "france": "FR",
+};
+
+function normalizeCountryCode(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return trimmed;
+  }
+
+  const upper = trimmed.toUpperCase();
+  if (COUNTRY_ALPHA2[upper]) {
+    return COUNTRY_ALPHA2[upper];
+  }
+
+  const lower = trimmed.toLowerCase();
+  if (COUNTRY_NAME_TO_ALPHA2[lower]) {
+    return COUNTRY_NAME_TO_ALPHA2[lower];
+  }
+
+  return trimmed;
+}
+
 export function getHomeJsonLd(
   siteUrl: string,
   description: string,
@@ -95,7 +157,7 @@ export function getPharmacyJsonLd(
   }
 
   if (pharmacy.country) {
-    address.addressCountry = pharmacy.country;
+    address.addressCountry = normalizeCountryCode(pharmacy.country);
   }
 
   if (Object.keys(address).length > 0) {

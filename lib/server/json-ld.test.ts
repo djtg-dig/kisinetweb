@@ -50,7 +50,7 @@ describe("getHomeJsonLd", () => {
 });
 
 describe("getPharmacyJsonLd", () => {
-  test("génère une pharmacie complète avec adresse", () => {
+  test("normalise le pays RDC vers le code ISO CD", () => {
     const result = getPharmacyJsonLd("https://kisinet.com", {
       name: "Pharmacie Test",
       reference: "PH0TEST",
@@ -74,7 +74,7 @@ describe("getPharmacyJsonLd", () => {
     assert.equal(address["@type"], "PostalAddress");
     assert.equal(address.streetAddress, "123 Rue Test");
     assert.equal(address.addressLocality, "Kinshasa");
-    assert.equal(address.addressCountry, "RDC");
+    assert.equal(address.addressCountry, "CD");
   });
 
   test("utilise neighborhood quand street est absent", () => {
@@ -89,6 +89,7 @@ describe("getPharmacyJsonLd", () => {
     assert.ok(result);
     const address = result.address as Record<string, unknown>;
     assert.equal(address.streetAddress, "Gombe");
+    assert.equal(address.addressCountry, "CD");
   });
 
   test("retourne null pour une référence vide", () => {
@@ -110,5 +111,50 @@ describe("getPharmacyJsonLd", () => {
     assert.equal(result.telephone, undefined);
     assert.equal(result.email, undefined);
     assert.equal(result.address, undefined);
+  });
+
+  test("conserve un code ISO déjà valide", () => {
+    const result = getPharmacyJsonLd("https://kisinet.com", {
+      name: "Pharmacie Test",
+      reference: "PH0TEST",
+      country: "CD",
+    });
+
+    assert.ok(result);
+    const address = result.address as Record<string, unknown>;
+    assert.equal(address.addressCountry, "CD");
+  });
+
+  test("conserve une valeur de pays inconnue", () => {
+    const result = getPharmacyJsonLd("https://kisinet.com", {
+      name: "Pharmacie Test",
+      reference: "PH0TEST",
+      country: "PaysInconnu",
+    });
+
+    assert.ok(result);
+    const address = result.address as Record<string, unknown>;
+    assert.equal(address.addressCountry, "PaysInconnu");
+  });
+
+  test("normalise plusieurs variantes de la RDC vers CD", () => {
+    const variants = [
+      "RDC",
+      "RD Congo",
+      "République démocratique du Congo",
+      "Democratic Republic of the Congo",
+    ];
+
+    for (const variant of variants) {
+      const result = getPharmacyJsonLd("https://kisinet.com", {
+        name: "Pharmacie Test",
+        reference: "PH0TEST",
+        country: variant,
+      });
+
+      assert.ok(result);
+      const address = result.address as Record<string, unknown>;
+      assert.equal(address.addressCountry, "CD", `Failed for: ${variant}`);
+    }
   });
 });
