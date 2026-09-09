@@ -11,6 +11,7 @@ export type PharmacySummary = {
   databaseId?: string;
   reference?: string;
   name: string;
+  description?: string;
   devise?: string;
   role?: string;
   status?: string;
@@ -459,6 +460,7 @@ function normalizePharmacy(item: UnknownRecord): PharmacySummary {
       databaseId === undefined || databaseId === null ? undefined : String(databaseId),
     reference: getText(item.reference) ?? String(id),
     name: String(name),
+    description: getText(item.description),
     devise: getText(item.devise) ?? "USD",
     role: getText(item.role),
     status: getText(item.status) ?? getText(subscription?.status),

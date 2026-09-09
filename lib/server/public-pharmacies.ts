@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { signedBackendFetch } from "@/lib/server/backend-fetch";
 import type { PharmacySummary } from "@/lib/api";
 
@@ -24,6 +25,7 @@ function normalizePharmacy(item: UnknownRecord): PharmacySummary {
     databaseId: item.databaseId ? String(item.databaseId) : undefined,
     reference: getText(item.reference),
     name: getText(item.name) || "Pharmacie",
+    description: getText(item.description),
     devise: getText(item.devise) || getText(item.currency),
     role: getText(item.role),
     status: getText(item.status),
@@ -44,7 +46,7 @@ function normalizePharmacy(item: UnknownRecord): PharmacySummary {
   };
 }
 
-export async function getPublicPharmacyByReferenceServer(
+export const getPublicPharmacyByReferenceServer = cache(async function getPublicPharmacyByReferenceServer(
   reference: string,
 ): Promise<PharmacySummary | null> {
   const path =
@@ -83,4 +85,4 @@ export async function getPublicPharmacyByReferenceServer(
     results.find((pharmacy) => pharmacy.id.toUpperCase() === normalizedReference) ||
     null
   );
-}
+});

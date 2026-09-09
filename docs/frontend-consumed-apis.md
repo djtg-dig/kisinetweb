@@ -329,17 +329,24 @@ agrégateur n'est appelée pour le moment.
 - **Méthode HTTP** : `GET`
 - **URL** : `/api/pharmacies/public/`
 - **Pages frontend** : `/pharmacies`, `/pharmacies/[reference]`
-- **Service frontend** : `getPublicPharmacies(filters)` dans `lib/api`
+- **Services frontend** : `getPublicPharmacies(filters)` dans `lib/api` pour
+  l'annuaire client, et `getPublicPharmacyByReferenceServer(reference)` dans
+  `lib/server/public-pharmacies.ts` pour la fiche publique serveur.
 - **Authentification** : non requise.
 - **Pagination** : 10 pharmacies par page avec le paramètre `page`.
 - **Query params** : `search`, `reference`, `name`, `country`, `city_or_province`,
   `neighborhood`, `has_email`, `has_phone`, `ordering`, `page`.
 - **Réponse attendue (200)** : objet paginé `{ count, next, previous, results }`.
   Chaque élément de `results` contient `id`, `reference`, `name`, `slug`, `email`,
-  `phone_number`, `adresse` et `created_at`.
+  `phone_number`, `adresse` et `created_at`. La fiche publique consomme aussi
+  `description` lorsqu'il est renvoyé afin d'alimenter la description SEO, sans
+  supposer sa présence.
 - **Usage détail public** : la page `/pharmacies/[reference]` utilise
-  `getPublicPharmacyByReference(reference)` dans `lib/api`, qui interroge cet endpoint
-  avec le filtre `reference` puis sélectionne la pharmacie exacte.
+  `getPublicPharmacyByReferenceServer(reference)`, qui interroge cet endpoint
+  avec le filtre `reference` puis sélectionne la pharmacie exacte. Les metadata
+  SEO de la fiche utilisent uniquement les champs réellement récupérés :
+  `name`, `reference`, `description` si disponible, puis la localisation
+  (`adresse.city_or_province.name`, `adresse.country.name`) en repli.
 - **Navigation frontend** : sur `/pharmacies`, le bouton `Plus` des cartes mène vers
   `/pharmacies/{reference}`. La demande d'intégration n'est plus envoyée depuis la liste,
   mais depuis cette page détail.
