@@ -10,7 +10,7 @@ type PublicPharmaciesPage = {
   results: PharmacySummary[];
 };
 
-const PUBLIC_PHARMACIES_PATH = "/api/pharmacies/public";
+const PUBLIC_PHARMACIES_PATH = "/api/pharmacies/public/";
 const PUBLIC_PHARMACIES_SITEMAP_REVALIDATE_SECONDS = 60 * 60;
 
 function getRecord(value: unknown): UnknownRecord | null {
