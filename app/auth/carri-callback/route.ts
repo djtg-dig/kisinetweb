@@ -1,7 +1,6 @@
 import "server-only";
 
 import { NextResponse, type NextRequest } from "next/server";
-
 import { signedBackendFetch } from "@/lib/server/backend-fetch";
 import { ACCESS_COOKIE_NAME, REFRESH_COOKIE_NAME } from "@/lib/server/cookies";
 import { generateCsrfToken, CSRF_COOKIE_NAME } from "@/lib/server/csrf";
@@ -16,11 +15,18 @@ type CarriHandoffPayload = {
   carri_identity?: unknown;
 };
 
+function getAppOrigin(): string {
+  return process.env.KISINET_APP_ORIGIN ?? "http://localhost:3000";
+}
+
 export async function GET(request: NextRequest) {
   const handoff = request.nextUrl.searchParams.get("handoff");
+  const appOrigin = getAppOrigin();
 
   if (!handoff) {
-    return NextResponse.redirect(new URL("/auth/carri?error=no_handoff", request.url));
+    return NextResponse.redirect(
+      new URL("/auth/carri?error=no_handoff", appOrigin),
+    );
   }
 
   try {
@@ -32,7 +38,9 @@ export async function GET(request: NextRequest) {
     });
 
     if (!response.ok) {
-      return NextResponse.redirect(new URL("/auth/carri?error=callback_failed", request.url));
+      return NextResponse.redirect(
+        new URL("/auth/carri?error=callback_failed", appOrigin),
+      );
     }
 
     const payload = (await response.json()) as CarriHandoffPayload;
@@ -40,10 +48,12 @@ export async function GET(request: NextRequest) {
     const refresh = typeof payload?.refresh === "string" ? payload.refresh : "";
 
     if (!access || !refresh) {
-      return NextResponse.redirect(new URL("/auth/carri?error=no_tokens", request.url));
+      return NextResponse.redirect(
+        new URL("/auth/carri?error=no_tokens", appOrigin),
+      );
     }
 
-    const redirectUrl = new URL("/app/select-pharmacy", request.url);
+    const redirectUrl = new URL("/app/select-pharmacy", appOrigin);
     const nextResponse = NextResponse.redirect(redirectUrl);
 
     const isProduction = process.env.NODE_ENV === "production";
@@ -80,10 +90,15 @@ export async function GET(request: NextRequest) {
 
     // Le handoff est à usage unique côté backend ; on bloque aussi un éventuel
     // rejeu via le navigateur pendant la fenêtre de tolérance serveur.
-    nextResponse.headers.set("Cache-Control", "no-store, max-age=" + CARRI_HANDOFF_TTL_SECONDS);
+    nextResponse.headers.set(
+      "Cache-Control",
+      "no-store, max-age=" + CARRI_HANDOFF_TTL_SECONDS,
+    );
 
     return nextResponse;
   } catch {
-    return NextResponse.redirect(new URL("/auth/carri?error=server_error", request.url));
+    return NextResponse.redirect(
+      new URL("/auth/carri?error=server_error", appOrigin),
+    );
   }
 }
