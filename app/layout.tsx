@@ -2,15 +2,13 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { SalesChoicesBootstrap } from "@/components/sales/sales-choices-bootstrap";
 import { ThemeProvider } from "@/components/theme/theme-provider";
+import { siteDescription, defaultOpenGraph, defaultTwitter } from "@/lib/server/metadata-og";
 import "./globals.css";
 
 // Nom du cookie de thème. Partagé avec le ThemeProvider (qui l'écrit) et avec
 // le script d'initialisation (qui le lit). Il permet au serveur de connaître le
 // thème choisi pour le rendu SSR, afin d'éviter tout flash de thème.
 const THEME_COOKIE = "kisinet-theme";
-
-const siteDescription =
-  "Kisinet est une plateforme de gestion de pharmacies conçue pour simplifier la gestion des produits, stocks, ventes, factures et activités quotidiennes des pharmacies.";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://kisinet.com"),
@@ -22,19 +20,8 @@ export const metadata: Metadata = {
   icons: {
     icon: "/favicon.svg",
   },
-  openGraph: {
-    title: "Kisinet",
-    description: siteDescription,
-    url: "https://kisinet.com",
-    siteName: "Kisinet",
-    type: "website",
-    locale: "fr_CD",
-  },
-  twitter: {
-    card: "summary",
-    title: "Kisinet",
-    description: siteDescription,
-  },
+  openGraph: defaultOpenGraph,
+  twitter: defaultTwitter,
 };
 
 // Script d'initialisation exécuté avant le premier paint (Next.js 15 le place

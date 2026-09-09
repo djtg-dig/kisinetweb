@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import PublicPharmaciesPageClient from "./page-client";
+import { defaultOpenGraph, defaultTwitter } from "@/lib/server/metadata-og";
 
 const title = "Pharmacies sur Kisinet";
 const description =
@@ -13,15 +14,13 @@ export const metadata: Metadata = {
     canonical: url,
   },
   openGraph: {
+    ...defaultOpenGraph,
     title,
     description,
     url,
-    siteName: "Kisinet",
-    locale: "fr_CD",
-    type: "website",
   },
   twitter: {
-    card: "summary",
+    ...defaultTwitter,
     title,
     description,
   },

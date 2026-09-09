@@ -7,6 +7,7 @@ import { features } from "@/lib/features";
 import { HashFocus } from "@/components/hash-focus";
 import { JsonLd } from "@/components/json-ld";
 import { getHomeJsonLd } from "@/lib/server/json-ld";
+import { defaultOpenGraph, defaultTwitter } from "@/lib/server/metadata-og";
 
 const title = "Logiciel de gestion de pharmacie en RDC";
 const description =
@@ -23,15 +24,13 @@ export const metadata: Metadata = {
     canonical: url,
   },
   openGraph: {
+    ...defaultOpenGraph,
     title,
     description,
     url,
-    siteName: "Kisinet",
-    locale: "fr_CD",
-    type: "website",
   },
   twitter: {
-    card: "summary",
+    ...defaultTwitter,
     title: title + " | Kisinet",
     description,
   },

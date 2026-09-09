@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { PublicLayout } from "@/components/layout/public-layout";
 import { LinkButton } from "@/components/ui/link-button";
+import { defaultOpenGraph, defaultTwitter } from "@/lib/server/metadata-og";
 
 export const metadata: Metadata = {
   title: "Conditions d'utilisation",
@@ -10,20 +11,19 @@ export const metadata: Metadata = {
     canonical: "/terms",
   },
   openGraph: {
+    ...defaultOpenGraph,
     title: "Conditions d'utilisation",
     description:
       "Consultez les conditions applicables à l'accès et à l'utilisation de la plateforme de gestion de pharmacie Kisinet.",
     url: "/terms",
-    siteName: "Kisinet",
     type: "article",
-    locale: "fr_CD",
   },
   robots: {
     index: true,
     follow: true,
   },
   twitter: {
-    card: "summary",
+    ...defaultTwitter,
     title: "Conditions d'utilisation",
     description:
       "Consultez les conditions applicables à l'accès et à l'utilisation de la plateforme de gestion de pharmacie Kisinet.",

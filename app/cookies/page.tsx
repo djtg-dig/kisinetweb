@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { PublicLayout } from "@/components/layout/public-layout";
 import { LinkButton } from "@/components/ui/link-button";
+import { defaultOpenGraph, defaultTwitter } from "@/lib/server/metadata-og";
 
 export const metadata: Metadata = {
   title: "Politique relative aux cookies",
@@ -10,20 +11,19 @@ export const metadata: Metadata = {
     canonical: "/cookies",
   },
   openGraph: {
+    ...defaultOpenGraph,
     title: "Politique relative aux cookies",
     description:
       "Consultez la politique de cookies de Kisinet et découvrez comment la plateforme utilise les cookies et technologies similaires.",
     url: "/cookies",
-    siteName: "Kisinet",
     type: "article",
-    locale: "fr_CD",
   },
   robots: {
     index: true,
     follow: true,
   },
   twitter: {
-    card: "summary",
+    ...defaultTwitter,
     title: "Politique relative aux cookies",
     description:
       "Consultez la politique de cookies de Kisinet et découvrez comment la plateforme utilise les cookies et technologies similaires.",

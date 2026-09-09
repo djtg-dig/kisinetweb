@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import TarifsPageClient from "./page-client";
+import { defaultOpenGraph, defaultTwitter } from "@/lib/server/metadata-og";
 
 const title = "Tarifs du logiciel de gestion de pharmacie";
 const description =
@@ -13,15 +14,13 @@ export const metadata: Metadata = {
     canonical: url,
   },
   openGraph: {
+    ...defaultOpenGraph,
     title,
     description,
     url,
-    siteName: "Kisinet",
-    locale: "fr_CD",
-    type: "website",
   },
   twitter: {
-    card: "summary",
+    ...defaultTwitter,
     title,
     description,
   },

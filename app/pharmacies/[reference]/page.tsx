@@ -5,6 +5,7 @@ import { PublicPharmacyDetail } from "@/components/pharmacies/public-pharmacy-de
 import { getPublicPharmacyByReferenceServer } from "@/lib/server/public-pharmacies";
 import { getPharmacyJsonLd } from "@/lib/server/json-ld";
 import { JsonLd } from "@/components/json-ld";
+import { ogImage } from "@/lib/server/metadata-og";
 import type { PharmacySummary } from "@/lib/api";
 
 type PublicPharmacyDetailPageProps = {
@@ -42,11 +43,16 @@ export async function generateMetadata({
       siteName: "Kisinet",
       locale: "fr_CD",
       type: "website",
+      images: [{
+        ...ogImage,
+        alt: `${pharmacy.name} sur Kisinet`,
+      }],
     },
     twitter: {
-      card: "summary",
+      card: "summary_large_image",
       title: pharmacy.name,
       description,
+      images: [ogImage.url],
     },
   };
 }
