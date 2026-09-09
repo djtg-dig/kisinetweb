@@ -3,24 +3,30 @@ import { PublicLayout } from "@/components/layout/public-layout";
 import { LinkButton } from "@/components/ui/link-button";
 
 export const metadata: Metadata = {
-  title: "Conditions d'utilisation | Kisinet",
+  title: "Conditions d'utilisation",
   description:
     "Consultez les conditions applicables à l'accès et à l'utilisation de la plateforme de gestion de pharmacie Kisinet.",
   alternates: {
     canonical: "/terms",
   },
   openGraph: {
-    title: "Conditions d'utilisation | Kisinet",
+    title: "Conditions d'utilisation",
     description:
       "Consultez les conditions applicables à l'accès et à l'utilisation de la plateforme de gestion de pharmacie Kisinet.",
     url: "/terms",
     siteName: "Kisinet",
     type: "article",
-    locale: "fr_FR",
+    locale: "fr_CD",
   },
   robots: {
     index: true,
     follow: true,
+  },
+  twitter: {
+    card: "summary",
+    title: "Conditions d'utilisation",
+    description:
+      "Consultez les conditions applicables à l'accès et à l'utilisation de la plateforme de gestion de pharmacie Kisinet.",
   },
 };
 

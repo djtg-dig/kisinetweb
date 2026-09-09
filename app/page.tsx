@@ -1,9 +1,38 @@
+import type { Metadata } from "next";
 import { PublicLayout } from "@/components/layout/public-layout";
 import { PublicAuthLink } from "@/components/auth/public-auth-link";
 import { FeatureCard } from "@/components/ui/feature-card";
 import { LinkButton } from "@/components/ui/link-button";
 import { features } from "@/lib/features";
 import { HashFocus } from "@/components/hash-focus";
+
+const title = "Logiciel de gestion de pharmacie en RDC";
+const description =
+  "Kisinet est un logiciel de gestion de pharmacie conçu pour gérer les produits, stocks, ventes, factures et activités quotidiennes des pharmacies en RDC et en Afrique.";
+const url = "https://kisinet.com/";
+
+export const metadata: Metadata = {
+  title: {
+    absolute: title + " | Kisinet",
+  },
+  description,
+  alternates: {
+    canonical: url,
+  },
+  openGraph: {
+    title,
+    description,
+    url,
+    siteName: "Kisinet",
+    locale: "fr_CD",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: title + " | Kisinet",
+    description,
+  },
+};
 
 const quickBenefits = [
   "Stock suivi en temps réel",

@@ -1,4 +1,31 @@
+import type { Metadata } from "next";
 import { PublicLayout } from "@/components/layout/public-layout";
+
+const title = "Contact";
+const description =
+  "Contactez l'équipe Kisinet pour obtenir des informations sur la plateforme, les abonnements ou l'accompagnement des pharmacies.";
+const url = "https://kisinet.com/contact";
+
+export const metadata: Metadata = {
+  title,
+  description,
+  alternates: {
+    canonical: url,
+  },
+  openGraph: {
+    title,
+    description,
+    url,
+    siteName: "Kisinet",
+    locale: "fr_CD",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title,
+    description,
+  },
+};
 
 export default function ContactPage() {
   return (
@@ -14,9 +41,9 @@ export default function ContactPage() {
               <p className="text-sm font-semibold uppercase tracking-wide text-primary-700">
                 Contact
               </p>
-              <h2 className="mt-3 text-3xl font-bold leading-tight text-app-text">
+              <h1 className="mt-3 text-3xl font-bold leading-tight text-app-text">
                 Une question&nbsp;? Contactez-nous
-              </h2>
+              </h1>
               <p className="mt-3 text-sm leading-6 text-app-muted sm:text-base">
                 Notre équipe est disponible pour vous accompagner.
               </p>

@@ -3,7 +3,11 @@ import { PublicLayout } from "@/components/layout/public-layout";
 import { NotFoundActions } from "@/components/not-found-actions";
 
 export const metadata: Metadata = {
-  title: "404 - Page introuvable | Kisinet",
+  title: "404 - Page introuvable",
+  robots: {
+    index: false,
+    follow: false,
+  },
 };
 
 export default function NotFound() {
