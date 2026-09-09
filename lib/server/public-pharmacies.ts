@@ -5,6 +5,13 @@ import { signedBackendFetch } from "@/lib/server/backend-fetch";
 import type { PharmacySummary } from "@/lib/api";
 
 type UnknownRecord = Record<string, unknown>;
+type PublicPharmaciesPage = {
+  next: string | null;
+  results: PharmacySummary[];
+};
+
+const PUBLIC_PHARMACIES_PATH = "/api/pharmacies/public/";
+const PUBLIC_PHARMACIES_SITEMAP_REVALIDATE_SECONDS = 60 * 60;
 
 function getRecord(value: unknown): UnknownRecord | null {
   return value && typeof value === "object" ? (value as UnknownRecord) : null;
@@ -47,11 +54,39 @@ function normalizePharmacy(item: UnknownRecord): PharmacySummary {
   };
 }
 
+function getPageItems(data: unknown): UnknownRecord[] {
+  const dataRecord = getRecord(data);
+  const rows: unknown[] = Array.isArray(data)
+    ? data
+    : Array.isArray(dataRecord?.results)
+      ? dataRecord.results
+      : [];
+
+  return rows.filter(
+    (item: unknown): item is UnknownRecord =>
+      Boolean(item) && typeof item === "object",
+  );
+}
+
+function normalizePublicPharmaciesPage(data: unknown): PublicPharmaciesPage {
+  const dataRecord = getRecord(data);
+
+  return {
+    next: getText(dataRecord?.next) || null,
+    results: getPageItems(data)
+      .map(normalizePharmacy)
+      .filter(
+        (pharmacy: PharmacySummary) =>
+          Boolean(pharmacy.id) && pharmacy.isPublic === true,
+      ),
+  };
+}
+
 export const getPublicPharmacyByReferenceServer = cache(async function getPublicPharmacyByReferenceServer(
   reference: string,
 ): Promise<PharmacySummary | null> {
   const path =
-    "/api/pharmacies/public/?reference=" +
+    PUBLIC_PHARMACIES_PATH + "?reference=" +
     encodeURIComponent(reference) +
     "&page=1";
   const response = await signedBackendFetch({
@@ -68,19 +103,8 @@ export const getPublicPharmacyByReferenceServer = cache(async function getPublic
   }
 
   const data = (await response.json()) as unknown;
-  const dataRecord = getRecord(data);
-  const rows: UnknownRecord[] = Array.isArray(data)
-    ? (data as UnknownRecord[])
-    : Array.isArray(dataRecord?.results)
-      ? (dataRecord.results as UnknownRecord[])
-      : [];
   const normalizedReference = reference.trim().toUpperCase();
-  const results = rows
-    .map(normalizePharmacy)
-    .filter(
-      (pharmacy: PharmacySummary) =>
-        Boolean(pharmacy.id) && pharmacy.isPublic === true,
-    );
+  const { results } = normalizePublicPharmaciesPage(data);
 
   return (
     results.find(
@@ -90,3 +114,35 @@ export const getPublicPharmacyByReferenceServer = cache(async function getPublic
     null
   );
 });
+
+export async function getAllPublicPharmaciesForSitemapServer(): Promise<PharmacySummary[]> {
+  const pharmacies: PharmacySummary[] = [];
+  let page = 1;
+  let hasNextPage = true;
+
+  while (hasNextPage) {
+    const response = await signedBackendFetch({
+      path: PUBLIC_PHARMACIES_PATH + "?page=" + page,
+      method: "GET",
+      headers: { Accept: "application/json" },
+      cache: "force-cache",
+      revalidate: PUBLIC_PHARMACIES_SITEMAP_REVALIDATE_SECONDS,
+    });
+
+    if (!response.ok) {
+      throw new Error("Impossible de charger les pharmacies publiques du sitemap.");
+    }
+
+    const data = (await response.json()) as unknown;
+    const pageData = normalizePublicPharmaciesPage(data);
+
+    pharmacies.push(
+      ...pageData.results.filter((pharmacy) => Boolean(pharmacy.reference?.trim())),
+    );
+
+    hasNextPage = Boolean(pageData.next);
+    page += 1;
+  }
+
+  return pharmacies;
+}

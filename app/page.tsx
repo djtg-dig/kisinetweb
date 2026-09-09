@@ -5,10 +5,13 @@ import { FeatureCard } from "@/components/ui/feature-card";
 import { LinkButton } from "@/components/ui/link-button";
 import { features } from "@/lib/features";
 import { HashFocus } from "@/components/hash-focus";
+import { JsonLd } from "@/components/json-ld";
+import { getHomeJsonLd } from "@/lib/server/json-ld";
 
 const title = "Logiciel de gestion de pharmacie en RDC";
 const description =
   "Kisinet est un logiciel de gestion de pharmacie conçu pour gérer les produits, stocks, ventes, factures et activités quotidiennes des pharmacies en RDC et en Afrique.";
+const siteUrl = "https://kisinet.com";
 const url = "https://kisinet.com/";
 
 export const metadata: Metadata = {
@@ -165,9 +168,12 @@ const faqs = [
   },
 ];
 
+const homeJsonLd = getHomeJsonLd(siteUrl, description, faqs);
+
 export default function HomePage() {
   return (
     <PublicLayout>
+      <JsonLd data={homeJsonLd} />
       <main>
         <HashFocus />
         <section className="border-b border-app-border bg-app-background">

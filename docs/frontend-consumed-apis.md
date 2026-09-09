@@ -329,10 +329,12 @@ agrégateur n'est appelée pour le moment.
   et non archivées.
 - **Méthode HTTP** : `GET`
 - **URL** : `/api/pharmacies/public/`
-- **Pages frontend** : `/pharmacies`, `/pharmacies/[reference]`
+- **Pages frontend** : `/pharmacies`, `/pharmacies/[reference]`, `/sitemap.xml`
 - **Services frontend** : `getPublicPharmacies(filters)` dans `lib/api` pour
   l'annuaire client, et `getPublicPharmacyByReferenceServer(reference)` dans
   `lib/server/public-pharmacies.ts` pour la fiche publique serveur.
+  Le sitemap SEO utilise `getAllPublicPharmaciesForSitemapServer()` dans le même
+  fichier pour parcourir toutes les pages de l'annuaire public.
 - **Authentification** : non requise.
 - **Pagination** : 10 pharmacies par page avec le paramètre `page`.
 - **Query params** : `search`, `reference`, `name`, `country`, `city_or_province`,
@@ -350,6 +352,15 @@ agrégateur n'est appelée pour le moment.
   (`adresse.city_or_province.name`, `adresse.country.name`) en repli.
   La fiche détail refuse aussi toute pharmacie dont `is_public !== true`, même
   si l'endpoint public est déjà filtré côté backend.
+- **Usage sitemap SEO** : `/sitemap.xml` parcourt l'endpoint page par page avec
+  `page=1`, `page=2`, etc. tant que la réponse contient `next`. Il n'utilise pas
+  `page_size`. Une fiche est ajoutée uniquement si `is_public === true` après
+  normalisation frontend et si `reference` est non vide. Les URLs générées sont
+  de la forme `https://kisinet.com/pharmacies/{reference}`, sans query string ni
+  identifiant interne. En cas d'échec backend, le sitemap conserve seulement les
+  routes statiques publiques. Aucun `lastModified` n'est généré pour les fiches,
+  car cet endpoint public expose `created_at` mais pas un champ fiable de
+  modification publique comme `updated_at`.
 - **Navigation frontend** : sur `/pharmacies`, le bouton `Plus` des cartes mène vers
   `/pharmacies/{reference}`. La demande d'intégration n'est plus envoyée depuis la liste,
   mais depuis cette page détail.

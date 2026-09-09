@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { PublicLayout } from "@/components/layout/public-layout";
 import { PublicPharmacyDetail } from "@/components/pharmacies/public-pharmacy-detail";
 import { getPublicPharmacyByReferenceServer } from "@/lib/server/public-pharmacies";
+import { getPharmacyJsonLd } from "@/lib/server/json-ld";
+import { JsonLd } from "@/components/json-ld";
 import type { PharmacySummary } from "@/lib/api";
 
 type PublicPharmacyDetailPageProps = {
@@ -61,8 +63,11 @@ export default async function PublicPharmacyDetailPage({
     notFound();
   }
 
+  const pharmacyJsonLd = getPharmacyJsonLd(siteUrl, pharmacy);
+
   return (
     <PublicLayout>
+      {pharmacyJsonLd && <JsonLd data={pharmacyJsonLd} />}
       <PublicPharmacyDetail pharmacy={pharmacy} />
     </PublicLayout>
   );

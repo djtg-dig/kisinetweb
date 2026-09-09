@@ -10,7 +10,14 @@ export type SignedBackendFetchInput = {
   body?: BodyInit | null;
   accessToken?: string;
   cache?: RequestCache;
+  revalidate?: number;
   signal?: AbortSignal;
+};
+
+type NextFetchInit = RequestInit & {
+  next?: {
+    revalidate?: number;
+  };
 };
 
 const FORWARDED_RESPONSE_HEADERS = [
@@ -46,13 +53,16 @@ export async function signedBackendFetch(input: SignedBackendFetchInput): Promis
     bodyBytes: requestBody,
   }).forEach((value, key) => headers.set(key, value));
 
-  return fetch(backendUrl, {
+  const fetchInit: NextFetchInit = {
     method,
     headers,
     body: requestBody,
     cache: input.cache ?? "no-store",
+    next: input.revalidate === undefined ? undefined : { revalidate: input.revalidate },
     signal: input.signal,
-  });
+  };
+
+  return fetch(backendUrl, fetchInit);
 }
 
 export function buildBackendUrl(path: string): URL {
