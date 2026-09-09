@@ -44,6 +44,7 @@ export default function GeneralSettingsPage({ params }: GeneralSettingsPageProps
   const [state, setState] = useState<PageState>("loading");
   const [settings, setSettings] = useState<PharmacyGeneralSettings | null>(null);
   const [selectedWidth, setSelectedWidth] = useState<ReceiptPaperWidth>(80);
+  const [isPublic, setIsPublic] = useState(false);
   const [permissions, setPermissions] = useState<PharmacyPermissions>({});
   const [errorMessage, setErrorMessage] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -83,6 +84,7 @@ export default function GeneralSettingsPage({ params }: GeneralSettingsPageProps
         setPermissions(currentPermissions);
         setSettings(currentSettings);
         setSelectedWidth(currentSettings.receiptPaperWidth);
+        setIsPublic(currentSettings.isPublic);
         // general_settings_update permet implicitement de consulter la page.
         setState(canViewPharmacyGeneralSettings(currentPermissions) ? "ready" : "forbidden");
       } catch (error) {
@@ -108,7 +110,11 @@ export default function GeneralSettingsPage({ params }: GeneralSettingsPageProps
 
   const basePath = "/app/pharmacies/" + pharmacyId;
   const canEdit = canUpdatePharmacyGeneralSettings(permissions);
-  const hasChanged = Boolean(settings && settings.receiptPaperWidth !== selectedWidth);
+  const hasChanged = Boolean(
+    settings &&
+      (settings.receiptPaperWidth !== selectedWidth ||
+        settings.isPublic !== isPublic),
+  );
 
   async function saveSettings() {
     if (!pharmacyId || !canEdit || isSaving) {
@@ -119,12 +125,14 @@ export default function GeneralSettingsPage({ params }: GeneralSettingsPageProps
     setToast(null);
 
     try {
-      // La requête PATCH n'envoie que le choix de largeur modifiable.
+      // La requête PATCH n'envoie que les préférences modifiables.
       const updatedSettings = await updatePharmacyGeneralSettings(pharmacyId, {
         receiptPaperWidth: selectedWidth,
+        isPublic,
       });
       setSettings(updatedSettings);
       setSelectedWidth(updatedSettings.receiptPaperWidth);
+      setIsPublic(updatedSettings.isPublic);
       setToast({
         tone: "success",
         text: "Les paramètres généraux de la pharmacie ont été mis à jour.",
@@ -242,6 +250,38 @@ export default function GeneralSettingsPage({ params }: GeneralSettingsPageProps
               </label>
             ))}
           </fieldset>
+
+          <div className="mt-8 border-t border-app-border pt-6">
+            <div className="max-w-3xl">
+              <p className="text-sm font-semibold text-primary-700">Annuaire public</p>
+              <h2 className="mt-2 text-xl font-bold text-app-text">
+                Visibilité publique
+              </h2>
+              <p className="mt-3 text-sm leading-6 text-app-muted">
+                Autorisez l'apparition de cette pharmacie dans l'annuaire public
+                Kisinet et sur sa fiche publique indexable.
+              </p>
+            </div>
+
+            <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-md border border-app-border bg-app-surface px-4 py-3 transition hover:border-primary-300 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-70">
+              <input
+                type="checkbox"
+                checked={isPublic}
+                onChange={(event) => setIsPublic(event.target.checked)}
+                disabled={!canEdit || isSaving}
+                className="mt-1 h-4 w-4 accent-primary-600"
+              />
+              <span>
+                <span className="block text-sm font-bold text-app-text">
+                  Publier cette pharmacie
+                </span>
+                <span className="mt-1 block text-sm leading-5 text-app-muted">
+                  Si cette option est désactivée, la fiche publique est traitée
+                  comme introuvable.
+                </span>
+              </span>
+            </label>
+          </div>
 
           {canEdit && (
             <div className="mt-6 flex justify-end">

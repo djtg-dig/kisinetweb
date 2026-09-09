@@ -12,6 +12,7 @@ export type PharmacySummary = {
   reference?: string;
   name: string;
   description?: string;
+  isPublic?: boolean;
   devise?: string;
   role?: string;
   status?: string;
@@ -114,10 +115,12 @@ export type ReceiptPaperWidth = 58 | 80;
 
 export type PharmacyGeneralSettings = {
   receiptPaperWidth: ReceiptPaperWidth;
+  isPublic: boolean;
 };
 
 export type UpdatePharmacyGeneralSettingsInput = {
-  receiptPaperWidth: ReceiptPaperWidth;
+  receiptPaperWidth?: ReceiptPaperWidth;
+  isPublic?: boolean;
 };
 
 export type CreatePharmacyInput = {
@@ -461,6 +464,7 @@ function normalizePharmacy(item: UnknownRecord): PharmacySummary {
     reference: getText(item.reference) ?? String(id),
     name: String(name),
     description: getText(item.description),
+    isPublic: item.is_public === undefined ? undefined : Boolean(item.is_public),
     devise: getText(item.devise) ?? "USD",
     role: getText(item.role),
     status: getText(item.status) ?? getText(subscription?.status),
@@ -578,6 +582,7 @@ function normalizePharmacyGeneralSettings(item: UnknownRecord): PharmacyGeneralS
   // réponse inattendue arrive afin de ne pas rendre le formulaire incohérent.
   return {
     receiptPaperWidth: width === 58 ? 58 : 80,
+    isPublic: item.is_public === true,
   };
 }
 
@@ -1553,13 +1558,22 @@ export async function updatePharmacyGeneralSettings(
   pharmacyId: string,
   input: UpdatePharmacyGeneralSettingsInput,
 ): Promise<PharmacyGeneralSettings> {
-  // Seul le champ modifiable est envoyé : la pharmacie et les dates restent
-  // contrôlées par le backend.
+  const payload: UnknownRecord = {};
+
+  if (input.receiptPaperWidth !== undefined) {
+    payload.receipt_paper_width = input.receiptPaperWidth;
+  }
+  if (input.isPublic !== undefined) {
+    payload.is_public = input.isPublic;
+  }
+
+  // Seuls les champs modifiables sont envoyés : la pharmacie et les dates
+  // restent contrôlées par le backend.
   const data = await sendApiJson<unknown>(
     "/api/pharmacies/" + pharmacyId + "/general-settings/",
     "PATCH",
     "Impossible de modifier les paramètres généraux de la pharmacie.",
-    { receipt_paper_width: input.receiptPaperWidth },
+    payload,
   );
 
   return normalizePharmacyGeneralSettings((data || {}) as UnknownRecord);

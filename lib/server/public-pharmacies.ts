@@ -26,6 +26,7 @@ function normalizePharmacy(item: UnknownRecord): PharmacySummary {
     reference: getText(item.reference),
     name: getText(item.name) || "Pharmacie",
     description: getText(item.description),
+    isPublic: item.is_public === undefined ? undefined : Boolean(item.is_public),
     devise: getText(item.devise) || getText(item.currency),
     role: getText(item.role),
     status: getText(item.status),
@@ -76,7 +77,10 @@ export const getPublicPharmacyByReferenceServer = cache(async function getPublic
   const normalizedReference = reference.trim().toUpperCase();
   const results = rows
     .map(normalizePharmacy)
-    .filter((pharmacy: PharmacySummary) => Boolean(pharmacy.id));
+    .filter(
+      (pharmacy: PharmacySummary) =>
+        Boolean(pharmacy.id) && pharmacy.isPublic === true,
+    );
 
   return (
     results.find(

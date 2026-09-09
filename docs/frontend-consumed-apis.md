@@ -325,7 +325,8 @@ agrégateur n'est appelée pour le moment.
 
 ### GET /api/pharmacies/public/
 
-- **Objectif** : afficher l'annuaire public des pharmacies non archivées.
+- **Objectif** : afficher l'annuaire public des pharmacies explicitement publiées
+  et non archivées.
 - **Méthode HTTP** : `GET`
 - **URL** : `/api/pharmacies/public/`
 - **Pages frontend** : `/pharmacies`, `/pharmacies/[reference]`
@@ -337,16 +338,18 @@ agrégateur n'est appelée pour le moment.
 - **Query params** : `search`, `reference`, `name`, `country`, `city_or_province`,
   `neighborhood`, `has_email`, `has_phone`, `ordering`, `page`.
 - **Réponse attendue (200)** : objet paginé `{ count, next, previous, results }`.
-  Chaque élément de `results` contient `id`, `reference`, `name`, `slug`, `email`,
-  `phone_number`, `adresse` et `created_at`. La fiche publique consomme aussi
-  `description` lorsqu'il est renvoyé afin d'alimenter la description SEO, sans
-  supposer sa présence.
+  Chaque élément de `results` contient `id`, `reference`, `name`, `slug`,
+  `is_public`, `email`, `phone_number`, `adresse` et `created_at`. La fiche
+  publique consomme aussi `description` lorsqu'il est renvoyé afin d'alimenter
+  la description SEO, sans supposer sa présence.
 - **Usage détail public** : la page `/pharmacies/[reference]` utilise
   `getPublicPharmacyByReferenceServer(reference)`, qui interroge cet endpoint
   avec le filtre `reference` puis sélectionne la pharmacie exacte. Les metadata
   SEO de la fiche utilisent uniquement les champs réellement récupérés :
   `name`, `reference`, `description` si disponible, puis la localisation
   (`adresse.city_or_province.name`, `adresse.country.name`) en repli.
+  La fiche détail refuse aussi toute pharmacie dont `is_public !== true`, même
+  si l'endpoint public est déjà filtré côté backend.
 - **Navigation frontend** : sur `/pharmacies`, le bouton `Plus` des cartes mène vers
   `/pharmacies/{reference}`. La demande d'intégration n'est plus envoyée depuis la liste,
   mais depuis cette page détail.
@@ -1254,17 +1257,20 @@ Content-Type: application/json
 ### GET /api/pharmacies/{pharmacy_id}/general-settings/
 
 - **Objectif** : charger les préférences générales d'une pharmacie, notamment
-  la largeur du papier thermique POS.
+  la largeur du papier thermique POS et la visibilité dans l'annuaire public.
 - **Méthode HTTP** : `GET`
 - **URL** : `/api/pharmacies/{pharmacy_id}/general-settings/`
 - **Page frontend** : `/app/pharmacies/[pharmacyId]/settings/general`
 - **Service frontend** : `getPharmacyGeneralSettings(pharmacyId)` dans `lib/api`
 - **Authentification** : requise avec `Authorization: Bearer <access_token>`.
-- **Permission backend** : propriétaire ou `pharmacy_view` dans cette pharmacie.
-- **Réponse attendue (200)** : `{ "receipt_paper_width": 58 }` ou
-  `{ "receipt_paper_width": 80 }`.
+- **Permission backend** : propriétaire, admin interne, `general_settings_view`
+  ou `general_settings_update` dans cette pharmacie.
+- **Réponse attendue (200)** : `{ "receipt_paper_width": 58, "is_public": true }`
+  ou `{ "receipt_paper_width": 80, "is_public": false }`.
 - **Signification** : `receipt_paper_width` représente la largeur du papier
-  thermique POS en millimètres. Valeurs autorisées : `58` ou `80`.
+  thermique POS en millimètres. Valeurs autorisées : `58` ou `80`. `is_public`
+  indique si la pharmacie accepte d'apparaître dans l'annuaire public Kisinet
+  et d'avoir une fiche publique indexable.
 - **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden`, `404 Not Found`.
 
 ### PATCH /api/pharmacies/{pharmacy_id}/general-settings/
@@ -1276,12 +1282,15 @@ Content-Type: application/json
 - **Service frontend** : `updatePharmacyGeneralSettings(pharmacyId, input)` dans
   `lib/api`
 - **Authentification** : requise avec `Authorization: Bearer <access_token>`.
-- **Permission backend** : propriétaire ou `pharmacy_update` dans cette pharmacie.
-- **Corps envoyé** : uniquement le champ modifiable
-  `{ "receipt_paper_width": 58 }` ou `{ "receipt_paper_width": 80 }`.
-- **Réponse attendue (200)** : `{ "receipt_paper_width": 58 }` ou
-  `{ "receipt_paper_width": 80 }`.
-- **Validation** : toute valeur autre que `58` ou `80` retourne `400 Bad Request`.
+- **Permission backend** : propriétaire, admin interne ou
+  `general_settings_update` dans cette pharmacie.
+- **Corps envoyé** : uniquement les champs modifiables, par exemple
+  `{ "receipt_paper_width": 58 }`, `{ "is_public": true }` ou
+  `{ "receipt_paper_width": 80, "is_public": false }`.
+- **Réponse attendue (200)** : `{ "receipt_paper_width": 58, "is_public": true }`
+  ou `{ "receipt_paper_width": 80, "is_public": false }`.
+- **Validation** : toute largeur autre que `58` ou `80` retourne
+  `400 Bad Request`; `is_public` est un booléen.
 - **Erreurs possibles** : `400 Bad Request`, `401 Unauthorized`,
   `403 Forbidden`, `404 Not Found`.
 
