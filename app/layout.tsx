@@ -9,11 +9,31 @@ import "./globals.css";
 // thème choisi pour le rendu SSR, afin d'éviter tout flash de thème.
 const THEME_COOKIE = "kisinet-theme";
 
+const siteDescription =
+  "Kisinet est une plateforme de gestion de pharmacies conçue pour simplifier la gestion des produits, stocks, ventes, factures et activités quotidiennes des pharmacies.";
+
 export const metadata: Metadata = {
-  title: "Kisinet",
-  description: "Plateforme moderne de gestion de pharmacies",
+  metadataBase: new URL("https://kisinet.com"),
+  title: {
+    default: "Kisinet",
+    template: "%s | Kisinet",
+  },
+  description: siteDescription,
   icons: {
     icon: "/favicon.svg",
+  },
+  openGraph: {
+    title: "Kisinet",
+    description: siteDescription,
+    url: "https://kisinet.com",
+    siteName: "Kisinet",
+    type: "website",
+    locale: "fr_CD",
+  },
+  twitter: {
+    card: "summary",
+    title: "Kisinet",
+    description: siteDescription,
   },
 };
 
