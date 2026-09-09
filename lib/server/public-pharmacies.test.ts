@@ -115,8 +115,10 @@ describe("getAllPublicPharmaciesForSitemapServer", () => {
       ["PH0PAGE01", "PH0PAGE02"],
     );
     assert.equal(calls.length, 2);
-    assert.ok(calls[0]?.endsWith("/api/pharmacies/public/?page=1"));
-    assert.ok(calls[1]?.endsWith("/api/pharmacies/public/?page=2"));
+    assert.ok(calls[0]?.endsWith("/api/pharmacies/public?page=1"));
+    assert.ok(calls[1]?.endsWith("/api/pharmacies/public?page=2"));
+    assert.ok(!calls[0]?.includes("/api/pharmacies/public/?page="));
+    assert.ok(!calls[1]?.includes("/api/pharmacies/public/?page="));
   });
 
   test("ignore les pharmacies privées et les références absentes", async () => {
