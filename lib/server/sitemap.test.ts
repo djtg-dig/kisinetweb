@@ -32,7 +32,10 @@ function mockSitemapPages(pages: unknown[]) {
 
 describe("sitemap", () => {
   test("conserve les routes statiques et ajoute les pharmacies publiques valides sans doublon", async () => {
-    const { default: sitemap } = await loadSitemap();
+    const sitemapModule = await loadSitemap();
+    const sitemap = sitemapModule.default;
+
+    assert.equal(sitemapModule.dynamic, "force-dynamic");
 
     mockSitemapPages([
       {
@@ -88,7 +91,9 @@ describe("sitemap", () => {
   });
 
   test("retourne uniquement le sitemap statique si le backend échoue", async () => {
-    const { default: sitemap } = await loadSitemap();
+    const sitemapModule = await loadSitemap();
+    const sitemap = sitemapModule.default;
+
     const originalError = console.error;
 
     console.error = () => undefined;
@@ -114,7 +119,8 @@ describe("sitemap", () => {
   });
 
   test("retourne uniquement le sitemap statique si la liste publique est vide", async () => {
-    const { default: sitemap } = await loadSitemap();
+    const sitemapModule = await loadSitemap();
+    const sitemap = sitemapModule.default;
 
     mockSitemapPages([
       {
