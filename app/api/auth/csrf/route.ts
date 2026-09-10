@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import {
   CSRF_COOKIE_NAME,
-  getAllowedOrigin,
+  getAllowedOrigins,
   getCsrfToken,
   setCsrfCookie,
   validateCsrfToken,
@@ -31,9 +31,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const origin = request.headers.get("origin");
-  const allowedOrigin = getAllowedOrigin(request);
+  const allowedOrigins = getAllowedOrigins();
 
-  if (origin && allowedOrigin && origin !== allowedOrigin) {
+  if (origin && allowedOrigins.length && !allowedOrigins.includes(origin)) {
     return NextResponse.json({ code: "csrf_failed", detail: "Invalid origin." }, { status: 403 });
   }
 

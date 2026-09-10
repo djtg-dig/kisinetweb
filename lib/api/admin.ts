@@ -1,5 +1,6 @@
 import { apiFetch } from "@/lib/api/request";
 import { apiBaseUrl } from "@/lib/carri-account";
+import { csrfFetch } from "@/lib/csrf-fetch";
 
 export type AdminProfile = {
   id: string;
@@ -650,7 +651,11 @@ export async function deactivateAdminUserPaymentAccount(
 }
 
 export async function loginAdmin(email: string, password: string): Promise<AdminLoginResponse> {
-  const response = await fetch("/api/auth/admin/login", {
+  await fetch("/api/auth/csrf", {
+    credentials: "include",
+  }).catch(() => null);
+
+  const response = await csrfFetch("/api/auth/admin/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),

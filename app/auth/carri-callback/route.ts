@@ -15,13 +15,14 @@ type CarriHandoffPayload = {
   carri_identity?: unknown;
 };
 
-function getAppOrigin(): string {
-  return process.env.KISINET_APP_ORIGIN ?? "http://localhost:3000";
+function getAppOrigin(request: NextRequest): string {
+  const configuredOrigin = process.env.KISINET_APP_ORIGIN?.split(",")[0]?.trim();
+  return configuredOrigin || request.nextUrl.origin;
 }
 
 export async function GET(request: NextRequest) {
   const handoff = request.nextUrl.searchParams.get("handoff");
-  const appOrigin = getAppOrigin();
+  const appOrigin = getAppOrigin(request);
 
   if (!handoff) {
     return NextResponse.redirect(

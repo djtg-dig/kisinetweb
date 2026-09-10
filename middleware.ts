@@ -5,11 +5,13 @@ const adminHostname = hostnameFromHost(adminHost);
 const publicHostnames = ["kisinet.com", "www.kisinet.com"];
 
 const adminAllowedPathPrefixes = [
-  "/admin",
+  "/admin/",
   "/api/auth/admin",
+  "/api/auth/csrf",
   "/api/backend/api/admin",
   "/api/backend/api/paiements/admin",
   "/api/backend/api/paiements/currencies",
+  "/api/backend/api/pharmacies/countries",
   "/_next",
 ];
 
@@ -59,12 +61,18 @@ export function middleware(request: NextRequest) {
     return NextResponse.rewrite(url);
   }
 
+  if (pathname === "/admin") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/";
+    return NextResponse.redirect(url);
+  }
+
   if (isAllowedOnAdminHost(pathname)) {
     return NextResponse.next();
   }
 
   const url = request.nextUrl.clone();
-  url.pathname = "/admin";
+  url.pathname = "/";
   url.search = "";
   return NextResponse.redirect(url);
 }

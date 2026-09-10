@@ -65,12 +65,17 @@ pas Carri Account pour cette première version.
 
 Route de connexion frontend:
 
-- `/admin`;
-- sur le sous-domaine `admin.kisinet.com`, la racine `/` est réécrite vers
-  `/admin` par le middleware Next.js;
+- `https://admin.kisinet.com/` est l'URL canonique visible du login admin;
+- sur le sous-domaine `admin.kisinet.com`, la racine `/` est réécrite
+  intérieurement vers `/admin` par le middleware Next.js;
+- sur le sous-domaine `admin.kisinet.com`, `/admin` redirige vers `/` en
+  conservant la query string, par exemple `/admin?session_expired=1` devient
+  `/?session_expired=1`;
 - sur `kisinet.com` et `www.kisinet.com`, les chemins `/admin...` sont redirigés
   vers `admin.kisinet.com`;
 - les autres routes publiques ne sont pas servies depuis le sous-domaine admin.
+- `ops.kisinet.com` n'est pas traité par le middleware Next.js et doit rester
+  routé séparément vers le Django Admin.
 
 Le sous-domaine admin ne remplace pas les contrôles d'accès : les routes
 protégées restent sous `AdminAuthGuard` côté frontend, et les endpoints backend
@@ -78,7 +83,7 @@ admin restent réservés aux comptes `is_staff`.
 
 Routes frontend protégées:
 
-- `/admin`
+- `/admin` (login, redirigé vers `/` sur `admin.kisinet.com`)
 - `/admin/dashboard`
 - `/admin/dashboard/ai`
 - `/admin/dashboard/ai/analyses`

@@ -52,32 +52,44 @@ export function validateCsrfToken(
   }
 }
 
-export function getAllowedOrigin(_request: NextRequest): string | null {
+const productionAllowedOrigins = [
+  "https://kisinet.com",
+  "https://www.kisinet.com",
+  "https://admin.kisinet.com",
+];
+
+export function getAllowedOrigins(): string[] {
   const envOrigin = process.env.KISINET_APP_ORIGIN;
   if (envOrigin) {
-    return envOrigin;
+    return envOrigin
+      .split(",")
+      .map((origin) => origin.trim())
+      .filter(Boolean);
   }
-
   if (process.env.NODE_ENV !== "production") {
-    return "http://localhost:3000";
+    return ["http://localhost:3000", "http://127.0.0.1:3000"];
   }
 
-  return null;
+  return productionAllowedOrigins;
+}
+
+export function getAllowedOrigin(): string | null {
+  return getAllowedOrigins()[0] ?? null;
 }
 
 export function validateOrigin(request: NextRequest): boolean {
   const origin = request.headers.get("origin");
-  const allowedOrigin = getAllowedOrigin(request);
+  const allowedOrigins = getAllowedOrigins();
 
   if (!origin) {
     return false;
   }
 
-  if (!allowedOrigin) {
+  if (!allowedOrigins.length) {
     return false;
   }
 
-  return origin === allowedOrigin;
+  return allowedOrigins.includes(origin);
 }
 
 export function isMutationMethod(method: string): boolean {

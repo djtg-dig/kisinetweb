@@ -25,13 +25,20 @@ type TestRequest = {
   url: string;
 };
 
+type CarriCallbackRoute = {
+  GET: (request: never) => Promise<Response>;
+};
+
 async function loadRoute() {
   process.env.KISINET_BACKEND_URL = BACKEND_URL;
   process.env.KISINET_HMAC_CLIENT_ID = "kisinet-web";
   process.env.KISINET_HMAC_SIGNATURE_VERSION = "v1";
   process.env.KISINET_HMAC_SECRET = SECRET;
 
-  return import("@/app/auth/carri-callback/route");
+  const routeModule = (await import("@/app/auth/carri-callback/route")) as
+    | CarriCallbackRoute
+    | { default: CarriCallbackRoute };
+  return "GET" in routeModule ? routeModule : routeModule.default;
 }
 
 function makeRequest(url: string): TestRequest {
