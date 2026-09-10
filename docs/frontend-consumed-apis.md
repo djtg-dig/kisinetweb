@@ -65,14 +65,16 @@ pas Carri Account pour cette première version.
 
 Route de connexion frontend:
 
-- `/lapatatedoucue/admin/` par défaut;
-- le segment `lapatatedoucue` est centralisé dans `lib/admin/config.ts`;
-- il peut être remplacé par `NEXT_PUBLIC_ADMIN_ENTRY_PATH`;
-- cette valeur n'est pas un secret.
+- `/admin`;
+- sur le sous-domaine `admin.kisinet.com`, la racine `/` est réécrite vers
+  `/admin` par le middleware Next.js;
+- sur `kisinet.com` et `www.kisinet.com`, les chemins `/admin...` sont redirigés
+  vers `admin.kisinet.com`;
+- les autres routes publiques ne sont pas servies depuis le sous-domaine admin.
 
-La route demandée `/api/lapatatedoucue/admin/` n'est pas utilisée côté frontend
-Next.js, car le préfixe `/api` est réservé aux Route Handlers/API Routes et peut
-entrer en collision avec un reverse proxy qui route `/api/*` vers Django.
+Le sous-domaine admin ne remplace pas les contrôles d'accès : les routes
+protégées restent sous `AdminAuthGuard` côté frontend, et les endpoints backend
+admin restent réservés aux comptes `is_staff`.
 
 Routes frontend protégées:
 

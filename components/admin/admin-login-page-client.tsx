@@ -20,8 +20,7 @@ export function AdminLoginPageClient() {
       await loginAdmin(email.trim(), password);
       window.location.href = adminDashboardPath;
     } catch (error) {
-      // On affiche le message renvoyé par le backend (ex. compte désactivé)
-      // plutôt qu'un texte figé, pour ne pas masquer la raison réelle.
+      // On affiche le message renvoyé par le backend quand il est disponible.
       const text =
         error instanceof Error && error.message
           ? error.message
