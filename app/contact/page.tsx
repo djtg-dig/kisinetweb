@@ -64,7 +64,7 @@ export default function ContactPage() {
               <article className="rounded-lg border border-app-border bg-app-card p-5 shadow-sm">
                 <h3 className="text-lg font-bold text-app-text">Téléphone</h3>
                 <p className="mt-2 text-sm leading-6 text-app-muted">
-                  +243 000 000 000
+                  +243 81 9339 737
                 </p>
               </article>
               {/* Carte Adresse — localisation de l'entreprise */}
