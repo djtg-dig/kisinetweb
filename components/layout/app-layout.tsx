@@ -211,7 +211,7 @@ function AppNavbar({
               priority
             />
           </span>
-          <span className="truncate text-base font-bold text-app-text sm:text-lg">Kisi<span className="text-accent-700">net</span></span>
+          <span className="truncate text-base font-bold text-app-text sm:text-lg">Kisi<span className="text-accent-800">net</span></span>
         </a>
 
         <DesktopNav

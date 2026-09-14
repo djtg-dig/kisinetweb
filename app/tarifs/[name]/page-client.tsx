@@ -667,7 +667,7 @@ function PharmacySubscriptionSection({
           <p className="text-sm font-semibold text-app-text">
             Vous devez être connecté pour souscrire à un abonnement.
           </p>
-          <LinkButton href={loginHref} className="mt-4">
+          <LinkButton href={loginHref} className="mt-4" aria-label="Se connecter pour finaliser la souscription">
             Se connecter
           </LinkButton>
         </div>

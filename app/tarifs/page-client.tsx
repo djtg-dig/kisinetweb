@@ -159,6 +159,7 @@ export default function TarifsPage() {
                       <div className="mt-auto pt-7">
                         <LinkButton
                           href={"/tarifs/" + encodeURIComponent(plan.name)}
+                          aria-label={"Sélectionner le plan " + plan.name}
                           variant={plan.highlighted ? "primary" : "secondary"}
                           className="w-full"
                         >
