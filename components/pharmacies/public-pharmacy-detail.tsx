@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { JoinRequestModal } from "@/components/pharmacies/join-request-modal";
 import type { PharmacySummary } from "@/lib/api";
-import { useSession } from "@/lib/hooks/use-session";
+import { ensureCsrfToken } from "@/lib/auth";
 
 type PublicPharmacyDetailProps = {
   pharmacy: PharmacySummary;
@@ -12,7 +12,7 @@ type PublicPharmacyDetailProps = {
 export function PublicPharmacyDetail({ pharmacy }: PublicPharmacyDetailProps) {
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
   const [loginToast, setLoginToast] = useState("");
-  const { authenticated } = useSession();
+  const [checkingSession, setCheckingSession] = useState(false);
 
   useEffect(() => {
     if (!loginToast) {
@@ -26,13 +26,26 @@ export function PublicPharmacyDetail({ pharmacy }: PublicPharmacyDetailProps) {
     return () => clearTimeout(timer);
   }, [loginToast]);
 
-  function openJoinRequest() {
-    if (!authenticated) {
-      setLoginToast("Veuillez d'abord vous connecter.");
-      return;
-    }
+  async function openJoinRequest() {
+    setCheckingSession(true);
+    try {
+      const response = await fetch("/api/auth/session", {
+        cache: "no-store",
+        credentials: "include",
+      });
+      const data = (await response.json()) as { authenticated?: boolean };
+      if (!data.authenticated) {
+        setLoginToast("Veuillez d'abord vous connecter.");
+        return;
+      }
 
-    setIsJoinModalOpen(true);
+      await ensureCsrfToken();
+      setIsJoinModalOpen(true);
+    } catch {
+      setLoginToast("Veuillez d'abord vous connecter.");
+    } finally {
+      setCheckingSession(false);
+    }
   }
 
   return (
@@ -74,9 +87,10 @@ export function PublicPharmacyDetail({ pharmacy }: PublicPharmacyDetailProps) {
                 <button
                   type="button"
                   onClick={openJoinRequest}
-                  className="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-md bg-success-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-success-700 focus:outline-none focus:ring-4 focus:ring-success-100"
+                  disabled={checkingSession}
+                  className="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-md bg-success-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-success-700 focus:outline-none focus:ring-4 focus:ring-success-100 disabled:cursor-not-allowed disabled:opacity-70"
                 >
-                  Devenir employé
+                  {checkingSession ? "Vérification..." : "Devenir employé"}
                 </button>
               </div>
             </div>

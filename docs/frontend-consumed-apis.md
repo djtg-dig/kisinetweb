@@ -1190,8 +1190,9 @@ Content-Type: application/json
 - **Méthode HTTP** : `GET`
 - **URL** : `/api/sales/payment-methods/`
 - **Service frontend** : `refreshSalesChoices()` dans `lib/api/sales-choices.ts`
-- **Chargement frontend** : `SalesChoicesBootstrap` est monté dans `app/layout.tsx`
-  et rafraîchit `localStorage` à chaque ouverture de l'application.
+- **Chargement frontend** : `SalesChoicesBootstrap` est monté dans
+  `components/layout/app-layout.tsx` et rafraîchit `localStorage` à chaque
+  ouverture de l'espace privé `/app/*`.
 - **Authentification** : aucune.
 - **Permission** : aucune.
 - **Réponse attendue (200)** : liste d'objets `{ value, label }`.
@@ -1206,7 +1207,7 @@ Content-Type: application/json
 - **Méthode HTTP** : `GET`
 - **URL** : `/api/sales/payment-statuses/`
 - **Service frontend** : `refreshSalesChoices()` dans `lib/api/sales-choices.ts`
-- **Chargement frontend** : à chaque ouverture de l'application via
+- **Chargement frontend** : à chaque ouverture de l'espace privé `/app/*` via
   `SalesChoicesBootstrap`.
 - **Authentification** : aucune.
 - **Permission** : aucune.
@@ -1219,7 +1220,7 @@ Content-Type: application/json
 - **Méthode HTTP** : `GET`
 - **URL** : `/api/sales/statuses/`
 - **Service frontend** : `refreshSalesChoices()` dans `lib/api/sales-choices.ts`
-- **Chargement frontend** : à chaque ouverture de l'application via
+- **Chargement frontend** : à chaque ouverture de l'espace privé `/app/*` via
   `SalesChoicesBootstrap`.
 - **Authentification** : aucune.
 - **Permission** : aucune.

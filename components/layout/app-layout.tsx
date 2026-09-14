@@ -20,6 +20,7 @@ import {
   setActivePharmacyId,
 } from "@/lib/auth";
 import { useSession } from "@/lib/hooks/use-session";
+import { SalesChoicesBootstrap } from "@/components/sales/sales-choices-bootstrap";
 
 type AppLayoutProps = {
   children: React.ReactNode;
@@ -151,6 +152,7 @@ export function AppLayout({ children, pharmacyId, permissions: initialPermission
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-app-background pt-16 text-app-text lg:pt-[72px]">
+      <SalesChoicesBootstrap />
       <AppNavbar
         pharmacyId={pharmacyId}
         permissions={permissions}

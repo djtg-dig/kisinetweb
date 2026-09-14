@@ -138,3 +138,5 @@ Optimisation :
 - Cache TTL + lecture du cache local non sensible pour les choix de vente dans `lib/api/sales-choices.ts`.
 - Invalidation du cache en memoire dans `lib/auth.ts`.
 - Gardes d'obsolescence dans `components/layout/public-layout.tsx`, `dashboard/page.tsx`, `products/page.tsx`, `stock/page.tsx`, `invoices/page.tsx` et `sales/create/page.tsx`.
+- Deplacement de `SalesChoicesBootstrap` hors du layout racine vers `components/layout/app-layout.tsx` pour limiter les appels `/api/sales/*` a l'espace prive `/app/*`.
+- Suppression de `useSession` de `components/layout/public-layout.tsx` et `components/auth/public-auth-link.tsx` pour eviter les appels `/api/auth/session` et `/api/auth/csrf` sur les pages publiques.

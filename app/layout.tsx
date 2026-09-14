@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { SalesChoicesBootstrap } from "@/components/sales/sales-choices-bootstrap";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import { siteDescription, defaultOpenGraph, defaultTwitter } from "@/lib/server/metadata-og";
 import "./globals.css";
@@ -58,7 +57,6 @@ export default async function RootLayout({
             l'affichage. Supprime le flash de thème. Aucune logique métier. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <ThemeProvider>
-          <SalesChoicesBootstrap />
           {children}
         </ThemeProvider>
       </body>

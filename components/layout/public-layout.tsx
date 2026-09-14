@@ -5,14 +5,9 @@ import { useEffect, useRef, useState } from "react";
 import { LinkButton } from "@/components/ui/link-button";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { ThemeSwitcher } from "@/components/theme/theme-switcher";
-import { getUserPharmacies, type PharmacySummary } from "@/lib/api";
 import { carriAccountLoginUrl } from "@/lib/carri-account";
-import {
-  getActivePharmacyId,
-  logout,
-  subscribeToAuthChanges,
-} from "@/lib/auth";
-import { useSession } from "@/lib/hooks/use-session";
+import { logout } from "@/lib/auth";
+import type { PharmacySummary } from "@/lib/api";
 
 type PublicLayoutProps = {
   children: React.ReactNode;
@@ -32,15 +27,14 @@ const navLinks = [
   { label: "Contact", href: "/#contact" },
 ];
 
-export function PublicLayout({ children, activePharmacy = null, userData: initialUserData }: PublicLayoutProps) {
+export function PublicLayout({ children, activePharmacy = null }: PublicLayoutProps) {
   const [isMounted, setIsMounted] = useState(false);
-  const { authenticated } = useSession();
   const [userMenu, setUserMenu] = useState<{
     isLoggedIn: boolean;
     contextPharmacy: PharmacySummary | null;
   }>({
-    isLoggedIn: initialUserData?.isLoggedIn ?? false,
-    contextPharmacy: initialUserData?.contextPharmacy ?? activePharmacy ?? null,
+    isLoggedIn: Boolean(activePharmacy),
+    contextPharmacy: activePharmacy,
   });
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -50,54 +44,11 @@ export function PublicLayout({ children, activePharmacy = null, userData: initia
   }, []);
 
   useEffect(() => {
-    let isMounted = true;
-
-    async function loadUserMenu() {
-      if (!authenticated) {
-        if (isMounted) {
-          setUserMenu({ isLoggedIn: false, contextPharmacy: null });
-        }
-        return;
-      }
-
-      if (activePharmacy || initialUserData?.contextPharmacy) {
-        if (isMounted) {
-          setUserMenu({
-            isLoggedIn: true,
-            contextPharmacy: activePharmacy ?? initialUserData?.contextPharmacy ?? null
-          });
-        }
-        return;
-      }
-
-      try {
-        const pharmacies = await getUserPharmacies();
-        if (!isMounted) return;
-
-        const lastPharmacyId = getActivePharmacyId();
-        const lastPharmacy = pharmacies.find(
-          (pharmacy) => pharmacy.id === lastPharmacyId,
-        );
-
-        setUserMenu({
-          isLoggedIn: true,
-          contextPharmacy: lastPharmacy || null,
-        });
-      } catch {
-        if (isMounted) {
-          setUserMenu({ isLoggedIn: true, contextPharmacy: null });
-        }
-      }
-    }
-
-    loadUserMenu();
-    const unsubscribe = subscribeToAuthChanges(loadUserMenu);
-
-    return () => {
-      isMounted = false;
-      unsubscribe();
-    };
-  }, [authenticated, activePharmacy, initialUserData?.contextPharmacy]);
+    setUserMenu({
+      isLoggedIn: Boolean(activePharmacy),
+      contextPharmacy: activePharmacy,
+    });
+  }, [activePharmacy]);
 
   useEffect(() => {
     function closeMenuOnOutsideClick(event: MouseEvent) {
