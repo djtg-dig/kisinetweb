@@ -140,3 +140,4 @@ Optimisation :
 - Gardes d'obsolescence dans `components/layout/public-layout.tsx`, `dashboard/page.tsx`, `products/page.tsx`, `stock/page.tsx`, `invoices/page.tsx` et `sales/create/page.tsx`.
 - Deplacement de `SalesChoicesBootstrap` hors du layout racine vers `components/layout/app-layout.tsx` pour limiter les appels `/api/sales/*` a l'espace prive `/app/*`.
 - Suppression de `useSession` de `components/layout/public-layout.tsx` et `components/auth/public-auth-link.tsx` pour eviter les appels `/api/auth/session` et `/api/auth/csrf` sur les pages publiques.
+- Suppression de `useSession` de `components/pharmacies/public-pharmacy-detail.tsx` : la verification de session est desormais effectuee uniquement au clic sur "Devenir employe", pas au montage de la page.
