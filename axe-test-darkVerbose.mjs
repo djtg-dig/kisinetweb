@@ -1,10 +1,8 @@
 import puppeteer from "puppeteer";
 import { fileURLToPath } from "url";
-import { dirname } from "path";
 import { createRequire } from "module";
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 const require = createRequire(import.meta.url);
 const axePath = require.resolve("axe-core/axe.js");
 
@@ -21,7 +19,7 @@ async function run() {
     await page.goto(`http://localhost:3000${path}`, { waitUntil: "networkidle0" });
     await page.addScriptTag({ path: axePath });
     const results = await page.evaluate(async () => {
-      // @ts-ignore
+      // @ts-expect-error axe is injected at runtime
       return await window.axe.run({ runOnly: { type: "tag", values: ["wcag2aa", "wcag2aaa"] } });
     });
     console.log(`\n=== ${path} (dark) ===`);

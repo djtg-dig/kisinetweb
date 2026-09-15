@@ -81,6 +81,7 @@ export default function TarifsPage() {
                   <PublicAuthLink
                     variant="secondary"
                     className="mx-auto mt-6 w-fit"
+                    aria-label="Se connecter pour accéder aux tarifs"
                     loggedInHref="/app/select-pharmacy"
                     loggedInLabel="Ouvrir Kisinet"
                   >

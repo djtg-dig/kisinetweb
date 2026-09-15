@@ -9,7 +9,7 @@
   --color-card: 255 255 255; /* Couleur des cartes : blanc */
   --color-border: 226 232 240; /* Couleur de bordure : gris */
   --color-text: 15 23 42; /* Couleur du texte : bleu foncé */
-  --color-muted: 100 116 139; /* Couleur de texte secondaire : bleu-gris */
+  --color-muted: 91 107 123; /* Couleur de texte secondaire : bleu-gris foncé pour assurer le contraste WCAG AA */
   /* Identité visuelle inspirée de forum.minesursi.gouv.cd : bleu marine. */
   --color-primary-50: 236 242 250;
   --color-primary-100: 220 231 244;
