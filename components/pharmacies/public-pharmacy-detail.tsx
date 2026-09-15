@@ -88,7 +88,7 @@ export function PublicPharmacyDetail({ pharmacy }: PublicPharmacyDetailProps) {
                   type="button"
                   onClick={openJoinRequest}
                   disabled={checkingSession}
-                  className="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-md bg-success-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-success-700 focus:outline-none focus:ring-4 focus:ring-success-100 disabled:cursor-not-allowed disabled:opacity-70"
+                  className="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-md bg-success-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-success-800 focus:outline-none focus:ring-4 focus:ring-success-100 disabled:cursor-not-allowed disabled:opacity-70"
                 >
                   {checkingSession ? "Vérification..." : "Devenir employé"}
                 </button>
