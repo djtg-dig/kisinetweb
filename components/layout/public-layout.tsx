@@ -169,7 +169,12 @@ function PublicNavbar({ activePharmacy, userMenu, onMenuToggle }: PublicNavbarPr
               onClose={() => setIsMenuOpen(false)}
             />
           ) : (
-            <LinkButton href={carriAccountLoginUrl}>Se connecter</LinkButton>
+            <LinkButton
+              href={carriAccountLoginUrl}
+              className="dark:bg-primary-800 dark:hover:bg-primary-900 dark:focus:ring-primary-500"
+            >
+              Se connecter
+            </LinkButton>
           )}
         </div>
       </nav>
