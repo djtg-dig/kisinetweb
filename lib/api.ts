@@ -899,7 +899,7 @@ export async function getPublicPharmacies(
   appendFilter(params, "ordering", filters.ordering);
   appendFilter(params, "page", filters.page);
 
-  const path = "/api/pharmacies/public/" + (params.size ? "?" + params.toString() : "");
+  const path = "/api/pharmacies/public" + (params.size ? "?" + params.toString() : "");
   const data = await fetchPublicApiJson<unknown>(
     path,
     "Impossible de charger les pharmacies publiques.",
@@ -943,7 +943,7 @@ export async function getPublicPharmacyByReference(
 
 export async function getPublicPharmacyFilterOptions(): Promise<PublicPharmacyFilterOptions> {
   const data = await fetchPublicApiJson<unknown>(
-    "/api/pharmacies/public/filter-options/",
+    "/api/pharmacies/public/filter-options",
     "Impossible de charger les filtres pharmacies.",
   );
 
