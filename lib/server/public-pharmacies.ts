@@ -2,15 +2,18 @@ import "server-only";
 
 import { cache } from "react";
 import { signedBackendFetch } from "@/lib/server/backend-fetch";
-import type { PharmacySummary } from "@/lib/api";
+import type { PharmacySummary, PublicPharmacyFilters } from "@/lib/api";
 
 type UnknownRecord = Record<string, unknown>;
-type PublicPharmaciesPage = {
+export type PublicPharmaciesPage = {
+  count: number;
   next: string | null;
+  previous: string | null;
   results: PharmacySummary[];
 };
 
 const PUBLIC_PHARMACIES_PATH = "/api/pharmacies/public/";
+const PUBLIC_PHARMACIES_PAGE_REVALIDATE_SECONDS = 300;
 const PUBLIC_PHARMACIES_SITEMAP_REVALIDATE_SECONDS = 60 * 60;
 
 function getRecord(value: unknown): UnknownRecord | null {
@@ -70,17 +73,59 @@ function getPageItems(data: unknown): UnknownRecord[] {
 
 function normalizePublicPharmaciesPage(data: unknown): PublicPharmaciesPage {
   const dataRecord = getRecord(data);
+  const results = getPageItems(data)
+    .map(normalizePharmacy)
+    .filter(
+      (pharmacy: PharmacySummary) =>
+        Boolean(pharmacy.id) && pharmacy.isPublic === true,
+    );
 
   return {
+    count: Number(dataRecord?.count ?? results.length),
     next: getText(dataRecord?.next) || null,
-    results: getPageItems(data)
-      .map(normalizePharmacy)
-      .filter(
-        (pharmacy: PharmacySummary) =>
-          Boolean(pharmacy.id) && pharmacy.isPublic === true,
-      ),
+    previous: getText(dataRecord?.previous) || null,
+    results,
   };
 }
+
+export type PublicPharmaciesPageServerParams = {
+  page?: number;
+  filters?: Partial<PublicPharmacyFilters>;
+};
+
+export const getPublicPharmaciesPageServer = cache(async function getPublicPharmaciesPageServer(
+  { page = 1, filters = {} }: PublicPharmaciesPageServerParams = {},
+): Promise<PublicPharmaciesPage> {
+  const params = new URLSearchParams();
+  params.set("page", String(page));
+
+  if (filters.search) params.set("search", filters.search);
+  if (filters.reference) params.set("reference", filters.reference);
+  if (filters.name) params.set("name", filters.name);
+  if (filters.country) params.set("country", filters.country);
+  if (filters.cityOrProvince) params.set("city_or_province", filters.cityOrProvince);
+  if (filters.neighborhood) params.set("neighborhood", filters.neighborhood);
+  if (filters.hasEmail) params.set("has_email", filters.hasEmail);
+  if (filters.hasPhone) params.set("has_phone", filters.hasPhone);
+  if (filters.ordering) params.set("ordering", filters.ordering);
+
+  const path = PUBLIC_PHARMACIES_PATH + (params.size ? "?" + params.toString() : "");
+
+  const response = await signedBackendFetch({
+    path,
+    method: "GET",
+    headers: { Accept: "application/json" },
+    cache: "force-cache",
+    revalidate: PUBLIC_PHARMACIES_PAGE_REVALIDATE_SECONDS,
+  });
+
+  if (!response.ok) {
+    throw new Error("Impossible de charger la page publique des pharmacies.");
+  }
+
+  const data = (await response.json()) as unknown;
+  return normalizePublicPharmaciesPage(data);
+});
 
 export const getPublicPharmacyByReferenceServer = cache(async function getPublicPharmacyByReferenceServer(
   reference: string,
@@ -89,6 +134,7 @@ export const getPublicPharmacyByReferenceServer = cache(async function getPublic
     PUBLIC_PHARMACIES_PATH + "?reference=" +
     encodeURIComponent(reference) +
     "&page=1";
+
   const response = await signedBackendFetch({
     path,
     method: "GET",

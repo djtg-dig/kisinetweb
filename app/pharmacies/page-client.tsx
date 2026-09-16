@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { PublicLayout } from "@/components/layout/public-layout";
 import {
   getPublicPharmacies,
@@ -23,17 +23,34 @@ const initialFilters: PublicPharmacyFilters = {
   page: "1",
 };
 
-export default function PublicPharmaciesPage() {
-  const [filters, setFilters] = useState<PublicPharmacyFilters>(initialFilters);
+type PublicPharmaciesPageClientProps = {
+  initialPharmacies: PharmacySummary[];
+  initialCount: number;
+  initialPage: number;
+  initialError?: string | null;
+};
+
+export default function PublicPharmaciesPage({
+  initialPharmacies,
+  initialCount,
+  initialPage,
+  initialError = null,
+}: PublicPharmaciesPageClientProps) {
+  const initialAppliedFilters = useMemo(
+    () => ({ ...initialFilters, page: String(initialPage) }),
+    [initialPage],
+  );
+  const [filters, setFilters] = useState<PublicPharmacyFilters>(initialAppliedFilters);
   const [appliedFilters, setAppliedFilters] =
-    useState<PublicPharmacyFilters>(initialFilters);
+    useState<PublicPharmacyFilters>(initialAppliedFilters);
   const [filterOptions, setFilterOptions] =
     useState<PublicPharmacyFilterOptions | null>(null);
-  const [pharmacies, setPharmacies] = useState<PharmacySummary[]>([]);
-  const [count, setCount] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [pharmacies, setPharmacies] = useState<PharmacySummary[]>(initialPharmacies);
+  const [count, setCount] = useState(initialCount);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(initialError);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const hasUserInteractedRef = useRef(false);
 
   const selectedCountry = filters.country || appliedFilters.country;
   const cityOptions = useMemo(() => {
@@ -75,6 +92,10 @@ export default function PublicPharmaciesPage() {
   }, []);
 
   useEffect(() => {
+    if (!hasUserInteractedRef.current) {
+      return;
+    }
+
     let isMounted = true;
 
     setIsLoading(true);
@@ -123,16 +144,19 @@ export default function PublicPharmaciesPage() {
 
   function submitFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    hasUserInteractedRef.current = true;
     setAppliedFilters({ ...filters, page: "1" });
   }
 
   function resetFilters() {
+    hasUserInteractedRef.current = true;
     setFilters(initialFilters);
     setAppliedFilters(initialFilters);
   }
 
   function goToPage(nextPage: number) {
     const normalizedPage = String(Math.min(Math.max(nextPage, 1), totalPages));
+    hasUserInteractedRef.current = true;
     setFilters((current) => ({ ...current, page: normalizedPage }));
     setAppliedFilters((current) => ({ ...current, page: normalizedPage }));
   }

@@ -41,6 +41,48 @@ function mockPublicPharmaciesPages(pages: unknown[]) {
   return calls;
 }
 
+describe("getPublicPharmaciesPageServer", () => {
+  test("récupère la première page publique sans erreur ni chemin HMAC non canonique", async () => {
+    const { getPublicPharmaciesPageServer } = await loadPublicPharmacies();
+    const calls = mockPublicPharmaciesPages([
+      {
+        count: 1,
+        next: null,
+        previous: null,
+        results: [
+          {
+            id: 12,
+            reference: "PH60A9VC77",
+            name: "Pharmacie centrale",
+            is_public: true,
+          },
+        ],
+      },
+    ]);
+
+    const page = await getPublicPharmaciesPageServer({ page: 1 });
+
+    assert.equal(page.count, 1);
+    assert.equal(page.results.length, 1);
+    assert.equal(page.results[0]?.reference, "PH60A9VC77");
+    assert.equal(page.results[0]?.name, "Pharmacie centrale");
+    assert.ok(calls[0]?.endsWith("/api/pharmacies/public/?page=1"));
+    assert.ok(!calls[0]?.includes("/api/pharmacies/public?page=1"));
+  });
+
+  test("remonte une erreur si la page publique ne répond pas", async () => {
+    const { getPublicPharmaciesPageServer } = await loadPublicPharmacies();
+    mockPublicPharmaciesPages([
+      Response.json({ detail: "Service indisponible" }, { status: 503 }),
+    ]);
+
+    await assert.rejects(
+      getPublicPharmaciesPageServer({ page: 1 }),
+      /Impossible de charger la page publique des pharmacies/,
+    );
+  });
+});
+
 describe("getPublicPharmacyByReferenceServer", () => {
   test("retourne une pharmacie explicitement publique", async () => {
     const { getPublicPharmacyByReferenceServer } = await loadPublicPharmacies();
