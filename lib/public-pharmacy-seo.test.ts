@@ -19,25 +19,32 @@ function makePharmacy(overrides: Partial<PharmacySummary> = {}): PharmacySummary
 }
 
 describe("public pharmacy SEO content", () => {
-  test("génère un titre metadata neutre avec cityOrProvince", () => {
-    assert.equal(
-      buildPublicPharmacyMetadataTitle(
-        makePharmacy({ cityOrProvince: "Kinshasa", country: "RDC" }),
-      ),
-      "Pharmacie Test | Kinshasa | Kisinet",
+  test("génère la valeur locale du title sans suffixe Kisinet", () => {
+    const localTitle = buildPublicPharmacyMetadataTitle(
+      makePharmacy({
+        name: "La Guérrison",
+        cityOrProvince: "Kinshasa",
+        country: "RDC",
+      }),
     );
+
+    assert.equal(localTitle, "La Guérrison | Kinshasa");
+    assert.equal(localTitle + " | Kisinet", "La Guérrison | Kinshasa | Kisinet");
+    assert.ok(!localTitle.endsWith(" | Kisinet"));
 
     assert.equal(
       buildPublicPharmacyMetadataTitle(
         makePharmacy({ cityOrProvince: "Kongo Central", country: "RDC" }),
       ),
-      "Pharmacie Test | Kongo Central | Kisinet",
+      "Pharmacie Test | Kongo Central",
     );
 
-    assert.equal(
-      buildPublicPharmacyMetadataTitle(makePharmacy({ country: "RDC" })),
-      "Pharmacie Test | Kisinet",
+    const localTitleWithoutLocation = buildPublicPharmacyMetadataTitle(
+      makePharmacy({ name: "La Guérrison", country: "RDC" }),
     );
+
+    assert.equal(localTitleWithoutLocation, "La Guérrison");
+    assert.equal(localTitleWithoutLocation + " | Kisinet", "La Guérrison | Kisinet");
   });
 
   test("utilise la description publique réelle avant tout texte généré", () => {

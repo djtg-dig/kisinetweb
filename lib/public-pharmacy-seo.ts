@@ -8,10 +8,10 @@ export function buildPublicPharmacyIntro(pharmacy: PharmacySummary) {
 
 export function buildPublicPharmacyMetadataTitle(pharmacy: PharmacySummary) {
   if (pharmacy.cityOrProvince) {
-    return pharmacy.name + " | " + pharmacy.cityOrProvince + " | Kisinet";
+    return pharmacy.name + " | " + pharmacy.cityOrProvince;
   }
 
-  return pharmacy.name + " | Kisinet";
+  return pharmacy.name;
 }
 
 export function buildPublicPharmacyMetadataDescription(pharmacy: PharmacySummary) {
