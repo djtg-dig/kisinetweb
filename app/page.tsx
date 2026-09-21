@@ -229,7 +229,7 @@ export default function HomePage() {
           <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr]">
             <SectionHeading
               eyebrow="Pour qui ?"
-              title="Une solution conçue pour les vrais circuits de santé"
+              title="Une solution conçue pour la gestion quotidienne des pharmacies"
               description="Kisinet s'adapte aux établissements qui doivent contrôler leurs produits, leurs mouvements et leurs équipes avec rigueur."
             />
             <div className="grid gap-4 sm:grid-cols-2">
@@ -336,7 +336,7 @@ export default function HomePage() {
               Pourquoi ça compte
             </p>
             <h2 className="mt-3 text-3xl font-bold leading-tight text-app-text">
-              Moins d'oublis, plus de visibilité.
+              Suivez les opérations essentielles de votre pharmacie
             </h2>
             <div className="mt-6 grid gap-3">
               {proofPoints.map((point) => (

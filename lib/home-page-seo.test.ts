@@ -36,11 +36,15 @@ describe("home page SEO editorial content", () => {
 
     assert.equal((source.match(/<h1\b/g) || []).length, 1);
     assert.ok(source.includes("Kisinet, plateforme de gestion pour pharmacies."));
+    assert.ok(source.includes("Une solution conçue pour la gestion quotidienne des pharmacies"));
     assert.ok(source.includes("Fonctionnalités de Kisinet"));
     assert.ok(source.includes("Consultez les pharmacies publiques et les tarifs"));
     assert.ok(source.includes("Centralisez la gestion de votre pharmacie"));
+    assert.ok(source.includes("Suivez les opérations essentielles de votre pharmacie"));
     assert.ok(source.includes("Questions fréquentes"));
     assert.ok(source.includes("<h3 className=\"font-semibold text-app-text\">{faq.question}</h3>"));
+    assert.ok(!source.includes("Une solution conçue pour les vrais circuits de santé"));
+    assert.ok(!source.includes("Moins d'oublis, plus de visibilité."));
   });
 
   test("conserve des liens HTML descriptifs vers les pharmacies publiques et les tarifs", () => {
