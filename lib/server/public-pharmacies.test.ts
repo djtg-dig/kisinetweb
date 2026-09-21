@@ -91,7 +91,19 @@ describe("getPublicPharmacyByReferenceServer", () => {
         id: 12,
         reference: "PH0PUBLIC",
         name: "Pharmacie Publique",
+        description: "Description publique",
         is_public: true,
+        devise: "CDF",
+        email: "contact@example.com",
+        phone_number: "+243900000000",
+        adresse: {
+          street: "Avenue Test",
+          neighborhood: "Gombe",
+          latitude: "-4.325",
+          longitude: "15.322",
+          country: { id: 1, name: "RDC" },
+          city_or_province: { id: 2, name: "Kinshasa" },
+        },
       },
     ]);
 
@@ -99,6 +111,17 @@ describe("getPublicPharmacyByReferenceServer", () => {
 
     assert.equal(pharmacy?.reference, "PH0PUBLIC");
     assert.equal(pharmacy?.isPublic, true);
+    assert.equal(pharmacy?.description, "Description publique");
+    assert.equal(pharmacy?.devise, "CDF");
+    assert.equal(pharmacy?.email, "contact@example.com");
+    assert.equal(pharmacy?.phoneNumber, "+243900000000");
+    assert.equal(pharmacy?.addressLine, "Avenue Test");
+    assert.equal(pharmacy?.neighborhood, "Gombe");
+    assert.equal(pharmacy?.street, "Avenue Test");
+    assert.equal(pharmacy?.cityOrProvince, "Kinshasa");
+    assert.equal(pharmacy?.country, "RDC");
+    assert.equal(pharmacy?.latitude, "-4.325");
+    assert.equal(pharmacy?.longitude, "15.322");
   });
 
   test("ignore une pharmacie non explicitement publique", async () => {
@@ -113,6 +136,15 @@ describe("getPublicPharmacyByReferenceServer", () => {
     ]);
 
     const pharmacy = await getPublicPharmacyByReferenceServer("PH0PRIVATE");
+
+    assert.equal(pharmacy, null);
+  });
+
+  test("retourne null quand aucune pharmacie publique ne correspond", async () => {
+    const { getPublicPharmacyByReferenceServer } = await loadPublicPharmacies();
+    mockPublicPharmaciesResponse([]);
+
+    const pharmacy = await getPublicPharmacyByReferenceServer("PH0ABSENT");
 
     assert.equal(pharmacy, null);
   });

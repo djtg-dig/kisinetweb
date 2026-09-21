@@ -4,6 +4,10 @@ import { useEffect, useState } from "react";
 import { JoinRequestModal } from "@/components/pharmacies/join-request-modal";
 import type { PharmacySummary } from "@/lib/api";
 import { ensureCsrfToken } from "@/lib/auth";
+import {
+  buildLocationLabel,
+  buildPublicPharmacyIntro,
+} from "@/lib/public-pharmacy-seo";
 
 type PublicPharmacyDetailProps = {
   pharmacy: PharmacySummary;
@@ -13,6 +17,19 @@ export function PublicPharmacyDetail({ pharmacy }: PublicPharmacyDetailProps) {
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
   const [loginToast, setLoginToast] = useState("");
   const [checkingSession, setCheckingSession] = useState(false);
+  const intro = buildPublicPharmacyIntro(pharmacy);
+  const location = buildLocationLabel(pharmacy, { includeNeighborhood: true });
+  const hasContactDetails = Boolean(pharmacy.email || pharmacy.phoneNumber);
+  const hasAddressDetails = Boolean(
+    pharmacy.addressLine ||
+      pharmacy.neighborhood ||
+      pharmacy.street ||
+      pharmacy.cityOrProvince ||
+      pharmacy.country ||
+      pharmacy.latitude ||
+      pharmacy.longitude,
+  );
+  const hasPublicInfo = Boolean(pharmacy.reference || pharmacy.devise);
 
   useEffect(() => {
     if (!loginToast) {
@@ -61,7 +78,7 @@ export function PublicPharmacyDetail({ pharmacy }: PublicPharmacyDetailProps) {
               href="/pharmacies"
               className="text-sm font-semibold text-primary-700 transition hover:text-primary-800"
             >
-              Retour
+              Retour aux pharmacies
             </a>
             <div className="mt-6 grid gap-8 lg:grid-cols-[1fr_360px] lg:items-start">
               <div>
@@ -71,10 +88,16 @@ export function PublicPharmacyDetail({ pharmacy }: PublicPharmacyDetailProps) {
                 <h1 className="mt-3 max-w-3xl text-3xl font-bold text-app-text sm:text-4xl">
                   {pharmacy.name}
                 </h1>
-                <p className="mt-4 max-w-3xl text-sm leading-6 text-app-muted sm:text-base">
-                  {pharmacy.addressLine ||
-                    "Les informations d'adresse de cette pharmacie ne sont pas encore renseignées."}
-                </p>
+                {intro && (
+                  <p className="mt-4 max-w-3xl text-sm leading-6 text-app-muted sm:text-base">
+                    {intro}
+                  </p>
+                )}
+                {pharmacy.description && (
+                  <p className="mt-3 max-w-3xl text-sm leading-6 text-app-muted sm:text-base">
+                    {pharmacy.description}
+                  </p>
+                )}
               </div>
 
               <div className="rounded-lg border border-app-border bg-app-card p-5 shadow-soft">
@@ -99,34 +122,40 @@ export function PublicPharmacyDetail({ pharmacy }: PublicPharmacyDetailProps) {
 
         <section className="mx-auto grid max-w-6xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[1fr_360px] lg:px-8">
           <div className="grid gap-4">
-            <article className="rounded-lg border border-app-border bg-app-card p-5">
-              <h2 className="text-lg font-bold text-app-text">Coordonnées</h2>
-              <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                <Detail label="Email" value={pharmacy.email} />
-                <Detail label="Téléphone" value={pharmacy.phoneNumber} />
-                <Detail label="Pays" value={pharmacy.country} />
-                <Detail label="Ville,province,égion ou territoire." value={pharmacy.cityOrProvince} />
-              </div>
-            </article>
+            {hasAddressDetails && (
+              <article className="rounded-lg border border-app-border bg-app-card p-5">
+                <h2 className="text-lg font-bold text-app-text">Localisation</h2>
+                <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                  <Detail label="Adresse" value={pharmacy.addressLine} />
+                  <Detail label="Localisation" value={location} />
+                  <Detail label="Quartier ou repère local" value={pharmacy.neighborhood} />
+                  <Detail label="Rue" value={pharmacy.street} />
+                  <Detail label="Latitude" value={pharmacy.latitude} />
+                  <Detail label="Longitude" value={pharmacy.longitude} />
+                </div>
+              </article>
+            )}
 
-            <article className="rounded-lg border border-app-border bg-app-card p-5">
-              <h2 className="text-lg font-bold text-app-text">Adresse</h2>
-              <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                <Detail label="Quartier,arrondissement, secteur, village ou repère local" value={pharmacy.neighborhood} />
-                <Detail label="Rue" value={pharmacy.street} />
-                <Detail label="Latitude" value={pharmacy.latitude} />
-                <Detail label="Longitude" value={pharmacy.longitude} />
-              </div>
-            </article>
+            {hasContactDetails && (
+              <article className="rounded-lg border border-app-border bg-app-card p-5">
+                <h2 className="text-lg font-bold text-app-text">Coordonnées</h2>
+                <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                  <Detail label="Email" value={pharmacy.email} />
+                  <Detail label="Téléphone" value={pharmacy.phoneNumber} />
+                </div>
+              </article>
+            )}
           </div>
 
-          <aside className="h-fit rounded-lg border border-app-border bg-app-card p-5">
-            <h2 className="text-lg font-bold text-app-text">Informations</h2>
-            <div className="mt-5 grid gap-4">
-              <Detail label="Référence" value={pharmacy.reference} />
-              <Detail label="Devise" value={pharmacy.devise} />
-            </div>
-          </aside>
+          {hasPublicInfo && (
+            <aside className="h-fit rounded-lg border border-app-border bg-app-card p-5">
+              <h2 className="text-lg font-bold text-app-text">Informations</h2>
+              <div className="mt-5 grid gap-4">
+                <Detail label="Référence" value={pharmacy.reference} />
+                <Detail label="Devise" value={pharmacy.devise} />
+              </div>
+            </aside>
+          )}
         </section>
       </main>
 
@@ -139,12 +168,16 @@ export function PublicPharmacyDetail({ pharmacy }: PublicPharmacyDetailProps) {
 }
 
 function Detail({ label, value }: { label: string; value?: string }) {
+  if (!value) {
+    return null;
+  }
+
   return (
     <div>
       <p className="text-xs font-semibold uppercase tracking-wide text-app-muted">
         {label}
       </p>
-      <p className="mt-1 font-medium text-app-text">{value || "Non renseigné"}</p>
+      <p className="mt-1 font-medium text-app-text">{value}</p>
     </div>
   );
 }

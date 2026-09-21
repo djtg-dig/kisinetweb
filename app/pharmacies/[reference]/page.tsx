@@ -6,7 +6,10 @@ import { getPublicPharmacyByReferenceServer } from "@/lib/server/public-pharmaci
 import { getPharmacyJsonLd } from "@/lib/server/json-ld";
 import { JsonLd } from "@/components/json-ld";
 import { ogImage } from "@/lib/server/metadata-og";
-import type { PharmacySummary } from "@/lib/api";
+import {
+  buildPublicPharmacyMetadataDescription,
+  buildPublicPharmacyMetadataTitle,
+} from "@/lib/public-pharmacy-seo";
 
 type PublicPharmacyDetailPageProps = {
   params: Promise<{ reference: string }>;
@@ -26,18 +29,19 @@ export async function generateMetadata({
     notFound();
   }
 
-  const description = buildPharmacyDescription(pharmacy);
+  const title = buildPublicPharmacyMetadataTitle(pharmacy);
+  const description = buildPublicPharmacyMetadataDescription(pharmacy);
   const canonicalReference = pharmacy.reference || decodeURIComponent(reference);
   const url = siteUrl + "/pharmacies/" + encodeURIComponent(canonicalReference);
 
   return {
-    title: pharmacy.name,
+    title,
     description,
     alternates: {
       canonical: url,
     },
     openGraph: {
-      title: pharmacy.name,
+      title,
       description,
       url,
       siteName: "Kisinet",
@@ -50,7 +54,7 @@ export async function generateMetadata({
     },
     twitter: {
       card: "summary_large_image",
-      title: pharmacy.name,
+      title,
       description,
       images: [ogImage.url],
     },
@@ -77,38 +81,4 @@ export default async function PublicPharmacyDetailPage({
       <PublicPharmacyDetail pharmacy={pharmacy} />
     </PublicLayout>
   );
-}
-
-function buildPharmacyDescription(pharmacy: PharmacySummary) {
-  const publicDescription = cleanDescription(pharmacy.description);
-
-  if (publicDescription) {
-    return publicDescription;
-  }
-
-  const location = [pharmacy.cityOrProvince, pharmacy.country]
-    .filter(Boolean)
-    .join(", ");
-
-  if (location) {
-    return (
-      "Découvrez " +
-      pharmacy.name +
-      " à " +
-      location +
-      " sur Kisinet et consultez ses informations publiques."
-    );
-  }
-
-  return "Consultez les informations publiques de " + pharmacy.name + " sur Kisinet.";
-}
-
-function cleanDescription(value?: string) {
-  const description = value?.replace(/\s+/g, " ").trim();
-
-  if (!description) {
-    return "";
-  }
-
-  return description.length > 155 ? description.slice(0, 152).trimEnd() + "..." : description;
 }

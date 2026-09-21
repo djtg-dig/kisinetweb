@@ -113,6 +113,21 @@ describe("getPharmacyJsonLd", () => {
     assert.equal(result.address, undefined);
   });
 
+  test("n'ajoute pas de propriétés fictives sans données réelles", () => {
+    const result = getPharmacyJsonLd("https://kisinet.com", {
+      name: "Pharmacie Test",
+      reference: "PH0TEST",
+      cityOrProvince: "Kinshasa",
+      country: "RDC",
+    });
+
+    assert.ok(result);
+    assert.equal(result.aggregateRating, undefined);
+    assert.equal(result.review, undefined);
+    assert.equal(result.openingHours, undefined);
+    assert.equal(result.priceRange, undefined);
+  });
+
   test("conserve un code ISO déjà valide", () => {
     const result = getPharmacyJsonLd("https://kisinet.com", {
       name: "Pharmacie Test",
