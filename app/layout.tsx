@@ -17,7 +17,20 @@ export const metadata: Metadata = {
   },
   description: siteDescription,
   icons: {
-    icon: "/favicon.svg",
+    icon: [
+      {
+        url: "/favicon.ico",
+      },
+      {
+        url: "/favicon-96x96.png",
+        type: "image/png",
+        sizes: "96x96",
+      },
+      {
+        url: "/favicon.svg",
+        type: "image/svg+xml",
+      },
+    ],
   },
   openGraph: defaultOpenGraph,
   twitter: defaultTwitter,
