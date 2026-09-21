@@ -3,19 +3,21 @@ import { PublicLayout } from "@/components/layout/public-layout";
 import { LinkButton } from "@/components/ui/link-button";
 import { defaultOpenGraph, defaultTwitter } from "@/lib/server/metadata-og";
 
+const url = "https://kisinet.com/cookies";
+
 export const metadata: Metadata = {
   title: "Politique relative aux cookies",
   description:
     "Consultez la politique de cookies de Kisinet et découvrez comment la plateforme utilise les cookies et technologies similaires.",
   alternates: {
-    canonical: "/cookies",
+    canonical: url,
   },
   openGraph: {
     ...defaultOpenGraph,
     title: "Politique relative aux cookies",
     description:
       "Consultez la politique de cookies de Kisinet et découvrez comment la plateforme utilise les cookies et technologies similaires.",
-    url: "/cookies",
+    url,
     type: "article",
   },
   robots: {
@@ -314,7 +316,7 @@ const legalSections: LegalSection[] = [
       },
       {
         type: "paragraph",
-        text: "Les détails techniques précis des cookies de session doivent être [À confirmer avant la mise en production].",
+        text: "Les durées exactes des cookies de session peuvent varier selon le parcours d'authentification et les paramètres du navigateur.",
       },
     ],
   },
@@ -515,21 +517,7 @@ const legalSections: LegalSection[] = [
     blocks: [
       {
         type: "paragraph",
-        text: "Pour toute question relative à l'utilisation des cookies par Kisinet, l'utilisateur peut contacter Kisinet par les moyens officiels affichés sur le site.",
-      },
-      {
-        type: "paragraph",
-        text: "Informations à afficher lorsqu'elles seront officiellement confirmées :",
-      },
-      {
-        type: "list",
-        items: [
-          "Entreprise : [Nom juridique officiel] ;",
-          "Produit : Kisinet ;",
-          "Adresse : [Adresse officielle] ;",
-          "E-mail : [Adresse e-mail officielle du support] ;",
-          "Site web : [Domaine officiel de Kisinet].",
-        ],
+        text: "Pour toute question relative à l'utilisation des cookies par Kisinet, l'utilisateur peut contacter Kisinet à l'adresse contact@kisinet.com.",
       },
     ],
   },

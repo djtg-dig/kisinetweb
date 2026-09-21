@@ -53,7 +53,7 @@ export function SiteFooter() {
             { label: "Fonctionnalités", href: "/#fonctionnalites" },
             { label: "Tarifs", href: "/tarifs" },
             { label: "FAQ", href: "/#faq" },
-            { label: "Contact", href: "/#contact" },
+            { label: "Contact", href: "/contact" },
           ]}
         />
         <FooterLinks

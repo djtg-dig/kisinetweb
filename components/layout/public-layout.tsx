@@ -24,7 +24,7 @@ const navLinks = [
   { label: "Fonctionnalités", href: "/#fonctionnalites" },
   { label: "Tarifs", href: "/tarifs" },
   { label: "FAQ", href: "/#faq" },
-  { label: "Contact", href: "/#contact" },
+  { label: "Contact", href: "/contact" },
 ];
 
 export function PublicLayout({ children, activePharmacy = null }: PublicLayoutProps) {

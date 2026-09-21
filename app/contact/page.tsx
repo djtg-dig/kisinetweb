@@ -48,9 +48,9 @@ export default function ContactPage() {
               </p>
             </div>
             <div className="mt-8 grid gap-4">
-              {/* Carte E-mail — coordonnée principale de contact */}
+              {/* Carte E-mail — coordonnée officielle de contact */}
               <article className="rounded-lg border border-app-border bg-app-card p-5 shadow-sm">
-                <h3 className="text-lg font-bold text-app-text">E-mail</h3>
+                <h2 className="text-lg font-bold text-app-text">E-mail</h2>
                 <p className="mt-2 text-sm leading-6 text-app-muted">
                   <a
                     href="mailto:contact@kisinet.com"
@@ -58,20 +58,6 @@ export default function ContactPage() {
                   >
                     contact@kisinet.com
                   </a>
-                </p>
-              </article>
-              {/* Carte Téléphone — coordonnée secondaire de contact */}
-              <article className="rounded-lg border border-app-border bg-app-card p-5 shadow-sm">
-                <h3 className="text-lg font-bold text-app-text">Téléphone</h3>
-                <p className="mt-2 text-sm leading-6 text-app-muted">
-                  +243 81 9339 737
-                </p>
-              </article>
-              {/* Carte Adresse — localisation de l'entreprise */}
-              <article className="rounded-lg border border-app-border bg-app-card p-5 shadow-sm">
-                <h3 className="text-lg font-bold text-app-text">Adresse</h3>
-                <p className="mt-2 text-sm leading-6 text-app-muted">
-                  Kinshasa, République Démocratique du Congo
                 </p>
               </article>
             </div>

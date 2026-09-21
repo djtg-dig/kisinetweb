@@ -3,19 +3,21 @@ import { PublicLayout } from "@/components/layout/public-layout";
 import { LinkButton } from "@/components/ui/link-button";
 import { defaultOpenGraph, defaultTwitter } from "@/lib/server/metadata-og";
 
+const url = "https://kisinet.com/terms";
+
 export const metadata: Metadata = {
   title: "Conditions d'utilisation",
   description:
     "Consultez les conditions applicables à l'accès et à l'utilisation de la plateforme de gestion de pharmacie Kisinet.",
   alternates: {
-    canonical: "/terms",
+    canonical: url,
   },
   openGraph: {
     ...defaultOpenGraph,
     title: "Conditions d'utilisation",
     description:
       "Consultez les conditions applicables à l'accès et à l'utilisation de la plateforme de gestion de pharmacie Kisinet.",
-    url: "/terms",
+    url,
     type: "article",
   },
   robots: {
@@ -557,18 +559,7 @@ const legalSections: LegalSection[] = [
     id: "contact",
     title: "Contact",
     blocks: [
-      { type: "paragraph", text: "Pour toute question relative aux présentes Conditions d'utilisation, l'utilisateur peut contacter Kisinet par les moyens officiels affichés sur le site." },
-      { type: "paragraph", text: "Informations à afficher lorsque celles-ci seront officiellement confirmées :" },
-      {
-        type: "list",
-        items: [
-          "Entreprise : [Nom juridique officiel] ;",
-          "Produit : Kisinet ;",
-          "Adresse : [Adresse officielle] ;",
-          "E-mail : [Adresse e-mail officielle du support] ;",
-          "Site web : [Domaine officiel de Kisinet].",
-        ],
-      },
+      { type: "paragraph", text: "Pour toute question relative aux présentes Conditions d'utilisation, l'utilisateur peut contacter Kisinet à l'adresse contact@kisinet.com." },
     ],
   },
 ];
