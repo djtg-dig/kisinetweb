@@ -9,9 +9,9 @@ import { JsonLd } from "@/components/json-ld";
 import { getHomeJsonLd } from "@/lib/server/json-ld";
 import { defaultOpenGraph, defaultTwitter } from "@/lib/server/metadata-og";
 
-const title = "Logiciel de gestion de pharmacie en RDC";
+const title = "Logiciel de gestion de pharmacie";
 const description =
-  "Kisinet est un logiciel de gestion de pharmacie conçu pour gérer les produits, stocks, ventes, factures et activités quotidiennes des pharmacies en RDC et en Afrique.";
+  "Kisinet est un logiciel de gestion de pharmacie conçu pour gérer les produits, stocks, ventes, factures et activités quotidiennes des pharmacies.";
 const siteUrl = "https://kisinet.com";
 const url = "https://kisinet.com/";
 
