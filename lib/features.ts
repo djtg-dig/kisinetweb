@@ -17,7 +17,7 @@ export const features: Feature[] = [
   },
   {
     title: "Stock et alertes",
-    description: "Suivez les quantités et repérez rapidement les stocks faibles.",
+    description: "Suivez les quantités, les stocks faibles et les dates d'expiration.",
     badge: "Alertes",
     icon: "ST",
     tone: "warning",
@@ -30,10 +30,10 @@ export const features: Feature[] = [
     tone: "success",
   },
   {
-    title: "Rapports",
-    description: "Consultez les indicateurs utiles pour piloter l'activité.",
+    title: "Rapports et IA",
+    description: "Consultez les indicateurs utiles et l'analyse d'ordonnances assistée par intelligence artificielle.",
     badge: "Analyse",
-    icon: "RP",
+    icon: "IA",
     tone: "info",
   },
   {

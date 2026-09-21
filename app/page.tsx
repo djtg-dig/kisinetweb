@@ -9,16 +9,14 @@ import { JsonLd } from "@/components/json-ld";
 import { getHomeJsonLd } from "@/lib/server/json-ld";
 import { defaultOpenGraph, defaultTwitter } from "@/lib/server/metadata-og";
 
-const title = "Logiciel de gestion de pharmacie";
+const title = "Gestion de pharmacie";
 const description =
-  "Kisinet est un logiciel de gestion de pharmacie conçu pour gérer les produits, stocks, ventes, factures et activités quotidiennes des pharmacies.";
+  "Kisinet centralise la gestion des produits, stocks, ventes, factures, expirations et accès d'équipe pour les pharmacies.";
 const siteUrl = "https://kisinet.com";
 const url = "https://kisinet.com/";
 
 export const metadata: Metadata = {
-  title: {
-    absolute: title + " | Kisinet",
-  },
+  title,
   description,
   alternates: {
     canonical: url,
@@ -31,14 +29,14 @@ export const metadata: Metadata = {
   },
   twitter: {
     ...defaultTwitter,
-    title: title + " | Kisinet",
+    title,
     description,
   },
 };
 
 const quickBenefits = [
-  "Stock suivi en temps réel",
-  "Factures et paiements alignés",
+  "Suivi des stocks",
+  "Factures et ventes alignées",
   "Équipe encadrée par rôles",
   "Alertes de péremption",
   "Multi-pharmacies",
@@ -65,29 +63,29 @@ const audiences = [
 ];
 
 const productMetrics = [
-  { label: "Produits suivis", value: "1 284", tone: "primary" },
-  { label: "Stock faible", value: "18", tone: "warning" },
-  { label: "Ventes du jour", value: "42", tone: "success" },
-  { label: "Factures impayées", value: "7", tone: "info" },
+  { label: "Produits suivis", value: "Catalogue", tone: "primary" },
+  { label: "Stock à surveiller", value: "Alertes", tone: "warning" },
+  { label: "Ventes enregistrées", value: "Journal", tone: "success" },
+  { label: "Factures à suivre", value: "Suivi", tone: "info" },
 ] as const;
 
 const stockRows = [
   {
     name: "Paracétamol 500 mg",
     status: "Stock stable",
-    value: "430 unités",
+    value: "Quantités suivies",
     tone: "success",
   },
   {
     name: "Amoxicilline sirop",
     status: "À réapprovisionner",
-    value: "12 unités",
+    value: "Attention requise",
     tone: "warning",
   },
   {
     name: "Gants médicaux",
     status: "Rotation élevée",
-    value: "86 boîtes",
+    value: "Mouvements visibles",
     tone: "info",
   },
 ] as const;
@@ -182,12 +180,12 @@ export default function HomePage() {
                 Gestion pharmaceutique moderne
               </span>
               <h1 className="mt-5 max-w-3xl text-4xl font-bold leading-tight text-app-text sm:text-5xl">
-                Une pharmacie mieux suivie, une équipe plus sereine.
+                Kisinet, plateforme de gestion pour pharmacies.
               </h1>
               <p className="mt-5 max-w-2xl text-base leading-8 text-app-muted sm:text-lg">
-                Kisinet rassemble stocks, ventes, factures, produits,
-                collaborateurs et alertes dans un espace clair pour piloter les
-                opérations quotidiennes sans perdre le fil.
+                Kisinet rassemble produits, stocks, ventes, factures, dates
+                d'expiration, collaborateurs et opérations assistées par IA dans
+                un espace clair pour piloter la pharmacie au quotidien.
               </p>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -198,9 +196,9 @@ export default function HomePage() {
               </div>
 
               <div className="mt-8 grid gap-3 sm:grid-cols-3">
-                <TrustSignal value="5 min" label="pour prendre en main" />
-                <TrustSignal value="24/7" label="accès à l'espace" />
-                <TrustSignal value="1+" label="pharmacie gérée" />
+                <TrustSignal value="Stocks" label="quantités et alertes" />
+                <TrustSignal value="Ventes" label="factures et suivi" />
+                <TrustSignal value="Équipe" label="rôles et permissions" />
               </div>
             </div>
 
@@ -259,8 +257,8 @@ export default function HomePage() {
           <div className="mx-auto max-w-6xl scroll-mt-24 px-4 py-16 sm:px-6 lg:px-8">
             <SectionHeading
               eyebrow="Fonctionnalités"
-              title="Les modules essentiels, sans surcharge"
-              description="Chaque partie de Kisinet sert un objectif précis : mieux voir, mieux décider et mieux contrôler l'activité."
+              title="Fonctionnalités de Kisinet"
+              description="Chaque module aide à gérer une opération concrète de la pharmacie, du stock aux factures en passant par les accès de l'équipe."
             />
             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {features.map((feature) => (
@@ -270,11 +268,45 @@ export default function HomePage() {
           </div>
         </section>
 
+        <section className="mx-auto grid max-w-6xl gap-6 px-4 py-16 sm:px-6 lg:grid-cols-[0.9fr_1.1fr] lg:px-8">
+          <SectionHeading
+            eyebrow="Accès public"
+            title="Consultez les pharmacies publiques et les tarifs"
+            description="Les visiteurs peuvent parcourir les pharmacies publiques référencées sur Kisinet et comparer les formules disponibles."
+          />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <article className="rounded-lg border border-app-border bg-app-card p-5 shadow-sm">
+              <h3 className="text-lg font-bold text-app-text">
+                Pharmacies publiques
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-app-muted">
+                Retrouvez les pharmacies publiques référencées et leurs
+                informations disponibles.
+              </p>
+              <LinkButton href="/pharmacies" variant="secondary" className="mt-5">
+                Consulter les pharmacies
+              </LinkButton>
+            </article>
+            <article className="rounded-lg border border-app-border bg-app-card p-5 shadow-sm">
+              <h3 className="text-lg font-bold text-app-text">
+                Formules Kisinet
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-app-muted">
+                Comparez les plans proposés pour choisir une formule adaptée à
+                votre gestion.
+              </p>
+              <LinkButton href="/tarifs" variant="secondary" className="mt-5">
+                Voir les tarifs
+              </LinkButton>
+            </article>
+          </div>
+        </section>
+
         <section className="mx-auto grid max-w-6xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[1fr_0.95fr] lg:px-8">
           <div>
             <SectionHeading
               eyebrow="Méthode"
-              title="Un parcours simple pour passer du désordre au contrôle"
+              title="Centralisez la gestion de votre pharmacie"
               description="La plateforme accompagne les équipes sans leur imposer une logique compliquée."
             />
             <div className="mt-8 grid gap-4">
@@ -469,10 +501,10 @@ function ProductShowcase() {
           <div className="grid gap-3 rounded-md border border-app-border bg-app-surface p-4">
             <div className="flex items-center justify-between text-sm">
               <span className="font-semibold text-app-text">
-                Qualité du stock
+                Lecture du stock
               </span>
               <span className="font-bold text-success-700 dark:text-success-400">
-                74%
+                Vue structurée
               </span>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-primary-100">
