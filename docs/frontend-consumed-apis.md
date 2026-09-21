@@ -1473,10 +1473,14 @@ paginer et formater l'affichage.
 
 ## Abonnements et paiements
 
-- **Page frontend** : `/tarifs/[name]`
+- **Pages frontend** : `/tarifs`, `/tarifs/[name]`
 - **Service frontend** : `lib/api.ts`
-- **Authentification** : requise avec `Authorization: Bearer <access_token>` pour
-  initialiser un paiement ou consulter un reçu.
+- **Service serveur** : `lib/server/public-pricing-plans.ts` pour le rendu initial
+  de `/tarifs`.
+- **Authentification** : les plans publics sont chargés côté serveur avec la
+  signature HMAC backend de Next.js. L'authentification utilisateur
+  `Authorization: Bearer <access_token>` reste requise pour initialiser un
+  paiement ou consulter un reçu.
 
 Endpoints consommés:
 

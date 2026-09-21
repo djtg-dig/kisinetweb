@@ -1,35 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { PublicLayout } from "@/components/layout/public-layout";
 import { PublicAuthLink } from "@/components/auth/public-auth-link";
 import { LinkButton } from "@/components/ui/link-button";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
-import { getPharmacyPlans, type PharmacyPlan } from "@/lib/api";
+import type { PharmacyPlan } from "@/lib/api";
 import { PlanElements } from "@/components/pricing/plan-elements";
 
 type PageState = "loading" | "error" | "ready";
 
-export default function TarifsPage() {
-  const [state, setState] = useState<PageState>("loading");
-  const [plans, setPlans] = useState<PharmacyPlan[]>([]);
-  const [errorMessage, setErrorMessage] = useState("");
+type TarifsPageClientProps = {
+  initialPlans: PharmacyPlan[];
+  initialLoadError?: string;
+};
 
-  useEffect(() => {
-    async function loadPlans() {
-      try {
-        const pharmacyPlans = await getPharmacyPlans();
-        setPlans(pharmacyPlans);
-        setState("ready");
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "";
-        setErrorMessage(message || "Une erreur inconnue est survenue.");
-        setState("error");
-      }
-    }
-
-    loadPlans();
-  }, []);
+export default function TarifsPageClient({
+  initialPlans,
+  initialLoadError,
+}: TarifsPageClientProps) {
+  const [state] = useState<PageState>(initialLoadError ? "error" : "ready");
+  const [plans] = useState<PharmacyPlan[]>(initialPlans);
+  const [errorMessage] = useState(
+    initialLoadError || "Une erreur inconnue est survenue.",
+  );
 
   return (
     <PublicLayout>

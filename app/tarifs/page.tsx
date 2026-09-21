@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import TarifsPageClient from "./page-client";
 import { defaultOpenGraph, defaultTwitter } from "@/lib/server/metadata-og";
+import { getPublicPricingPlansServer } from "@/lib/server/public-pricing-plans";
 
 const title = "Tarifs du logiciel de gestion de pharmacie";
 const description =
@@ -26,6 +27,19 @@ export const metadata: Metadata = {
   },
 };
 
-export default function TarifsPage() {
-  return <TarifsPageClient />;
+export default async function TarifsPage() {
+  try {
+    const initialPlans = await getPublicPricingPlansServer();
+
+    return <TarifsPageClient initialPlans={initialPlans} />;
+  } catch (error) {
+    console.error("Impossible de charger les tarifs publics côté serveur.", error);
+
+    return (
+      <TarifsPageClient
+        initialPlans={[]}
+        initialLoadError="Les tarifs sont temporairement indisponibles. Veuillez réessayer dans quelques instants."
+      />
+    );
+  }
 }
