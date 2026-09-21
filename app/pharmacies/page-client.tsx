@@ -3,6 +3,11 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { PublicLayout } from "@/components/layout/public-layout";
 import {
+  PUBLIC_PHARMACIES_CATALOG_HEADING,
+  PUBLIC_PHARMACIES_H1,
+  PUBLIC_PHARMACIES_INTRO,
+} from "@/lib/public-pharmacies-page-seo";
+import {
   getPublicPharmacies,
   getPublicPharmacyFilterOptions,
   type PharmacySummary,
@@ -170,11 +175,10 @@ export default function PublicPharmaciesPage({
               Pharmacies
             </p>
             <h1 className="mt-3 max-w-3xl text-3xl font-bold text-app-text sm:text-4xl">
-              Annuaire public des pharmacies
+              {PUBLIC_PHARMACIES_H1}
             </h1>
             <p className="mt-4 max-w-3xl text-sm leading-6 text-app-muted sm:text-base">
-              Retrouvez les pharmacies enregistrées sur Kisinet et filtrez par
-              localisation ou information de contact.
+              {PUBLIC_PHARMACIES_INTRO}
             </p>
           </div>
         </section>
@@ -286,6 +290,9 @@ export default function PublicPharmaciesPage({
           </form>
 
           <div>
+            <h2 className="mb-3 text-2xl font-bold text-app-text">
+              {PUBLIC_PHARMACIES_CATALOG_HEADING}
+            </h2>
             <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm font-semibold text-app-text">
                 {count} pharmacie{count > 1 ? "s" : ""} trouvée{count > 1 ? "s" : ""}
@@ -322,9 +329,9 @@ export default function PublicPharmaciesPage({
             ) : (
               !error && (
                 <div className="rounded-lg border border-app-border bg-app-card p-8 text-center">
-                  <h2 className="text-lg font-semibold text-app-text">
+                  <p className="text-lg font-semibold text-app-text">
                     Aucune pharmacie trouvée
-                  </h2>
+                  </p>
                   <p className="mt-2 text-sm text-app-muted">
                     Ajustez vos filtres pour élargir la recherche.
                   </p>
@@ -365,7 +372,7 @@ function PharmacyCard({ pharmacy }: { pharmacy: PharmacySummary }) {
           <p className="text-xs font-semibold uppercase tracking-wide text-primary-700">
             {pharmacy.reference}
           </p>
-          <h2 className="mt-1 text-xl font-bold text-app-text">{pharmacy.name}</h2>
+          <h3 className="mt-1 text-xl font-bold text-app-text">{pharmacy.name}</h3>
           <p className="mt-2 text-sm leading-6 text-app-muted">
             {pharmacy.addressLine || "Adresse non renseignée"}
           </p>

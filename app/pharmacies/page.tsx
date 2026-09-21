@@ -1,32 +1,32 @@
 import type { Metadata } from "next";
 import PublicPharmaciesPageClient from "./page-client";
+import {
+  PUBLIC_PHARMACIES_CANONICAL_URL,
+  PUBLIC_PHARMACIES_DESCRIPTION,
+  PUBLIC_PHARMACIES_TITLE,
+} from "@/lib/public-pharmacies-page-seo";
 import { defaultOpenGraph, defaultTwitter } from "@/lib/server/metadata-og";
 import {
   getPublicPharmaciesPageServer,
   type PublicPharmaciesPage,
 } from "@/lib/server/public-pharmacies";
 
-const title = "Pharmacies sur Kisinet";
-const description =
-  "Découvrez les pharmacies publiques présentes sur Kisinet et consultez leurs informations disponibles en ligne.";
-const url = "https://kisinet.com/pharmacies";
-
 export const metadata: Metadata = {
-  title,
-  description,
+  title: PUBLIC_PHARMACIES_TITLE,
+  description: PUBLIC_PHARMACIES_DESCRIPTION,
   alternates: {
-    canonical: url,
+    canonical: PUBLIC_PHARMACIES_CANONICAL_URL,
   },
   openGraph: {
     ...defaultOpenGraph,
-    title,
-    description,
-    url,
+    title: PUBLIC_PHARMACIES_TITLE,
+    description: PUBLIC_PHARMACIES_DESCRIPTION,
+    url: PUBLIC_PHARMACIES_CANONICAL_URL,
   },
   twitter: {
     ...defaultTwitter,
-    title,
-    description,
+    title: PUBLIC_PHARMACIES_TITLE,
+    description: PUBLIC_PHARMACIES_DESCRIPTION,
   },
 };
 
