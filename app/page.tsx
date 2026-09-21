@@ -16,7 +16,9 @@ const siteUrl = "https://kisinet.com";
 const url = "https://kisinet.com/";
 
 export const metadata: Metadata = {
-  title,
+  title: {
+    absolute: title + " | Kisinet",
+  },
   description,
   alternates: {
     canonical: url,

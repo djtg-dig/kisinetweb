@@ -10,12 +10,13 @@ function readProjectFile(path: string) {
 }
 
 describe("home page SEO editorial content", () => {
-  test("définit un title local sans double suffixe Kisinet", () => {
+  test("définit le title absolu de la homepage avec le suffixe Kisinet", () => {
     const source = readProjectFile("app/page.tsx");
 
     assert.ok(source.includes('const title = "Gestion de pharmacie";'));
-    assert.ok(source.includes("title,"));
-    assert.ok(!source.includes("absolute: title + \" | Kisinet\""));
+    // La homepage est dans le même segment que app/layout.tsx et n'hérite pas
+    // de son title.template ; elle doit donc définir son title complet.
+    assert.ok(source.includes('absolute: title + " | Kisinet"'));
     assert.ok(!source.includes("title: title + \" | Kisinet\""));
   });
 
