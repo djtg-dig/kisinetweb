@@ -36,8 +36,6 @@ export function PublicLayout({ children, activePharmacy = null }: PublicLayoutPr
     isLoggedIn: Boolean(activePharmacy),
     contextPharmacy: activePharmacy,
   });
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -49,20 +47,6 @@ export function PublicLayout({ children, activePharmacy = null }: PublicLayoutPr
       contextPharmacy: activePharmacy,
     });
   }, [activePharmacy]);
-
-  useEffect(() => {
-    function closeMenuOnOutsideClick(event: MouseEvent) {
-      if (!menuRef.current || menuRef.current.contains(event.target as Node)) {
-        return;
-      }
-      setIsMenuOpen(false);
-    }
-
-    document.addEventListener("mousedown", closeMenuOnOutsideClick);
-    return () => {
-      document.removeEventListener("mousedown", closeMenuOnOutsideClick);
-    };
-  }, []);
 
   if (!isMounted) {
     return (
@@ -97,7 +81,7 @@ export function PublicLayout({ children, activePharmacy = null }: PublicLayoutPr
 
   return (
     <div className="min-h-screen bg-app-background pt-[77px] text-app-text">
-      <PublicNavbar activePharmacy={activePharmacy} userMenu={userMenu} onMenuToggle={() => setIsMenuOpen((current) => !current)} />
+      <PublicNavbar activePharmacy={activePharmacy} userMenu={userMenu} />
 
       {children}
 
@@ -113,12 +97,13 @@ export function PublicLayout({ children, activePharmacy = null }: PublicLayoutPr
 type PublicNavbarProps = {
   activePharmacy?: PharmacySummary | null;
   userMenu: { isLoggedIn: boolean; contextPharmacy: PharmacySummary | null };
-  onMenuToggle: () => void;
 };
 
-function PublicNavbar({ activePharmacy, userMenu, onMenuToggle }: PublicNavbarProps) {
+function PublicNavbar({ activePharmacy, userMenu }: PublicNavbarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const mobileNavRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function closeMenuOnOutsideClick(event: MouseEvent) {
@@ -131,6 +116,20 @@ function PublicNavbar({ activePharmacy, userMenu, onMenuToggle }: PublicNavbarPr
     document.addEventListener("mousedown", closeMenuOnOutsideClick);
     return () => {
       document.removeEventListener("mousedown", closeMenuOnOutsideClick);
+    };
+  }, []);
+
+  useEffect(() => {
+    function closeMobileNavOnOutsideClick(event: MouseEvent) {
+      if (!mobileNavRef.current || mobileNavRef.current.contains(event.target as Node)) {
+        return;
+      }
+      setIsMobileNavOpen(false);
+    }
+
+    document.addEventListener("mousedown", closeMobileNavOnOutsideClick);
+    return () => {
+      document.removeEventListener("mousedown", closeMobileNavOnOutsideClick);
     };
   }, []);
 
@@ -159,7 +158,7 @@ function PublicNavbar({ activePharmacy, userMenu, onMenuToggle }: PublicNavbarPr
           ))}
         </div>
 
-        <div className="flex min-h-11 min-w-32 items-center justify-end gap-2">
+        <div className="flex min-h-11 items-center justify-end gap-2 md:min-w-32">
           {userMenu.isLoggedIn ? (
             <UserMenu
               contextPharmacy={userMenu.contextPharmacy}
@@ -176,6 +175,38 @@ function PublicNavbar({ activePharmacy, userMenu, onMenuToggle }: PublicNavbarPr
               Se connecter
             </LinkButton>
           )}
+          <div ref={mobileNavRef} className="relative md:hidden">
+            <button
+              type="button"
+              aria-expanded={isMobileNavOpen}
+              aria-controls="public-mobile-navigation"
+              aria-label={isMobileNavOpen ? "Fermer le menu de navigation" : "Ouvrir le menu de navigation"}
+              onClick={() => setIsMobileNavOpen((current) => !current)}
+              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md border border-app-border bg-app-card text-app-text transition hover:bg-primary-50 focus:outline-none focus:ring-4 focus:ring-primary-100"
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current stroke-2">
+                <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />
+              </svg>
+            </button>
+
+            {isMobileNavOpen && (
+              <div
+                id="public-mobile-navigation"
+                className="absolute right-0 mt-3 w-[min(88vw,280px)] overflow-hidden rounded-lg border border-app-border bg-app-card py-2 text-sm shadow-soft"
+              >
+                {navLinks.map((link) => (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setIsMobileNavOpen(false)}
+                    className="block px-4 py-2.5 font-medium text-app-muted transition hover:bg-primary-50 hover:text-primary-700"
+                  >
+                    {link.label}
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </nav>
     </header>
