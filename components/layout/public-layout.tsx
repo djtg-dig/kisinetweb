@@ -7,6 +7,7 @@ import { SiteFooter } from "@/components/layout/site-footer";
 import { ThemeSwitcher } from "@/components/theme/theme-switcher";
 import { carriAccountLoginUrl } from "@/lib/carri-account";
 import { logout } from "@/lib/auth";
+import { useSession } from "@/lib/hooks/use-session";
 import type { PharmacySummary } from "@/lib/api";
 
 type PublicLayoutProps = {
@@ -27,26 +28,27 @@ const navLinks = [
   { label: "Contact", href: "/contact" },
 ];
 
-export function PublicLayout({ children, activePharmacy = null }: PublicLayoutProps) {
+export function PublicLayout({ children, activePharmacy = null, userData }: PublicLayoutProps) {
   const [isMounted, setIsMounted] = useState(false);
+  const { authenticated } = useSession();
+  // Quand elles sont fournies, les donnees utilisateur sont la source de
+  // verite. Sinon, la session existante permet aux pages qui ne les passent
+  // pas encore de connaitre l'etat de connexion reel.
+  const isLoggedIn = userData ? userData.isLoggedIn : authenticated;
+  // Le contexte pharmacie ne sert qu'a orienter les liens du compte.
+  const contextPharmacy = userData ? userData.contextPharmacy : activePharmacy;
   const [userMenu, setUserMenu] = useState<{
     isLoggedIn: boolean;
     contextPharmacy: PharmacySummary | null;
-  }>({
-    isLoggedIn: Boolean(activePharmacy),
-    contextPharmacy: activePharmacy,
-  });
+  }>({ isLoggedIn, contextPharmacy });
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
   useEffect(() => {
-    setUserMenu({
-      isLoggedIn: Boolean(activePharmacy),
-      contextPharmacy: activePharmacy,
-    });
-  }, [activePharmacy]);
+    setUserMenu({ isLoggedIn, contextPharmacy });
+  }, [isLoggedIn, contextPharmacy]);
 
   if (!isMounted) {
     return (
@@ -81,7 +83,7 @@ export function PublicLayout({ children, activePharmacy = null }: PublicLayoutPr
 
   return (
     <div className="min-h-screen bg-app-background pt-[77px] text-app-text">
-      <PublicNavbar activePharmacy={activePharmacy} userMenu={userMenu} />
+      <PublicNavbar userMenu={userMenu} />
 
       {children}
 
@@ -95,11 +97,10 @@ export function PublicLayout({ children, activePharmacy = null }: PublicLayoutPr
 }
 
 type PublicNavbarProps = {
-  activePharmacy?: PharmacySummary | null;
   userMenu: { isLoggedIn: boolean; contextPharmacy: PharmacySummary | null };
 };
 
-function PublicNavbar({ activePharmacy, userMenu }: PublicNavbarProps) {
+function PublicNavbar({ userMenu }: PublicNavbarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
