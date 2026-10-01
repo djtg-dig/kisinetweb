@@ -24,10 +24,15 @@ export async function GET(request: NextRequest) {
   const handoff = request.nextUrl.searchParams.get("handoff");
   const appOrigin = getAppOrigin(request);
 
+  const oauthError = request.nextUrl.searchParams.get("error");
+  if (oauthError) {
+    const errorUrl = new URL("/auth/carri/error", appOrigin);
+    errorUrl.searchParams.set("error", oauthError === "access_denied" ? "access_denied" : "oauth_error");
+    return NextResponse.redirect(errorUrl);
+  }
+
   if (!handoff) {
-    return NextResponse.redirect(
-      new URL("/auth/carri?error=no_handoff", appOrigin),
-    );
+    return NextResponse.redirect(new URL("/auth/carri/error?error=no_handoff", appOrigin));
   }
 
   try {
@@ -40,7 +45,7 @@ export async function GET(request: NextRequest) {
 
     if (!response.ok) {
       return NextResponse.redirect(
-        new URL("/auth/carri?error=callback_failed", appOrigin),
+        new URL("/auth/carri/error?error=callback_failed", appOrigin),
       );
     }
 
@@ -50,7 +55,7 @@ export async function GET(request: NextRequest) {
 
     if (!access || !refresh) {
       return NextResponse.redirect(
-        new URL("/auth/carri?error=no_tokens", appOrigin),
+        new URL("/auth/carri/error?error=no_tokens", appOrigin),
       );
     }
 
@@ -99,7 +104,7 @@ export async function GET(request: NextRequest) {
     return nextResponse;
   } catch {
     return NextResponse.redirect(
-      new URL("/auth/carri?error=server_error", appOrigin),
+      new URL("/auth/carri/error?error=server_error", appOrigin),
     );
   }
 }

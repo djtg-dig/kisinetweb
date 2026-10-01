@@ -93,7 +93,25 @@ describe("/auth/carri-callback route handler", () => {
 
     assert.equal(response.status, 307);
     const location = response.headers.get("location");
-    assert.equal(location, "http://next.test/auth/carri?error=no_handoff");
+    assert.equal(location, "http://next.test/auth/carri/error?error=no_handoff");
+  });
+
+  test("redirige une annulation OAuth sans consommer de handoff", async () => {
+    const route = await loadRoute();
+    const calls = mockFetch(Response.json({}));
+    const response = await route.GET(makeRequest("http://next.test/auth/carri-callback?error=access_denied") as never);
+    assert.equal(response.status, 307);
+    assert.equal(response.headers.get("location"), "http://next.test/auth/carri/error?error=access_denied");
+    assert.equal(calls.length, 0);
+  });
+
+  test("redirige une erreur OAuth contrôlée sans consommer de handoff", async () => {
+    const route = await loadRoute();
+    const calls = mockFetch(Response.json({}));
+    const response = await route.GET(makeRequest("http://next.test/auth/carri-callback?error=oauth_error&code=invalid_request") as never);
+    assert.equal(response.status, 307);
+    assert.equal(response.headers.get("location"), "http://next.test/auth/carri/error?error=oauth_error");
+    assert.equal(calls.length, 0);
   });
 
   test("poste le handoff via HMAC sur /api/carri-account/handoff/consume/", async () => {
@@ -141,7 +159,7 @@ describe("/auth/carri-callback route handler", () => {
     );
 
     assert.equal(response.status, 307);
-    assert.equal(response.headers.get("location"), "http://next.test/auth/carri?error=callback_failed");
+    assert.equal(response.headers.get("location"), "http://next.test/auth/carri/error?error=callback_failed");
   });
 
   test("sur payload sans access/refresh, redirige vers /auth/carri?error=no_tokens", async () => {
@@ -153,6 +171,6 @@ describe("/auth/carri-callback route handler", () => {
     );
 
     assert.equal(response.status, 307);
-    assert.equal(response.headers.get("location"), "http://next.test/auth/carri?error=no_tokens");
+    assert.equal(response.headers.get("location"), "http://next.test/auth/carri/error?error=no_tokens");
   });
 });
