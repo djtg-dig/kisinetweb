@@ -204,3 +204,43 @@ describe("/auth/carri-callback route handler", () => {
     assert.equal(response.headers.get("location"), "http://next.test/auth/carri/error?error=no_tokens");
   });
 });
+
+type CarriLoginRoute = {
+  GET: (request: never) => Response;
+};
+
+async function loadCarriLoginRoute() {
+  process.env.KISINET_BACKEND_URL = BACKEND_URL;
+  const routeModule = (await import("@/app/api/auth/carri/route")) as
+    | CarriLoginRoute
+    | { default: CarriLoginRoute };
+  return "GET" in routeModule ? routeModule : routeModule.default;
+}
+
+describe("/api/auth/carri route handler", () => {
+  test("conserve un next interne avec le token dans un cookie temporaire", async () => {
+    const route = await loadCarriLoginRoute();
+    const invitationPath = "/invitations/accept?token=opaque-token";
+    const response = await route.GET(
+      makeRequest(
+        "http://next.test/api/auth/carri?next=" + encodeURIComponent(invitationPath),
+      ) as never,
+    );
+
+    const redirectUrl = new URL(response.headers.get("location") || "");
+    assert.equal(redirectUrl.href.startsWith(BACKEND_URL + "/api/carri-account/login/"), true);
+    assert.equal(redirectUrl.searchParams.get("next"), invitationPath);
+    const savedNext = readSetCookies(response).get("kisinet_auth_next");
+    assert.equal(decodeURIComponent(savedNext || ""), invitationPath);
+  });
+
+  test("remplace un next externe par le fallback interne", async () => {
+    const route = await loadCarriLoginRoute();
+    const response = await route.GET(
+      makeRequest("http://next.test/api/auth/carri?next=https%3A%2F%2Fevil.example") as never,
+    );
+
+    const savedNext = readSetCookies(response).get("kisinet_auth_next");
+    assert.equal(decodeURIComponent(savedNext || ""), "/app/select-pharmacy");
+  });
+});

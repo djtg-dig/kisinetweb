@@ -36,9 +36,8 @@ function InvitationAcceptanceContent() {
   const [result, setResult] = useState<InvitationResult>(null);
   const [errorMessage, setErrorMessage] = useState("");
 
-  const loginHref = token
-    ? carriAccountLoginUrl + "?next=" + encodeURIComponent("/invitations/accept?token=" + token)
-    : carriAccountLoginUrl;
+  const invitationPath = "/invitations/accept?token=" + encodeURIComponent(token);
+  const loginHref = carriAccountLoginUrl + "?next=" + encodeURIComponent(invitationPath);
 
   async function respond(action: "accept" | "decline") {
     if (!token) {
@@ -64,7 +63,11 @@ function InvitationAcceptanceContent() {
   }
 
   if (!token) {
-    return <InvitationPanel title="Lien d’invitation incomplet">Le token de cette invitation est absent. Utilisez le lien reçu par e-mail.</InvitationPanel>;
+    return (
+      <InvitationPanel title="Invitation invalide">
+        Le lien d’invitation est incomplet ou invalide.
+      </InvitationPanel>
+    );
   }
 
   if (loading) {
@@ -77,14 +80,22 @@ function InvitationAcceptanceContent() {
 
   if (!authenticated) {
     return (
-      <InvitationPanel title="Connexion requise">
-        <p>Connectez-vous à votre compte Kisinet pour répondre à cette invitation.</p>
+      <InvitationPanel title="Connectez-vous pour continuer">
+        <p>
+          Vous devez vous connecter à votre compte Kisinet avant de pouvoir consulter et accepter cette invitation.
+        </p>
+        <p className="mt-3">
+          Cette invitation est personnelle. Connectez-vous avec le compte correspondant à l’adresse e-mail sur laquelle vous avez reçu l’invitation.
+        </p>
         <a
           href={loginHref}
           className="mt-6 inline-flex min-h-11 items-center justify-center rounded-md bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-700 focus:outline-none focus:ring-4 focus:ring-primary-200"
         >
-          Se connecter
+          Se connecter à Kisinet
         </a>
+        <p className="mt-5 text-xs leading-5 text-app-muted">
+          Si la connexion ne fonctionne pas dans le navigateur intégré de votre application e-mail, ouvrez cette page dans votre navigateur habituel.
+        </p>
       </InvitationPanel>
     );
   }
@@ -92,19 +103,29 @@ function InvitationAcceptanceContent() {
   if (result === "accepted") {
     return (
       <InvitationPanel title="Invitation acceptée">
-        <p>Vous faites désormais partie de cette pharmacie.</p>
+        <p>Vous avez rejoint la pharmacie avec succès.</p>
         <a
           href="/app/select-pharmacy"
           className="mt-6 inline-flex min-h-11 items-center justify-center rounded-md bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-700 focus:outline-none focus:ring-4 focus:ring-primary-200"
         >
-          Accéder à mes pharmacies
+          Continuer
         </a>
       </InvitationPanel>
     );
   }
 
   if (result === "declined") {
-    return <InvitationPanel title="Invitation refusée">Aucune adhésion à cette pharmacie n’a été créée.</InvitationPanel>;
+    return (
+      <InvitationPanel title="Invitation refusée">
+        <p>Vous avez refusé cette invitation. Aucun accès à la pharmacie n’a été créé.</p>
+        <a
+          href="/app/select-pharmacy"
+          className="mt-6 inline-flex min-h-11 items-center justify-center rounded-md border border-app-border bg-app-surface px-5 py-2.5 text-sm font-semibold text-app-text transition hover:bg-primary-50 focus:outline-none focus:ring-4 focus:ring-primary-100"
+        >
+          Retour à Kisinet
+        </a>
+      </InvitationPanel>
+    );
   }
 
   return (
