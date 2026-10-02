@@ -2,8 +2,13 @@
 
 import { useEffect, useState, type ChangeEvent, type ReactNode } from "react";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { MemberInvitationDialog } from "@/components/pharmacies/member-invitation-dialog";
 import {
   assignPharmacyMemberPermissions,
+  getPharmacyMemberInvitations,
+  resendPharmacyMemberInvitation,
+  revokePharmacyMemberInvitation,
   deletePharmacyMember,
   getPharmacyMembers,
   getPharmacyPermissions,
@@ -11,6 +16,7 @@ import {
   updatePharmacyMember,
   type PharmacyMember,
   type PharmacyMemberRole,
+  type PharmacyMemberInvitation,
   type PharmacyPermissions,
 } from "@/lib/api";
 
@@ -42,18 +48,11 @@ const permissionGroups = [
     title: "Membres",
     permissions: [
       ["member_view", "Voir les membres"],
+      ["member_invite", "Inviter des membres"],
       ["member_update", "Modifier les membres"],
       ["member_suspend", "Suspendre les membres"],
       ["member_delete", "Supprimer les membres"],
       ["member_manage_permissions", "Gérer les permissions"],
-    ],
-  },
-  {
-    title: "Demandes",
-    permissions: [
-      ["join_request_view", "Voir les demandes"],
-      ["join_request_accept", "Accepter les demandes"],
-      ["join_request_reject", "Refuser les demandes"],
     ],
   },
   {
@@ -89,6 +88,10 @@ export default function HumanResourcesSettingsPage({
 }: HumanResourcesSettingsPageProps) {
   const [pharmacyId, setPharmacyId] = useState("");
   const [members, setMembers] = useState<PharmacyMember[]>([]);
+  const [invitations, setInvitations] = useState<PharmacyMemberInvitation[]>([]);
+  const [isInvitationDialogOpen, setIsInvitationDialogOpen] = useState(false);
+  const [invitationToRevoke, setInvitationToRevoke] =
+    useState<PharmacyMemberInvitation | null>(null);
   const [permissions, setPermissions] = useState<PharmacyPermissions>({});
   const [permissionModalMember, setPermissionModalMember] =
     useState<PharmacyMember | null>(null);
@@ -118,17 +121,24 @@ export default function HumanResourcesSettingsPage({
       setErrorMessage("");
 
       try {
-        // On charge les membres et les droits de l'utilisateur en même temps.
-        const [pageMembers, currentPermissions] = await Promise.all([
-          getPharmacyMembers(pharmacyId),
-          getPharmacyPermissions(pharmacyId),
+        const currentPermissions = await getPharmacyPermissions(pharmacyId);
+        const canViewMembers = Boolean(currentPermissions.member_view);
+        const canViewInvitations = Boolean(
+          currentPermissions.member_view || currentPermissions.member_invite,
+        );
+        const [pageMembers, pageInvitations] = await Promise.all([
+          canViewMembers ? getPharmacyMembers(pharmacyId) : Promise.resolve([]),
+          canViewInvitations
+            ? getPharmacyMemberInvitations(pharmacyId)
+            : Promise.resolve([]),
         ]);
 
         setMembers(pageMembers);
+        setInvitations(pageInvitations);
         setPermissions(currentPermissions);
         setPermissionModalMember(null);
         setDraftPermissions({});
-        setState(pageMembers.length ? "ready" : "empty");
+        setState("ready");
       } catch (error) {
         setErrorMessage(
           error instanceof Error ? error.message : "Impossible de charger les membres.",
@@ -139,6 +149,51 @@ export default function HumanResourcesSettingsPage({
 
     loadMembers();
   }, [pharmacyId]);
+
+  async function refreshInvitations() {
+    if (!pharmacyId) {
+      return;
+    }
+
+    const pageInvitations = await getPharmacyMemberInvitations(pharmacyId);
+    setInvitations(pageInvitations);
+  }
+
+  async function resendInvitation(invitation: PharmacyMemberInvitation) {
+    await runMemberAction("invitation:resend:" + invitation.id, async () => {
+      await resendPharmacyMemberInvitation(pharmacyId, invitation.id);
+      await refreshInvitations();
+      setSuccessMessage("Invitation renvoyée.");
+    });
+  }
+
+  function requestRevokeInvitation(invitation: PharmacyMemberInvitation) {
+    setInvitationToRevoke(invitation);
+    setErrorMessage("");
+    setSuccessMessage("");
+  }
+
+  async function confirmRevokeInvitation() {
+    if (!invitationToRevoke) {
+      return;
+    }
+
+    const actionKey = "invitation:revoke:" + invitationToRevoke.id;
+    setRunningAction(actionKey);
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    try {
+      await revokePharmacyMemberInvitation(pharmacyId, invitationToRevoke.id);
+      await refreshInvitations();
+      setInvitationToRevoke(null);
+      setSuccessMessage("Invitation révoquée.");
+    } catch {
+      setErrorMessage("Impossible de révoquer cette invitation. Veuillez réessayer.");
+    } finally {
+      setRunningAction("");
+    }
+  }
 
   function openPermissionsModal(member: PharmacyMember) {
     setPermissionModalMember(member);
@@ -194,7 +249,7 @@ export default function HumanResourcesSettingsPage({
       if (permissionModalMember?.id === member.id) {
         closePermissionsModal();
       }
-      setState(nextMembers.length ? "ready" : "empty");
+      setState("ready");
       setSuccessMessage("Membre supprimé.");
     });
   }
@@ -266,8 +321,19 @@ export default function HumanResourcesSettingsPage({
               Gérez les rôles, les accès et les permissions des membres de cette pharmacie.
             </p>
           </div>
-          <div className="rounded-lg border border-app-border bg-app-background px-4 py-3 text-sm">
-            <span className="font-semibold text-app-text">{members.length} membre{members.length > 1 ? "s" : ""}</span>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="rounded-lg border border-app-border bg-app-background px-4 py-3 text-sm">
+              <span className="font-semibold text-app-text">{members.length} membre{members.length > 1 ? "s" : ""}</span>
+            </div>
+            {permissions.member_invite && (
+              <button
+                type="button"
+                onClick={() => setIsInvitationDialogOpen(true)}
+                className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-700 focus:outline-none focus:ring-4 focus:ring-primary-200"
+              >
+                Inviter un membre
+              </button>
+            )}
           </div>
         </div>
       </section>
@@ -294,19 +360,48 @@ export default function HumanResourcesSettingsPage({
       )}
 
       {state === "ready" && (
-        <section className="mt-6">
-          <MembersList
-            pharmacyId={pharmacyId}
-            members={members}
-            currentPermissions={permissions}
+        <>
+          <section className="mt-6">
+            <MembersList
+              pharmacyId={pharmacyId}
+              members={members}
+              currentPermissions={permissions}
+              runningAction={runningAction}
+              onChangeRole={changeRole}
+              onSuspend={suspendMember}
+              onDelete={removeMember}
+              onOpenPermissions={openPermissionsModal}
+            />
+          </section>
+          <PendingInvitations
+            invitations={invitations}
+            canManage={Boolean(permissions.member_invite)}
             runningAction={runningAction}
-            onChangeRole={changeRole}
-            onSuspend={suspendMember}
-            onDelete={removeMember}
-            onOpenPermissions={openPermissionsModal}
+            onResend={resendInvitation}
+            onRevoke={requestRevokeInvitation}
           />
-        </section>
+        </>
       )}
+
+      <MemberInvitationDialog
+        open={isInvitationDialogOpen}
+        pharmacyId={pharmacyId}
+        onClose={() => setIsInvitationDialogOpen(false)}
+        onCreated={async () => {
+          await refreshInvitations();
+          setSuccessMessage("Invitation envoyée.");
+        }}
+      />
+
+      <ConfirmDialog
+        open={Boolean(invitationToRevoke)}
+        title="Révoquer cette invitation ?"
+        message={invitationToRevoke ? `${invitationToRevoke.invitedUserDisplayName || invitationToRevoke.invitedEmail} (${invitationToRevoke.invitedEmail}) ne pourra plus utiliser le lien d’invitation actuel pour rejoindre la pharmacie. Rôle proposé : ${roleLabels[invitationToRevoke.role]}.` : ""}
+        confirmLabel="Révoquer l’invitation"
+        loading={Boolean(invitationToRevoke && runningAction === "invitation:revoke:" + invitationToRevoke.id)}
+        onCancel={() => setInvitationToRevoke(null)}
+        onConfirm={confirmRevokeInvitation}
+      />
 
       <PermissionsModal
         member={permissionModalMember}
@@ -325,6 +420,106 @@ export default function HumanResourcesSettingsPage({
         onSave={savePermissions}
       />
     </main>
+  );
+}
+
+function PendingInvitations({
+  invitations,
+  canManage,
+  runningAction,
+  onResend,
+  onRevoke,
+}: {
+  invitations: PharmacyMemberInvitation[];
+  canManage: boolean;
+  runningAction: string;
+  onResend: (invitation: PharmacyMemberInvitation) => void;
+  onRevoke: (invitation: PharmacyMemberInvitation) => void;
+}) {
+  const pendingInvitations = invitations.filter(
+    (invitation) => invitation.status === "PENDING" || invitation.status === "EXPIRED",
+  );
+
+  return (
+    <section className="mt-6 overflow-hidden rounded-lg border border-app-border bg-app-card">
+      <div className="border-b border-app-border px-4 py-3">
+        <h2 className="text-base font-bold text-app-text">Invitations en attente</h2>
+        <p className="mt-1 text-sm text-app-muted">
+          Les invitations ne deviennent des adhésions qu’après acceptation.
+        </p>
+      </div>
+
+      {pendingInvitations.length === 0 ? (
+        <p className="p-4 text-sm text-app-muted">Aucune invitation en attente.</p>
+      ) : (
+        <div className="divide-y divide-app-border">
+          {pendingInvitations.map((invitation) => {
+            const isBusy = runningAction.endsWith(":" + invitation.id);
+            const canResend = invitation.status === "PENDING" || invitation.status === "EXPIRED";
+            const canRevoke = invitation.status === "PENDING";
+
+            return (
+              <article
+                key={invitation.id}
+                className="flex flex-col gap-4 p-4 lg:flex-row lg:items-center lg:justify-between"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-app-text">
+                    {invitation.invitedUserDisplayName || invitation.invitedEmail}
+                  </p>
+                  <p className="mt-1 truncate text-sm text-app-muted">{invitation.invitedEmail}</p>
+                  <p className="mt-2 text-xs text-app-muted">
+                    {roleLabels[invitation.role]} · envoyée le {formatDate(invitation.createdAt) || "Date inconnue"} · expire le {formatDate(invitation.expiresAt) || "Date inconnue"}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <InvitationStatusBadge status={invitation.status} />
+                  {canManage && canResend && (
+                    <button
+                      type="button"
+                      onClick={() => onResend(invitation)}
+                      disabled={isBusy}
+                      className="inline-flex min-h-10 items-center justify-center rounded-md border border-app-border bg-app-surface px-3 py-2 text-sm font-semibold text-app-text transition hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Renvoyer
+                    </button>
+                  )}
+                  {canManage && canRevoke && (
+                    <button
+                      type="button"
+                      onClick={() => onRevoke(invitation)}
+                      disabled={isBusy}
+                      className="inline-flex min-h-10 items-center justify-center rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Révoquer
+                    </button>
+                  )}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function InvitationStatusBadge({ status }: { status: PharmacyMemberInvitation["status"] }) {
+  const labels: Record<PharmacyMemberInvitation["status"], string> = {
+    PENDING: "En attente",
+    ACCEPTED: "Acceptée",
+    DECLINED: "Refusée",
+    REVOKED: "Révoquée",
+    EXPIRED: "Expirée",
+  };
+  const className = status === "EXPIRED"
+    ? "bg-amber-50 text-amber-700 ring-amber-100"
+    : "bg-primary-50 text-primary-700 ring-primary-100";
+
+  return (
+    <span className={"rounded-full px-2.5 py-1 text-xs font-semibold ring-1 " + className}>
+      {labels[status]}
+    </span>
   );
 }
 

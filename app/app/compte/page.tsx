@@ -25,7 +25,7 @@ import {
 } from "@/lib/api/referrals";
 
 type PageState = "loading" | "error" | "ready";
-type PersonalNotificationGroup = "all" | "commissions" | "withdrawals" | "system";
+type PersonalNotificationGroup = "all" | "commissions" | "withdrawals" | "members" | "system";
 
 type ToastState = {
   tone: "success" | "error" | "warning";
@@ -39,6 +39,7 @@ const PERSONAL_NOTIFICATION_CATEGORIES: NotificationCategory[] = [
   "WITHDRAWAL_APPROVED",
   "WITHDRAWAL_REJECTED",
   "WITHDRAWAL_PAID",
+  "MEMBER",
   "SYSTEM",
 ];
 
@@ -59,6 +60,7 @@ const PERSONAL_NOTIFICATION_GROUPS: {
       "WITHDRAWAL_PAID",
     ],
   },
+  { key: "members", label: "Invitations", categories: ["MEMBER"] },
   { key: "system", label: "Système", categories: ["SYSTEM"] },
 ];
 
@@ -312,7 +314,10 @@ function PersonalNotificationsSection({ onToast }: { onToast: (toast: ToastState
         const personalNotifications = dedupeNotifications(
           responses.flatMap((response) => response.results),
         )
-          .filter((notification) => notification.pharmacy_reference === null)
+          .filter(
+            (notification) =>
+              notification.pharmacy_reference === null || notification.category === "MEMBER",
+          )
           .sort(
             (first, second) =>
               new Date(second.created_at).getTime() - new Date(first.created_at).getTime(),
@@ -364,9 +369,9 @@ function PersonalNotificationsSection({ onToast }: { onToast: (toast: ToastState
   return (
     <section className="rounded-lg border border-app-border bg-app-card p-6 shadow-sm">
       <p className="text-sm font-semibold text-primary-700">Notifications personnelles</p>
-      <h2 className="mt-2 text-xl font-bold text-app-text">Commissions et retraits</h2>
+      <h2 className="mt-2 text-xl font-bold text-app-text">Notifications de votre compte</h2>
       <p className="mt-3 text-sm leading-6 text-app-muted">
-        Retrouvez ici les notifications globales de votre compte, sans les événements des pharmacies.
+        Retrouvez ici vos notifications globales, y compris les invitations personnelles à rejoindre une pharmacie.
       </p>
 
       <div className="mt-5 flex flex-wrap gap-2">

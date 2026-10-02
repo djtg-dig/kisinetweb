@@ -1,6 +1,7 @@
 import { dedupeRequest } from "@/lib/api-request-cache";
 import { apiBaseUrl } from "@/lib/carri-account";
 import { apiFetch } from "@/lib/api/request";
+import { getCsrfTokenFromCookie } from "@/lib/csrf-fetch";
 import {
   isAuthorizationDeniedStatus,
   isSessionExpiredStatus,
@@ -137,27 +138,6 @@ export type CreatePharmacyInput = {
   invitedBy?: string;
 };
 
-export type CreatePharmacyJoinRequestInput = {
-  pharmacy: string;
-  requestedRole?: "MANAGER" | "PHARMACIST" | "EMPLOYEE";
-  message?: string;
-};
-
-export type PharmacyJoinRequestSummary = {
-  id?: number;
-  pharmacy?: string;
-  pharmacyName?: string;
-  user?: string;
-  userEmail?: string;
-  requestedRole?: string;
-  message?: string;
-  status?: string;
-  isSeen?: boolean;
-  reviewerEmail?: string;
-  reviewedAt?: string;
-  createdAt?: string;
-};
-
 export type PharmacyLegalDocumentType =
   | "RCCM"
   | "ID_NAT"
@@ -292,9 +272,6 @@ export type PharmacyPermissions = {
   member_suspend?: boolean;
   member_delete?: boolean;
   member_manage_permissions?: boolean;
-  join_request_view?: boolean;
-  join_request_accept?: boolean;
-  join_request_reject?: boolean;
   product_view?: boolean;
   product_create?: boolean;
   product_update?: boolean;
@@ -321,6 +298,42 @@ export type PharmacyPermissions = {
 };
 
 export type PharmacyMemberRole = "OWNER" | "MANAGER" | "PHARMACIST" | "EMPLOYEE";
+
+export type MemberCandidate = {
+  reference: string;
+  email: string;
+  displayName: string;
+};
+
+export type CreateMemberInvitationPayload = {
+  userReference: string;
+  role: Exclude<PharmacyMemberRole, "OWNER">;
+};
+
+export type PharmacyMemberInvitationStatus =
+  | "PENDING"
+  | "ACCEPTED"
+  | "DECLINED"
+  | "REVOKED"
+  | "EXPIRED";
+
+export type PharmacyMemberInvitation = {
+  id: number;
+  pharmacy: string;
+  invitedUserReference: string;
+  invitedUserDisplayName: string;
+  invitedEmail: string;
+  invitedBy: string;
+  invitedByEmail: string;
+  role: Exclude<PharmacyMemberRole, "OWNER">;
+  status: PharmacyMemberInvitationStatus;
+  expiresAt: string;
+  acceptedBy: string | null;
+  acceptedByEmail: string | null;
+  acceptedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
 
 export type PharmacyMember = {
   id: number;
@@ -404,6 +417,13 @@ export async function authenticatedFetch(
 ): Promise<Response> {
   const headers = new Headers(init?.headers);
   headers.delete("Authorization");
+  const method = (init?.method || "GET").toUpperCase();
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
+    const csrfToken = getCsrfTokenFromCookie();
+    if (csrfToken) {
+      headers.set("X-Kisinet-CSRF", csrfToken);
+    }
+  }
 
   const response = await apiFetch(input, {
     ...init,
@@ -617,23 +637,6 @@ function normalizeProduct(item: UnknownRecord): ProductSummary {
   };
 }
 
-function normalizePharmacyJoinRequest(item: UnknownRecord): PharmacyJoinRequestSummary {
-  return {
-    id: item.id === undefined || item.id === null ? undefined : Number(item.id),
-    pharmacy: item.pharmacy === undefined || item.pharmacy === null ? undefined : String(item.pharmacy),
-    pharmacyName: getText(item.pharmacy_name),
-    user: item.user === undefined || item.user === null ? undefined : String(item.user),
-    userEmail: getText(item.user_email),
-    requestedRole: getText(item.requested_role),
-    message: getText(item.message),
-    status: getText(item.status),
-    isSeen: item.is_seen === undefined ? undefined : Boolean(item.is_seen),
-    reviewerEmail: getText(item.reviewer_email),
-    reviewedAt: getText(item.reviewed_at),
-    createdAt: getText(item.created_at),
-  };
-}
-
 function normalizePharmacyLegalDocument(item: UnknownRecord): PharmacyLegalDocument {
   return {
     id: Number(item.id) || 0,
@@ -674,6 +677,34 @@ function normalizePharmacyMember(item: UnknownRecord): PharmacyMember {
       Object.entries(permissions).map(([key, value]) => [key, Boolean(value)]),
     ) as PharmacyPermissions,
     joinedAt: getText(item.joined_at),
+  };
+}
+
+function normalizeMemberCandidate(item: UnknownRecord): MemberCandidate {
+  return {
+    reference: String(item.reference || ""),
+    email: String(item.email || ""),
+    displayName: String(item.display_name || item.email || ""),
+  };
+}
+
+function normalizePharmacyMemberInvitation(item: UnknownRecord): PharmacyMemberInvitation {
+  return {
+    id: Number(item.id),
+    pharmacy: String(item.pharmacy || ""),
+    invitedUserReference: String(item.invited_user_reference || ""),
+    invitedUserDisplayName: String(item.invited_user_display_name || item.invited_email || ""),
+    invitedEmail: String(item.invited_email || ""),
+    invitedBy: String(item.invited_by || ""),
+    invitedByEmail: String(item.invited_by_email || ""),
+    role: String(item.role || "EMPLOYEE") as Exclude<PharmacyMemberRole, "OWNER">,
+    status: String(item.status || "PENDING") as PharmacyMemberInvitationStatus,
+    expiresAt: String(item.expires_at || ""),
+    acceptedBy: item.accepted_by === null || item.accepted_by === undefined ? null : String(item.accepted_by),
+    acceptedByEmail: getText(item.accepted_by_email) ?? null,
+    acceptedAt: getText(item.accepted_at) ?? null,
+    createdAt: String(item.created_at || ""),
+    updatedAt: String(item.updated_at || ""),
   };
 }
 
@@ -1646,61 +1677,86 @@ export async function assignPharmacyMemberPermissions(
   return normalizePharmacyMember((data || {}) as UnknownRecord);
 }
 
-export async function getPharmacyJoinRequests(
-  pharmacyDatabaseId: string,
-): Promise<PharmacyJoinRequestSummary[]> {
+export async function searchPharmacyMemberCandidate(
+  pharmacyId: string,
+  email: string,
+): Promise<MemberCandidate> {
+  const normalizedEmail = email.trim().toLowerCase();
   const data = await fetchApiJson<unknown>(
-    "/api/pharmacies/" + pharmacyDatabaseId + "/join-requests/",
-    "Impossible de charger les notifications.",
+    "/api/pharmacies/" + pharmacyId + "/member-candidates/?email=" + encodeURIComponent(normalizedEmail),
+    "Aucun compte Kisinet n’est associé à cette adresse e-mail.",
+  );
+  return normalizeMemberCandidate((data || {}) as UnknownRecord);
+}
+
+export async function getPharmacyMemberInvitations(
+  pharmacyId: string,
+): Promise<PharmacyMemberInvitation[]> {
+  const data = await fetchApiJson<unknown>(
+    "/api/pharmacies/" + pharmacyId + "/member-invitations/",
+    "Impossible de charger les invitations.",
   );
   const rows = Array.isArray(data) ? data : [];
-
   return rows
     .filter((item: unknown): item is UnknownRecord => Boolean(item) && typeof item === "object")
-    .map(normalizePharmacyJoinRequest)
-    .filter((joinRequest) => Boolean(joinRequest.id));
+    .map(normalizePharmacyMemberInvitation)
+    .filter((invitation) => Boolean(invitation.id));
 }
 
-export async function acceptPharmacyJoinRequest(
-  pharmacyDatabaseId: string,
-  joinRequestId: number,
-): Promise<PharmacyJoinRequestSummary> {
-  const data = await postApiJson<unknown>(
-    "/api/pharmacies/" + pharmacyDatabaseId + "/join-requests/" + joinRequestId + "/accept/",
-    "Impossible d'accepter cette demande.",
+export async function createPharmacyMemberInvitation(
+  pharmacyId: string,
+  input: CreateMemberInvitationPayload,
+): Promise<PharmacyMemberInvitation> {
+  const data = await postJson<unknown>(
+    "/api/pharmacies/" + pharmacyId + "/member-invitations/",
+    "Impossible d’envoyer cette invitation.",
+    { user_reference: input.userReference, role: input.role },
   );
-
-  return data && typeof data === "object"
-    ? normalizePharmacyJoinRequest(data as UnknownRecord)
-    : {};
+  return normalizePharmacyMemberInvitation((data || {}) as UnknownRecord);
 }
 
-export async function rejectPharmacyJoinRequest(
-  pharmacyDatabaseId: string,
-  joinRequestId: number,
-): Promise<PharmacyJoinRequestSummary> {
+export async function revokePharmacyMemberInvitation(
+  pharmacyId: string,
+  invitationId: number,
+): Promise<PharmacyMemberInvitation> {
   const data = await postApiJson<unknown>(
-    "/api/pharmacies/" + pharmacyDatabaseId + "/join-requests/" + joinRequestId + "/reject/",
-    "Impossible de refuser cette demande.",
+    "/api/pharmacies/" + pharmacyId + "/member-invitations/" + invitationId + "/revoke/",
+    "Impossible de révoquer cette invitation.",
   );
-
-  return data && typeof data === "object"
-    ? normalizePharmacyJoinRequest(data as UnknownRecord)
-    : {};
+  return normalizePharmacyMemberInvitation((data || {}) as UnknownRecord);
 }
 
-export async function archivePharmacyJoinRequest(
-  pharmacyDatabaseId: string,
-  joinRequestId: number,
-): Promise<PharmacyJoinRequestSummary> {
+export async function resendPharmacyMemberInvitation(
+  pharmacyId: string,
+  invitationId: number,
+): Promise<PharmacyMemberInvitation> {
   const data = await postApiJson<unknown>(
-    "/api/pharmacies/" + pharmacyDatabaseId + "/join-requests/" + joinRequestId + "/archive/",
-    "Impossible d'archiver cette demande.",
+    "/api/pharmacies/" + pharmacyId + "/member-invitations/" + invitationId + "/resend/",
+    "Impossible de renvoyer cette invitation.",
   );
+  return normalizePharmacyMemberInvitation((data || {}) as UnknownRecord);
+}
 
-  return data && typeof data === "object"
-    ? normalizePharmacyJoinRequest(data as UnknownRecord)
-    : {};
+export async function acceptPharmacyMemberInvitation(
+  token: string,
+): Promise<PharmacyMemberInvitation> {
+  const data = await postJson<unknown>(
+    "/api/pharmacies/member-invitations/accept/",
+    "Impossible d’accepter cette invitation.",
+    { token },
+  );
+  return normalizePharmacyMemberInvitation((data || {}) as UnknownRecord);
+}
+
+export async function declinePharmacyMemberInvitation(
+  token: string,
+): Promise<PharmacyMemberInvitation> {
+  const data = await postJson<unknown>(
+    "/api/pharmacies/member-invitations/decline/",
+    "Impossible de refuser cette invitation.",
+    { token },
+  );
+  return normalizePharmacyMemberInvitation((data || {}) as UnknownRecord);
 }
 
 export async function getPharmacyLegalDocuments(
@@ -1946,42 +2002,4 @@ export async function createPharmacy(input: CreatePharmacyInput): Promise<Pharma
   }
 
   return normalizePharmacy(data as UnknownRecord);
-}
-
-export async function createPharmacyJoinRequest(
-  input: CreatePharmacyJoinRequestInput,
-): Promise<PharmacyJoinRequestSummary> {
-  const payload = {
-    pharmacy: input.pharmacy,
-    requested_role: input.requestedRole || "EMPLOYEE",
-    message: input.message || "",
-  };
-
-  const response = await authenticatedFetch(
-    apiBaseUrl.replace(/\/$/, "") + "/api/pharmacies/join-requests/",
-    {
-      method: "POST",
-      cache: "no-store",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    },
-  );
-
-  const responseText = await response.text();
-  const data = parseJsonResponse(responseText);
-
-  if (!response.ok) {
-    throw new Error(
-      getApiErrorMessage(data, "Impossible d'envoyer cette demande d'adhésion."),
-    );
-  }
-
-  if (!data || typeof data !== "object") {
-    return {};
-  }
-
-  return normalizePharmacyJoinRequest(data as UnknownRecord);
 }

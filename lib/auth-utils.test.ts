@@ -11,5 +11,6 @@ test("buildSafeAuthRedirect accepte seulement les chemins internes", () => {
   );
   assert.equal(buildSafeAuthRedirect("https://example.com"), "/app/select-pharmacy");
   assert.equal(buildSafeAuthRedirect("//example.com"), "/app/select-pharmacy");
+  assert.equal(buildSafeAuthRedirect("/\\example.com"), "/app/select-pharmacy");
   assert.equal(buildSafeAuthRedirect(null), "/app/select-pharmacy");
 });

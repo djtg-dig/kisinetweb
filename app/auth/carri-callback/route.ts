@@ -3,6 +3,7 @@ import "server-only";
 import { NextResponse, type NextRequest } from "next/server";
 import { signedBackendFetch } from "@/lib/server/backend-fetch";
 import { ACCESS_COOKIE_NAME, REFRESH_COOKIE_NAME } from "@/lib/server/cookies";
+import { buildSafeAuthRedirect, AUTH_NEXT_COOKIE_NAME } from "@/lib/auth-utils";
 import { generateCsrfToken, CSRF_COOKIE_NAME } from "@/lib/server/csrf";
 
 const CARRI_HANDOFF_PATH = "/api/carri-account/handoff/consume/";
@@ -59,7 +60,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const redirectUrl = new URL("/app/select-pharmacy", appOrigin);
+    const requestedNext = request.cookies.get(AUTH_NEXT_COOKIE_NAME)?.value;
+    const redirectUrl = new URL(buildSafeAuthRedirect(requestedNext), appOrigin);
     const nextResponse = NextResponse.redirect(redirectUrl);
 
     const isProduction = process.env.NODE_ENV === "production";
@@ -80,6 +82,16 @@ export async function GET(request: NextRequest) {
       httpOnly: true,
       path: "/",
       maxAge: 90 * 24 * 60 * 60,
+      sameSite: "lax",
+      secure: isProduction,
+    });
+
+    nextResponse.cookies.set({
+      name: AUTH_NEXT_COOKIE_NAME,
+      value: "",
+      httpOnly: true,
+      path: "/",
+      maxAge: 0,
       sameSite: "lax",
       secure: isProduction,
     });

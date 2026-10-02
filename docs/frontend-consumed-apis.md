@@ -307,11 +307,6 @@ agrégateur n'est appelée pour le moment.
 
 - `GET /api/pharmacies/public/`
 - `GET /api/pharmacies/public/filter-options/`
-- `POST /api/pharmacies/join-requests/`
-- `GET /api/pharmacies/{pharmacy_pk}/join-requests/`
-- `POST /api/pharmacies/{pharmacy_pk}/join-requests/{join_request_id}/accept/`
-- `POST /api/pharmacies/{pharmacy_pk}/join-requests/{join_request_id}/reject/`
-- `POST /api/pharmacies/{pharmacy_pk}/join-requests/{join_request_id}/archive/`
 - `GET /api/pharmacies/`
 - `POST /api/pharmacies/`
 - `GET /api/pharmacies/{pharmacy_id}/`
@@ -494,115 +489,7 @@ Content-Type: application/json
 }
 ```
 
-### POST /api/pharmacies/join-requests/
-
-- **Objectif** : créer une demande d'adhésion/d'intégration à une pharmacie.
-- **Méthode HTTP** : `POST`
-- **URL** : `/api/pharmacies/join-requests/`
-- **Page frontend** : `/pharmacies/[reference]` (bouton `Devenir employé`)
-- **Service frontend** : `createPharmacyJoinRequest(input)` dans `lib/api`
-- **Authentification** : requise avec `Authorization: Bearer <access_token>`.
-- **Déclenchement UI** : la page détail publique ouvre un modal de demande
-  (`components/pharmacies/join-request-modal.tsx`).
-
-#### Payload envoyé (JSON)
-
-| Champ            | Type   | Obligatoire | Remarque |
-| ---------------- | ------ | ----------- | -------- |
-| `pharmacy`       | string | oui         | Identifiant interne de la pharmacie (`id` renvoyé par l'annuaire public). |
-| `requested_role` | string | non         | `EMPLOYEE`, `PHARMACIST` ou `MANAGER`. Défaut frontend : `EMPLOYEE`. |
-| `message`        | string | non         | Message facultatif, 1000 caractères maximum. |
-
-> Remarque importante : pour cette API, le backend attend l'identifiant interne
-> de la pharmacie dans `pharmacy`, pas la référence publique `PHXXXXXXXX`.
-> C'est pourquoi `GET /api/pharmacies/public/` expose aussi `id`.
-
-#### Réponse attendue (201 Created)
-
-Demande créée avec les informations de suivi disponibles côté backend, notamment
-`id`, `pharmacy`, `pharmacy_name`, `requested_role`, `message` et `status`.
-
-#### Erreurs possibles
-
-- `400 Bad Request` : données invalides, utilisateur déjà membre de la pharmacie,
-  ou demande déjà en attente pour cette pharmacie.
-- `401 Unauthorized` : token d'accès absent ou invalide.
-
-#### Exemple de requête
-
-```http
-POST /api/pharmacies/join-requests/
-Authorization: Bearer <access_token>
-Content-Type: application/json
-
-{
-  "pharmacy": "12",
-  "requested_role": "EMPLOYEE",
-  "message": "Je souhaite rejoindre cette pharmacie."
-}
-```
-
-### GET /api/pharmacies/{pharmacy_pk}/join-requests/
-
-- **Objectif** : lister les demandes d'adhésion visibles par une pharmacie.
-- **Méthode HTTP** : `GET`
-- **URL** : `/api/pharmacies/{pharmacy_pk}/join-requests/`
-- **Page frontend** : `/app/pharmacies/[pharmacyId]/notifications`
-- **Service frontend** : `getPharmacyJoinRequests(pharmacyDatabaseId)` dans `lib/api`
-- **Authentification** : requise avec `Authorization: Bearer <access_token>`.
-- **Permission backend** : propriétaire ou `join_request_view`.
-- **Effet backend** : les demandes non vues sont marquées comme vues.
-- **Réponse attendue (200)** : liste de demandes, avec notamment `id`, `pharmacy`,
-  `pharmacy_name`, `user`, `user_email`, `requested_role`, `message`, `status`,
-  `is_seen`, `reviewer_email`, `reviewed_at`, `created_at`.
-
-> Remarque : ces endpoints management attendent l'identifiant interne numérique
-> de la pharmacie (`pharmacy_pk`). La page frontend part de la référence publique
-> `[pharmacyId]` (`PHXXXXXXXX`), puis récupère l'id interne via
-> `getPublicPharmacyByReference(pharmacyId)`.
-
-### POST /api/pharmacies/{pharmacy_pk}/join-requests/{join_request_id}/accept/
-
-- **Objectif** : accepter une demande d'adhésion en attente.
-- **Méthode HTTP** : `POST`
-- **URL** : `/api/pharmacies/{pharmacy_pk}/join-requests/{join_request_id}/accept/`
-- **Page frontend** : `/app/pharmacies/[pharmacyId]/notifications`
-- **Service frontend** : `acceptPharmacyJoinRequest(pharmacyDatabaseId, joinRequestId)` dans `lib/api`
-- **Authentification** : requise.
-- **Permission backend** : propriétaire ou `join_request_accept`.
-- **Payload** : aucun corps requis.
-- **Réponse attendue (200)** : demande mise à jour avec `status = ACCEPTED`.
-- **Erreurs possibles** : `400 Bad Request` si la demande n'est plus en attente,
-  `401 Unauthorized`, `403 Forbidden`, `404 Not Found`.
-
-### POST /api/pharmacies/{pharmacy_pk}/join-requests/{join_request_id}/reject/
-
-- **Objectif** : refuser une demande d'adhésion en attente.
-- **Méthode HTTP** : `POST`
-- **URL** : `/api/pharmacies/{pharmacy_pk}/join-requests/{join_request_id}/reject/`
-- **Page frontend** : `/app/pharmacies/[pharmacyId]/notifications`
-- **Service frontend** : `rejectPharmacyJoinRequest(pharmacyDatabaseId, joinRequestId)` dans `lib/api`
-- **Authentification** : requise.
-- **Permission backend** : propriétaire ou `join_request_reject`.
-- **Payload** : aucun corps requis.
-- **Réponse attendue (200)** : demande mise à jour avec `status = REJECTED`.
-- **Erreurs possibles** : `400 Bad Request` si la demande n'est plus en attente,
-  `401 Unauthorized`, `403 Forbidden`, `404 Not Found`.
-
-### POST /api/pharmacies/{pharmacy_pk}/join-requests/{join_request_id}/archive/
-
-- **Objectif** : archiver une demande uniquement côté pharmacie.
-- **Méthode HTTP** : `POST`
-- **URL** : `/api/pharmacies/{pharmacy_pk}/join-requests/{join_request_id}/archive/`
-- **Page frontend** : `/app/pharmacies/[pharmacyId]/notifications`
-- **Service frontend** : `archivePharmacyJoinRequest(pharmacyDatabaseId, joinRequestId)` dans `lib/api`
-- **Authentification** : requise.
-- **Permission backend** : propriétaire ou `join_request_view`.
-- **Payload** : aucun corps requis.
-- **Réponse attendue (200)** : demande archivée côté pharmacie.
-- **Comportement frontend** : la carte est retirée de la liste après succès.
-
-### GET /api/pharmacies/{pharmacy_id}/members/
+ ### GET /api/pharmacies/{pharmacy_id}/members/
 
 - **Objectif** : lister les membres d'une pharmacie.
 - **Méthode HTTP** : `GET`
@@ -1350,7 +1237,7 @@ Content-Type: application/json
   restent visibles dans la navigation de la pharmacie, mais ils sont désactivés si
   la permission correspondante n'est pas accordée. `Produits` dépend de
   `product_view`, `Stock` de `stock_view`, `Ventes` de `sale_view`, `Facture` de
-  `sale_view`, et `Notification` de `join_request_view`. L'onglet `Rapports`
+  `sale_view`, et `Notifications` est disponible à tout utilisateur authentifié de la pharmacie. L'onglet `Rapports`
   dépend de la feature de plan `reports` et de la permission `report_view`.
 - **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden`.
 
@@ -1837,8 +1724,10 @@ notification doit être rattachée à la pharmacie courante via
 `pharmacy_reference = <pharmacyId>`.
 
 Les notifications personnelles et globales du compte sont affichées dans
-`/app/compte`, rubrique `Notifications personnelles`, uniquement lorsqu'elles ne
-sont rattachées à aucune pharmacie (`pharmacy_reference = null`).
+`/app/compte`, rubrique `Notifications personnelles`, lorsqu’elles ne sont
+rattachées à aucune pharmacie. Les notifications `MEMBER` y sont aussi visibles
+lorsqu’elles sont liées à une pharmacie : l’invité n’est pas encore membre et doit
+pouvoir ouvrir son invitation depuis son compte.
 
 | Type | Page pharmacie |
 |------|----------------|
@@ -1877,3 +1766,46 @@ sont rattachées à aucune pharmacie (`pharmacy_reference = null`).
 | `MEMBER` | Membres | Événement relié à un membre |
 | `PERMISSION` | Permissions | Modification de permission |
 | `SYSTEM` | Système | Notification système |
+
+## Invitations de membres
+
+Le flux d’adhésion est initié exclusivement par une pharmacie. Une invitation est distincte d’un membre : aucune adhésion ni siège n’est créé avant l’acceptation par le compte Kisinet invité.
+
+| Usage | Méthode et URL | Permission |
+| --- | --- | --- |
+| Rechercher un candidat | `GET /api/pharmacies/{pharmacy_id}/member-candidates/?email=...` | `member_invite` |
+| Lister les invitations | `GET /api/pharmacies/{pharmacy_id}/member-invitations/` | `member_view` ou `member_invite` |
+| Créer une invitation | `POST /api/pharmacies/{pharmacy_id}/member-invitations/` | `member_invite` |
+| Révoquer | `POST /api/pharmacies/{pharmacy_id}/member-invitations/{id}/revoke/` | `member_invite` |
+| Renvoyer | `POST /api/pharmacies/{pharmacy_id}/member-invitations/{id}/resend/` | `member_invite` |
+| Accepter | `POST /api/pharmacies/member-invitations/accept/` | compte invité authentifié |
+| Refuser | `POST /api/pharmacies/member-invitations/decline/` | compte invité authentifié |
+
+### GET /api/pharmacies/{pharmacy_id}/member-candidates/
+
+Recherche exacte, authentifiée et scoppée à une pharmacie. Le query parameter requis est `email`; le frontend le normalise avec `trim().toLowerCase()` avant l’envoi. La réponse `200` ne contient que `reference`, `email` et `display_name`. Une absence de compte retourne `404` avec le code `user_not_found`.
+
+### GET /api/pharmacies/{pharmacy_id}/member-invitations/
+
+La page RH utilise `getPharmacyMemberInvitations(pharmacyId)` pour afficher les invitations séparément des membres. Chaque invitation contient notamment `id`, `pharmacy`, `invited_user_reference`, `invited_user_display_name`, `invited_email`, `invited_by`, `invited_by_email`, `role`, `status`, `expires_at`, `accepted_by`, `accepted_by_email`, `accepted_at`, `created_at` et `updated_at`.
+
+### POST /api/pharmacies/{pharmacy_id}/member-invitations/
+
+`createPharmacyMemberInvitation(pharmacyId, { userReference, role })` envoie uniquement :
+
+```json
+{
+  "user_reference": "USXXXXXXXX",
+  "role": "PHARMACIST"
+}
+```
+
+Les rôles autorisés sont `MANAGER`, `PHARMACIST` et `EMPLOYEE`; `OWNER` est interdit. L’utilisateur doit déjà exister dans Kisinet. Le backend refuse notamment une référence inconnue, une auto-invitation, le propriétaire, un membre actif et un doublon PENDING.
+
+### Actions sur une invitation
+
+`revokePharmacyMemberInvitation()` appelle `/revoke/` et `resendPharmacyMemberInvitation()` appelle `/resend/`. Elles rechargent la liste après succès. Le renvoi remplace le token précédent; aucun token n’est conservé ou affiché par le frontend de gestion.
+
+### Acceptation ou refus public
+
+La route frontend publique est `/invitations/accept?token=...`. Après authentification Carri Account, elle appelle respectivement `acceptPharmacyMemberInvitation(token)` ou `declinePharmacyMemberInvitation(token)`. Le token reste dans l’URL et, pendant le passage OAuth, dans un cookie HttpOnly de dix minutes strictement limité à un chemin interne validé. Il n’est jamais stocké dans localStorage, IndexedDB ou un cookie durable.

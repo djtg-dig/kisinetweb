@@ -35,18 +35,11 @@ const permissionGroups = [
     title: "Membres",
     permissions: [
       ["member_view", "Voir les membres"],
+      ["member_invite", "Inviter des membres"],
       ["member_update", "Modifier les membres"],
       ["member_suspend", "Suspendre les membres"],
       ["member_delete", "Supprimer les membres"],
       ["member_manage_permissions", "Gérer les permissions"],
-    ],
-  },
-  {
-    title: "Demandes",
-    permissions: [
-      ["join_request_view", "Voir les demandes"],
-      ["join_request_accept", "Accepter les demandes"],
-      ["join_request_reject", "Refuser les demandes"],
     ],
   },
   {

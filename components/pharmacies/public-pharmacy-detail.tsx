@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { JoinRequestModal } from "@/components/pharmacies/join-request-modal";
 import type { PharmacySummary } from "@/lib/api";
-import { ensureCsrfToken } from "@/lib/auth";
 import {
   buildLocationLabel,
   buildPublicPharmacyIntro,
@@ -14,9 +12,7 @@ type PublicPharmacyDetailProps = {
 };
 
 export function PublicPharmacyDetail({ pharmacy }: PublicPharmacyDetailProps) {
-  const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
   const [loginToast, setLoginToast] = useState("");
-  const [checkingSession, setCheckingSession] = useState(false);
   const intro = buildPublicPharmacyIntro(pharmacy);
   const location = buildLocationLabel(pharmacy, { includeNeighborhood: true });
   const hasContactDetails = Boolean(pharmacy.email || pharmacy.phoneNumber);
@@ -42,28 +38,6 @@ export function PublicPharmacyDetail({ pharmacy }: PublicPharmacyDetailProps) {
 
     return () => clearTimeout(timer);
   }, [loginToast]);
-
-  async function openJoinRequest() {
-    setCheckingSession(true);
-    try {
-      const response = await fetch("/api/auth/session", {
-        cache: "no-store",
-        credentials: "include",
-      });
-      const data = (await response.json()) as { authenticated?: boolean };
-      if (!data.authenticated) {
-        setLoginToast("Veuillez d'abord vous connecter.");
-        return;
-      }
-
-      await ensureCsrfToken();
-      setIsJoinModalOpen(true);
-    } catch {
-      setLoginToast("Veuillez d'abord vous connecter.");
-    } finally {
-      setCheckingSession(false);
-    }
-  }
 
   return (
     <>
@@ -100,22 +74,6 @@ export function PublicPharmacyDetail({ pharmacy }: PublicPharmacyDetailProps) {
                 )}
               </div>
 
-              <div className="rounded-lg border border-app-border bg-app-card p-5 shadow-soft">
-                <p className="text-sm font-semibold text-app-text">
-                  Rejoindre cette pharmacie
-                </p>
-                <p className="mt-2 text-sm leading-6 text-app-muted">
-                  Envoyez une demande d'intégration à l'équipe de cette pharmacie.
-                </p>
-                <button
-                  type="button"
-                  onClick={openJoinRequest}
-                  disabled={checkingSession}
-                  className="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-md bg-success-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-success-800 focus:outline-none focus:ring-4 focus:ring-success-100 disabled:cursor-not-allowed disabled:opacity-70"
-                >
-                  {checkingSession ? "Vérification..." : "Devenir employé"}
-                </button>
-              </div>
             </div>
           </div>
         </section>
@@ -159,10 +117,6 @@ export function PublicPharmacyDetail({ pharmacy }: PublicPharmacyDetailProps) {
         </section>
       </main>
 
-      <JoinRequestModal
-        pharmacy={isJoinModalOpen ? pharmacy : null}
-        onClose={() => setIsJoinModalOpen(false)}
-      />
     </>
   );
 }

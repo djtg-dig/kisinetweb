@@ -53,14 +53,6 @@ const permissionGroups = [
     ],
   },
   {
-    title: "Demandes",
-    permissions: [
-      ["join_request_view", "Voir les demandes"],
-      ["join_request_accept", "Accepter les demandes"],
-      ["join_request_reject", "Refuser les demandes"],
-    ],
-  },
-  {
     title: "Abonnement",
     permissions: [
       ["subscription_pay", "Payer l'abonnement"],

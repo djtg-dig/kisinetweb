@@ -41,12 +41,12 @@ async function loadRoute() {
   return "GET" in routeModule ? routeModule : routeModule.default;
 }
 
-function makeRequest(url: string): TestRequest {
+function makeRequest(url: string, cookies: Record<string, string> = {}): TestRequest {
   return {
     method: "GET",
     headers: new Headers(),
     nextUrl: new URL(url),
-    cookies: { get: () => undefined },
+    cookies: { get: (name: string) => cookies[name] ? { value: cookies[name] } : undefined },
     url,
   };
 }
@@ -148,6 +148,36 @@ describe("/auth/carri-callback route handler", () => {
     assert.ok(cookies.get("kisinet_access"));
     assert.ok(cookies.get("kisinet_refresh"));
     assert.ok(cookies.get("kisinet_csrf"));
+  });
+
+  test("restaure un next interne valide puis supprime le cookie temporaire", async () => {
+    const route = await loadRoute();
+    mockFetch(Response.json({ access: "kaccess", refresh: "krefresh" }));
+
+    const response = await route.GET(
+      makeRequest("http://next.test/auth/carri-callback?handoff=opaque-token", {
+        kisinet_auth_next: "/invitations/accept?token=opaque-token",
+      }) as never,
+    );
+
+    assert.equal(
+      response.headers.get("location"),
+      "http://next.test/invitations/accept?token=opaque-token",
+    );
+    assert.ok(readSetCookies(response).has("kisinet_auth_next"));
+  });
+
+  test("ignore un next externe puis supprime le cookie temporaire", async () => {
+    const route = await loadRoute();
+    mockFetch(Response.json({ access: "kaccess", refresh: "krefresh" }));
+
+    const response = await route.GET(
+      makeRequest("http://next.test/auth/carri-callback?handoff=opaque-token", {
+        kisinet_auth_next: "https://evil.example",
+      }) as never,
+    );
+
+    assert.equal(response.headers.get("location"), "http://next.test/app/select-pharmacy");
   });
 
   test("sur 502 backend, redirige vers /auth/carri?error=callback_failed", async () => {
