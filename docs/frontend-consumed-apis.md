@@ -1077,6 +1077,8 @@ Content-Type: application/json
   3. appel `POST /api/sales/vision/` (multipart : `pharmacy_reference` + `image`)
      via `analyzePrescription(pharmacyId, file)` pendant l'affichage d'un spinner et
      d'un compteur de secondes ;
+     le BFF initialise si nécessaire le cookie `kisinet_csrf` puis envoie le header
+     `X-Kisinet-CSRF` correspondant avec les cookies de session.
   4. pour chaque médicament détecté (`medications[].raw_name`), le frontend recherche
      le produit correspondant via `searchSaleProducts` et l'ajoute au brouillon
      (`addProduct`). Les médicaments sans correspondance dans le stock sont signalés.

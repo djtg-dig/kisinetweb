@@ -33,6 +33,9 @@ export const CREDIT_EXHAUSTED_MESSAGE =
 export const AI_UNAVAILABLE_MESSAGE =
   "Le service d'analyse IA est temporairement indisponible. Veuillez réessayer plus tard.";
 
+export const CSRF_ERROR_MESSAGE =
+  "Votre session de sécurité doit être actualisée. Veuillez réessayer.";
+
 // Message unique et professionnel affiché à l'utilisateur lorsque le backend
 // (ou le réseau) est injoignable. Aucun détail technique n'y figure.
 export const NETWORK_ERROR_MESSAGE =
@@ -103,6 +106,8 @@ export function describeApiError(error: unknown): string {
         // Message générique : on n'expose jamais le détail d'infrastructure
         // (quota, RESOURCE_EXHAUSTED…) à l'utilisateur.
         return AI_UNAVAILABLE_MESSAGE;
+      case "csrf_failed":
+        return CSRF_ERROR_MESSAGE;
       case "PRESCRIPTION_ANALYSIS_FAILED":
         // Erreur fonctionnelle : on affiche le message métier du backend.
         return error.message || "L'analyse de l'ordonnance a échoué.";

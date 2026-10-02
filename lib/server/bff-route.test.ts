@@ -135,6 +135,18 @@ describe("BFF /api/backend route handler", () => {
     }
   });
 
+  test("refuse une mutation sans header CSRF, sans appeler Django", async () => {
+    const route = await loadRoute();
+    const calls = mockBackend(() => Response.json({ ok: true }));
+    const request = makeRequest("POST", "http://next.test/api/backend/api/sales/vision/", new Uint8Array(), VALID_COOKIES);
+    request.headers.set("origin", "http://localhost:3000");
+
+    const response = await route.POST(request as never, routeContext(["api", "sales", "vision"]) as never);
+
+    assert.equal(response.status, 403);
+    assert.equal(calls.length, 0);
+  });
+
   test("préserve les erreurs JSON utiles du backend", async () => {
     const route = await loadRoute();
     const statuses = [400, 403, 404, 422, 429, 500];

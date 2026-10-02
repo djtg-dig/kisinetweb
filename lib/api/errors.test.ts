@@ -57,6 +57,12 @@ test("CAS 4 : PRESCRIPTION_ANALYSIS_FAILED (422) affiche le message fonctionnel 
   assert.doesNotMatch(message, new RegExp(CREDIT_TEXT));
 });
 
+test("CAS 4b : csrf_failed (403) n'est pas affiché comme une panne réseau", () => {
+  const message = describeApiError(new ApiError("CSRF validation failed.", "csrf_failed", 403));
+  assert.equal(message, "Votre session de sécurité doit être actualisée. Veuillez réessayer.");
+  assert.notEqual(message, "Impossible de contacter le serveur.");
+});
+
 test("CAS 5a : 429 (rate_limited) n'affiche PAS de message de crédits", () => {
   const error = new ApiError(
     "Trop de tentatives. Veuillez patienter avant de réessayer.",

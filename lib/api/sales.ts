@@ -6,6 +6,7 @@ import {
   type ProductSummary,
 } from "@/lib/api";
 import { apiBaseUrl } from "@/lib/carri-account";
+import { ensureCsrfToken } from "@/lib/auth";
 import { ApiError } from "./errors";
 
 // Renvoie le code d'erreur API éventuel porté par la réponse backend.
@@ -135,14 +136,18 @@ export async function analyzePrescription(
   form.append("pharmacy_reference", pharmacyId);
   form.append("image", image);
 
+  const csrfToken = await ensureCsrfToken();
+
   const response = await apiFetch(apiBaseUrl.replace(/\/$/, "") + "/api/sales/vision/", {
     method: "POST",
     cache: "no-store",
     headers: {
       Accept: "application/json",
+      ...(csrfToken ? { "X-Kisinet-CSRF": csrfToken } : {}),
     },
     body: form,
     signal,
+    credentials: "include",
   });
 
   const responseText = await response.text();
