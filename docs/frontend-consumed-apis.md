@@ -1778,6 +1778,7 @@ Le flux d’adhésion est initié exclusivement par une pharmacie. Une invitatio
 | Créer une invitation | `POST /api/pharmacies/{pharmacy_id}/member-invitations/` | `member_invite` |
 | Révoquer | `POST /api/pharmacies/{pharmacy_id}/member-invitations/{id}/revoke/` | `member_invite` |
 | Renvoyer | `POST /api/pharmacies/{pharmacy_id}/member-invitations/{id}/resend/` | `member_invite` |
+| Prévisualiser | `GET /api/pharmacies/member-invitations/preview/?token=...` | compte authentifié ; données minimales et comparaison du compte courant |
 | Accepter | `POST /api/pharmacies/member-invitations/accept/` | compte invité authentifié |
 | Refuser | `POST /api/pharmacies/member-invitations/decline/` | compte invité authentifié |
 
@@ -1805,6 +1806,10 @@ Les rôles autorisés sont `MANAGER`, `PHARMACIST` et `EMPLOYEE`; `OWNER` est in
 ### Actions sur une invitation
 
 `revokePharmacyMemberInvitation()` appelle `/revoke/` et `resendPharmacyMemberInvitation()` appelle `/resend/`. Elles rechargent la liste après succès. Le renvoi remplace le token précédent; aucun token n’est conservé ou affiché par le frontend de gestion.
+
+### Prévisualisation publique après connexion
+
+`getPharmacyMemberInvitationPreview(token)` appelle `GET /api/pharmacies/member-invitations/preview/?token=...` après authentification. La réponse contient seulement `pharmacy_name`, le rôle et son libellé, l’expiration, l’e-mail invité, l’e-mail du compte courant, le statut et `is_current_user`; elle ne contient ni hash ni token. La page d’acceptation affiche ces deux adresses et désactive accept/refuse lorsque le compte courant ne correspond pas.
 
 ### Acceptation ou refus public
 

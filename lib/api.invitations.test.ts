@@ -6,6 +6,7 @@ import {
   createPharmacyMemberInvitation,
   declinePharmacyMemberInvitation,
   getPharmacyMemberInvitations,
+  getPharmacyMemberInvitationPreview,
   resendPharmacyMemberInvitation,
   revokePharmacyMemberInvitation,
   searchPharmacyMemberCandidate,
@@ -105,5 +106,59 @@ describe("client API invitations membres", () => {
     assert.deepEqual(JSON.parse(String(actionCalls[2]?.init?.body)), {
       token: "token-secure-1234567890",
     });
+  });
+
+  test("prévisualise une invitation sans exposer de token", async () => {
+    const calls = mockApiResponse({
+      pharmacy_name: "Pharmacie Lajoie",
+      invited_email: "marie@example.com",
+      current_user_email: "marie@example.com",
+      role: "PHARMACIST",
+      role_display: "Pharmacien",
+      status: "PENDING",
+      expires_at: "2026-10-10T12:00:00Z",
+      is_current_user: true,
+    });
+
+    const preview = await getPharmacyMemberInvitationPreview("token-secure-1234567890");
+
+    assert.deepEqual(preview, {
+      pharmacyName: "Pharmacie Lajoie",
+      invitedEmail: "marie@example.com",
+      currentUserEmail: "marie@example.com",
+      role: "PHARMACIST",
+      roleDisplay: "Pharmacien",
+      status: "PENDING",
+      expiresAt: "2026-10-10T12:00:00Z",
+      isCurrentUser: true,
+    });
+    assert.equal(
+      calls[0]?.url,
+      "/api/backend/api/pharmacies/member-invitations/preview/?token=token-secure-1234567890",
+    );
+  });
+
+  test("conserve le détail métier 403 pour un autre compte", async () => {
+    setApiFetchImpl(async () => Response.json(
+      { detail: "Cette invitation est destinée à une autre adresse email." },
+      { status: 403 },
+    ));
+
+    await assert.rejects(
+      () => acceptPharmacyMemberInvitation("token-secure-1234567890"),
+      /Cette invitation est destinée à une autre adresse email/,
+    );
+  });
+
+  test("conserve le détail CSRF 403 lors d’un refus", async () => {
+    setApiFetchImpl(async () => Response.json(
+      { code: "csrf_failed", detail: "CSRF validation failed." },
+      { status: 403 },
+    ));
+
+    await assert.rejects(
+      () => declinePharmacyMemberInvitation("token-secure-1234567890"),
+      /CSRF validation failed/,
+    );
   });
 });

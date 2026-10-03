@@ -317,6 +317,17 @@ export type PharmacyMemberInvitationStatus =
   | "REVOKED"
   | "EXPIRED";
 
+export type PharmacyMemberInvitationPreview = {
+  pharmacyName: string;
+  invitedEmail: string;
+  currentUserEmail: string;
+  role: Exclude<PharmacyMemberRole, "OWNER">;
+  roleDisplay: string;
+  status: PharmacyMemberInvitationStatus;
+  expiresAt: string;
+  isCurrentUser: boolean;
+};
+
 export type PharmacyMemberInvitation = {
   id: number;
   pharmacy: string;
@@ -411,9 +422,14 @@ export class ApiAuthorizationError extends Error {
   }
 }
 
+type AuthenticatedFetchOptions = {
+  preserveErrorStatuses?: number[];
+};
+
 export async function authenticatedFetch(
   input: RequestInfo,
   init?: RequestInit,
+  options?: AuthenticatedFetchOptions,
 ): Promise<Response> {
   const headers = new Headers(init?.headers);
   headers.delete("Authorization");
@@ -430,7 +446,7 @@ export async function authenticatedFetch(
     headers,
   });
 
-  if (isAuthorizationDeniedStatus(response.status)) {
+  if (isAuthorizationDeniedStatus(response.status) && !options?.preserveErrorStatuses?.includes(response.status)) {
     throw new ApiAuthorizationError();
   }
 
@@ -688,6 +704,19 @@ function normalizeMemberCandidate(item: UnknownRecord): MemberCandidate {
   };
 }
 
+function normalizePharmacyMemberInvitationPreview(item: UnknownRecord): PharmacyMemberInvitationPreview {
+  return {
+    pharmacyName: String(item.pharmacy_name || ""),
+    invitedEmail: String(item.invited_email || ""),
+    currentUserEmail: String(item.current_user_email || ""),
+    role: String(item.role || "EMPLOYEE") as Exclude<PharmacyMemberRole, "OWNER">,
+    roleDisplay: String(item.role_display || item.role || ""),
+    status: String(item.status || "PENDING") as PharmacyMemberInvitationStatus,
+    expiresAt: String(item.expires_at || ""),
+    isCurrentUser: Boolean(item.is_current_user),
+  };
+}
+
 function normalizePharmacyMemberInvitation(item: UnknownRecord): PharmacyMemberInvitation {
   return {
     id: Number(item.id),
@@ -863,6 +892,7 @@ async function postJson<T>(
   path: string,
   fallbackMessage: string,
   body?: unknown,
+  options?: AuthenticatedFetchOptions,
 ): Promise<T> {
   const response = await authenticatedFetch(apiBaseUrl.replace(/\/$/, "") + path, {
     method: "POST",
@@ -872,7 +902,7 @@ async function postJson<T>(
       "Content-Type": "application/json",
     },
     body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  }, options);
 
   const responseText = await response.text();
   const data = parseJsonResponse(responseText);
@@ -1737,6 +1767,16 @@ export async function resendPharmacyMemberInvitation(
   return normalizePharmacyMemberInvitation((data || {}) as UnknownRecord);
 }
 
+export async function getPharmacyMemberInvitationPreview(
+  token: string,
+): Promise<PharmacyMemberInvitationPreview> {
+  const data = await fetchApiJson<unknown>(
+    "/api/pharmacies/member-invitations/preview/?token=" + encodeURIComponent(token),
+    "Impossible de charger cette invitation.",
+  );
+  return normalizePharmacyMemberInvitationPreview((data || {}) as UnknownRecord);
+}
+
 export async function acceptPharmacyMemberInvitation(
   token: string,
 ): Promise<PharmacyMemberInvitation> {
@@ -1744,6 +1784,7 @@ export async function acceptPharmacyMemberInvitation(
     "/api/pharmacies/member-invitations/accept/",
     "Impossible d’accepter cette invitation.",
     { token },
+    { preserveErrorStatuses: [403] },
   );
   return normalizePharmacyMemberInvitation((data || {}) as UnknownRecord);
 }
@@ -1755,6 +1796,7 @@ export async function declinePharmacyMemberInvitation(
     "/api/pharmacies/member-invitations/decline/",
     "Impossible de refuser cette invitation.",
     { token },
+    { preserveErrorStatuses: [403] },
   );
   return normalizePharmacyMemberInvitation((data || {}) as UnknownRecord);
 }

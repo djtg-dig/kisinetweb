@@ -29,13 +29,15 @@ export function clearActivePharmacyId() {
   localStorage.removeItem(ACTIVE_PHARMACY_KEY);
 }
 
-export function logout() {
+export function logout(): void;
+export function logout(redirectTo: string): void;
+export function logout(redirectTo = "/") {
   if (typeof window === "undefined") {
     return;
   }
   void callServerLogout();
   clearLocalSession();
-  window.location.href = "/";
+  window.location.href = buildSafeAuthRedirect(redirectTo);
 }
 
 export function subscribeToAuthChanges(callback: () => void) {
