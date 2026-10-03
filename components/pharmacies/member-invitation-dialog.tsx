@@ -193,6 +193,9 @@ function getInvitationCreationErrorMessage(error: unknown): string {
   if (/invitation en attente/i.test(message)) {
     return "Une invitation est déjà en attente pour cette personne.";
   }
+  if (/souscrire la pharmacie à un abonnement.*ajouter des membres/i.test(message)) {
+    return message;
+  }
   if (/permission|autorisation/i.test(message)) {
     return "Vous n’avez pas la permission d’envoyer cette invitation.";
   }

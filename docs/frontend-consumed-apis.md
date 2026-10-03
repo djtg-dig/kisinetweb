@@ -1803,6 +1803,8 @@ La page RH utilise `getPharmacyMemberInvitations(pharmacyId)` pour afficher les 
 
 Les rôles autorisés sont `MANAGER`, `PHARMACIST` et `EMPLOYEE`; `OWNER` est interdit. L’utilisateur doit déjà exister dans Kisinet. Le backend refuse notamment une référence inconnue, une auto-invitation, le propriétaire, un membre actif et un doublon PENDING.
 
+Pendant l'essai gratuit actif, création et renvoi retournent `400` avec le détail `Veuillez souscrire la pharmacie à un abonnement pour ajouter des membres à son effectif.`. Le frontend l'affiche, conserve le dialogue ouvert et ne signale ni création ni renvoi comme réussi. Pour le renvoi, aucun token ni expiration n'est modifié côté backend.
+
 ### Actions sur une invitation
 
 `revokePharmacyMemberInvitation()` appelle `/revoke/` et `resendPharmacyMemberInvitation()` appelle `/resend/`. Elles rechargent la liste après succès. Le renvoi remplace le token précédent; aucun token n’est conservé ou affiché par le frontend de gestion.
