@@ -928,7 +928,7 @@ Content-Type: application/json
 - `POST /api/sales/`
 - `GET /api/sales/?pharmacy_reference={pharmacy_id}`
 - `POST /api/sales/vision/` (analyse d'ordonnance, multipart `pharmacy_reference` + `image`)
-- `POST /api/sales/prescription-captures/` (sauvegarde de l'image d'ordonnance capturée, multipart `pharmacy` (optionnel) + `image`)
+- `POST /api/sales/prescription-captures/` (sauvegarde de l'image d'ordonnance capturée, multipart `pharmacy_reference` optionnel + `image`)
 
 ### Page `/app/pharmacies/{pharmacy_id}/sales/create`
 
@@ -966,6 +966,8 @@ Content-Type: application/json
      d'un compteur de secondes ;
      le BFF initialise si nécessaire le cookie `kisinet_csrf` puis envoie le header
      `X-Kisinet-CSRF` correspondant avec les cookies de session.
+     Une réponse JSON, HTML, vide, réseau ou `502`/`503`/`504` est affichée comme
+     une indisponibilité temporaire de l'analyse IA, sans exposer le message du proxy.
   4. pour chaque médicament détecté (`medications[].raw_name`), le frontend recherche
      le produit correspondant via `searchSaleProducts` et l'ajoute au brouillon
      (`addProduct`). Les médicaments sans correspondance dans le stock sont signalés.

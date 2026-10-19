@@ -116,6 +116,18 @@ async function proxyBackendRequest(request: NextRequest, context: RouteContext):
       console.info("[BFF] " + method + " " + backendPath + " -> " + response.status);
     }
 
+    // Les erreurs sont bufferisees avant d'etre renvoyees. Cela preserve le
+    // corps JSON Django et evite de propager au navigateur un flux amont
+    // interrompu (que Cloudflare afficherait comme une page technique).
+    if (!response.ok) {
+      const bodyBytes = method === "HEAD" ? null : await response.arrayBuffer();
+      return new NextResponse(bodyBytes, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: filterResponseHeaders(response.headers),
+      });
+    }
+
     return new Response(method === "HEAD" ? null : response.body, {
       status: response.status,
       statusText: response.statusText,

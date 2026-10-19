@@ -149,7 +149,7 @@ describe("BFF /api/backend route handler", () => {
 
   test("préserve les erreurs JSON utiles du backend", async () => {
     const route = await loadRoute();
-    const statuses = [400, 403, 404, 422, 429, 500];
+    const statuses = [400, 403, 404, 422, 429, 500, 502, 503, 504];
 
     for (const status of statuses) {
       mockBackend(() =>
@@ -164,6 +164,23 @@ describe("BFF /api/backend route handler", () => {
       assert.equal(response.status, status);
       assert.deepEqual(data, { code: "backend_code", detail: "Erreur backend" });
     }
+  });
+
+  test("préserve une réponse HTML d'erreur complète sans interrompre le proxy", async () => {
+    const route = await loadRoute();
+    mockBackend(() => new Response("<html><body>proxy failure</body></html>", {
+      status: 502,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    }));
+
+    const response = await route.GET(
+      makeRequest("GET", "http://next.test/api/backend/api/test/", new Uint8Array(), VALID_COOKIES) as never,
+      routeContext(["api", "test"]) as never,
+    );
+
+    assert.equal(response.status, 502);
+    assert.equal(response.headers.get("Content-Type"), "text/html; charset=utf-8");
+    assert.equal(await response.text(), "<html><body>proxy failure</body></html>");
   });
 
   test("lit l'access token depuis le cookie et ne fait pas confiance à Authorization navigateur", async () => {

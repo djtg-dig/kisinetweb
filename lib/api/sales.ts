@@ -7,7 +7,7 @@ import {
 } from "@/lib/api";
 import { apiBaseUrl } from "@/lib/carri-account";
 import { ensureCsrfToken } from "@/lib/auth";
-import { ApiError } from "./errors";
+import { AI_UNAVAILABLE_MESSAGE, ApiError } from "./errors";
 
 // Renvoie le code d'erreur API éventuel porté par la réponse backend.
 function extractErrorCode(data: unknown): string | undefined {
@@ -138,25 +138,50 @@ export async function analyzePrescription(
 
   const csrfToken = await ensureCsrfToken();
 
-  const response = await apiFetch(apiBaseUrl.replace(/\/$/, "") + "/api/sales/vision/", {
-    method: "POST",
-    cache: "no-store",
-    headers: {
-      Accept: "application/json",
-      ...(csrfToken ? { "X-Kisinet-CSRF": csrfToken } : {}),
-    },
-    body: form,
-    signal,
-    credentials: "include",
-  });
+  let response: Response;
+  try {
+    response = await apiFetch(apiBaseUrl.replace(/\/$/, "") + "/api/sales/vision/", {
+      method: "POST",
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+        ...(csrfToken ? { "X-Kisinet-CSRF": csrfToken } : {}),
+      },
+      body: form,
+      signal,
+      credentials: "include",
+    });
+  } catch {
+    // Le repli s'applique uniquement au scan : une panne reseau/proxy ne doit
+    // jamais afficher un document HTML ou un message Cloudflare au pharmacien.
+    throw new ApiError(AI_UNAVAILABLE_MESSAGE, "AI_PROVIDER_ERROR");
+  }
 
-  const responseText = await response.text();
+  let responseText: string;
+  try {
+    responseText = await response.text();
+  } catch {
+    // Un corps interrompu par un proxy/edge est traité comme une panne
+    // temporaire de l'analyse, sans jamais rendre son contenu technique.
+    throw new ApiError(AI_UNAVAILABLE_MESSAGE, "AI_PROVIDER_ERROR");
+  }
   const data = parseJsonResponse(responseText);
 
   if (!response.ok) {
+    const backendCode = extractErrorCode(data);
+    const isTransientAnalysisFailure = [502, 503, 504].includes(response.status);
+    const isKnownAiFailure =
+      backendCode === "AI_PROVIDER_ERROR" || backendCode === "AI_SERVICE_UNAVAILABLE";
+    const normalizedAiCode = isKnownAiFailure
+      ? backendCode
+      : isTransientAnalysisFailure
+        ? "AI_PROVIDER_ERROR"
+        : undefined;
     throw new ApiError(
-      getApiErrorMessage(data, "Impossible d'analyser l'ordonnance."),
-      extractErrorCode(data),
+      normalizedAiCode
+        ? AI_UNAVAILABLE_MESSAGE
+        : getApiErrorMessage(data, "Impossible d'analyser l'ordonnance."),
+      normalizedAiCode || backendCode,
       response.status,
     );
   }
@@ -180,8 +205,10 @@ export async function uploadPrescriptionCapture(
   image: Blob,
 ): Promise<void> {
   const form = new FormData();
-  form.append("pharmacy", pharmacyId);
+  form.append("pharmacy_reference", pharmacyId);
   form.append("image", image);
+
+  const csrfToken = await ensureCsrfToken();
 
   const response = await apiFetch(
     apiBaseUrl.replace(/\/$/, "") + "/api/sales/prescription-captures/",
@@ -190,8 +217,10 @@ export async function uploadPrescriptionCapture(
       cache: "no-store",
       headers: {
         Accept: "application/json",
+        ...(csrfToken ? { "X-Kisinet-CSRF": csrfToken } : {}),
       },
       body: form,
+      credentials: "include",
     },
   );
 
