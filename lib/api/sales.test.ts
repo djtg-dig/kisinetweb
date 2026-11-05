@@ -2,7 +2,7 @@ import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
 
 import { ApiError, AI_UNAVAILABLE_MESSAGE, describeApiError } from "./errors.ts";
-import { analyzePrescription, uploadPrescriptionCapture } from "./sales.ts";
+import { analyzePrescription, createSale, uploadPrescriptionCapture } from "./sales.ts";
 import { setApiFetchImpl } from "./request.ts";
 
 const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
@@ -111,4 +111,33 @@ test("la capture transmet la référence de pharmacie et le CSRF", async () => {
   assert.equal((request?.body as FormData).get("pharmacy"), null);
   assert.equal(new Headers(request?.headers).get("X-Kisinet-CSRF"), "a".repeat(64));
   assert.equal(request?.credentials, "include");
+});
+
+test("la création de vente transmet le CSRF et les cookies de session", async () => {
+  const calls: RequestInit[] = [];
+  Object.defineProperty(globalThis, "window", { value: {}, configurable: true });
+  Object.defineProperty(globalThis, "document", {
+    value: { cookie: "kisinet_csrf=" + "b".repeat(64) },
+    configurable: true,
+  });
+  setApiFetchImpl(async (_input, init) => {
+    calls.push(init ?? {});
+    return Response.json({ reference: "SA123", pharmacy: "PH12345678", items: [] }, { status: 201 });
+  });
+
+  await createSale({
+    pharmacyReference: "PH12345678",
+    items: [{ productReference: "PR123", quantity: 1, unitPrice: 12 }],
+  });
+
+  const request = calls[0];
+  assert.equal(new Headers(request?.headers).get("X-Kisinet-CSRF"), "b".repeat(64));
+  assert.equal(request?.credentials, "include");
+  assert.deepEqual(JSON.parse(String(request?.body)), {
+    pharmacy: "PH12345678",
+    customer_name: "",
+    customer_phone: "",
+    discount_amount: "0",
+    items: [{ pharmacy: "PH12345678", product: "PR123", quantity: 1 }],
+  });
 });

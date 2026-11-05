@@ -269,14 +269,21 @@ export async function createSale(payload: CreateSalePayload): Promise<CreatedSal
     })),
   };
 
+  // Le BFF exige le double-submit CSRF pour chaque mutation. Cette vente
+  // utilisait jusqu'ici apiFetch directement, contrairement aux autres POST
+  // de ce module, et omettait donc le jeton et les cookies de session.
+  const csrfToken = await ensureCsrfToken();
+
   const response = await apiFetch(apiBaseUrl.replace(/\/$/, "") + "/api/sales/", {
     method: "POST",
     cache: "no-store",
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
+      ...(csrfToken ? { "X-Kisinet-CSRF": csrfToken } : {}),
     },
     body: JSON.stringify(body),
+    credentials: "include",
   });
 
   const responseText = await response.text();
