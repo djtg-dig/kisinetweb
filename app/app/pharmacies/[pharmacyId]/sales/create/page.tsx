@@ -154,7 +154,7 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
   const total = Math.max(subtotal - discountAmount + taxAmount, 0);
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
   const dashboardHref = "/app/pharmacies/" + pharmacyId + "/dashboard";
-  const salesHref = "/app/pharmacies/" + pharmacyId + "/sales";
+  const salesHref = "/app/pharmacies/" + pharmacyId + "/invoices";
   const activeCurrency = currency;
   const hasDraftContent =
     items.length > 0 ||
