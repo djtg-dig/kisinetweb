@@ -16,6 +16,7 @@ type PrintReceiptData = {
     remainingAmount: number;
     changeAmount: number;
     createdAt: string;
+    paymentStatus: string;
     items: Array<{
       productName: string;
       unitPrice: number;
@@ -105,6 +106,11 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   CARD: "Carte bancaire",
   BANK_TRANSFER: "Virement bancaire",
   OTHER: "Autre",
+};
+
+const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  PAID: "Payée",
+  OVERPAID: "Payée avec excédent",
 };
 
 function TicketContent({ data }: { data: PrintReceiptData }) {
@@ -205,12 +211,14 @@ function TicketContent({ data }: { data: PrintReceiptData }) {
           <span>Réf :</span>
           <span style={{ fontWeight: "bold", textAlign: "right" }}>{data.invoice.reference}</span>
         </div>
-        {data.paymentInfo?.paidAt && (
-          <div style={rowStyle}>
-            <span>Date :</span>
-            <span>{formatDateTime(data.paymentInfo.paidAt)}</span>
-          </div>
-        )}
+        <div style={rowStyle}>
+          <span>Date :</span>
+          <span>{formatDateTime(data.paymentInfo?.paidAt || data.invoice.createdAt)}</span>
+        </div>
+        <div style={rowStyle}>
+          <span>Statut :</span>
+          <span>{PAYMENT_STATUS_LABELS[data.invoice.paymentStatus] || data.invoice.paymentStatus}</span>
+        </div>
         {data.paymentInfo?.cashierEmail && (
           <div style={rowStyle}>
             <span>Caissier :</span>
@@ -260,23 +268,19 @@ function TicketContent({ data }: { data: PrintReceiptData }) {
           <span>TOTAL</span>
           <span>{formatMoney(data.invoice.totalAmount, currencyCode)}</span>
         </div>
-        {data.paymentInfo && (
-          <>
-            <div style={totalRowStyle}>
-              <span>Payé</span>
-              <span>{formatMoney(Number(data.paymentInfo.amountReceived), currencyCode)}</span>
-            </div>
-            <div style={totalRowStyle}>
-              <span>Reste à payer</span>
-              <span>{formatMoney(remainingAmount, currencyCode)}</span>
-            </div>
-            {data.invoice.changeAmount > 0 && (
-              <div style={totalRowStyle}>
-                <span>Monnaie</span>
-                <span>{formatMoney(data.invoice.changeAmount, currencyCode)}</span>
-              </div>
-            )}
-          </>
+        <div style={totalRowStyle}>
+          <span>Payé</span>
+          <span>{formatMoney(data.invoice.paidAmount, currencyCode)}</span>
+        </div>
+        <div style={totalRowStyle}>
+          <span>Reste à payer</span>
+          <span>{formatMoney(remainingAmount, currencyCode)}</span>
+        </div>
+        {data.invoice.changeAmount > 0 && (
+          <div style={totalRowStyle}>
+            <span>Monnaie</span>
+            <span>{formatMoney(data.invoice.changeAmount, currencyCode)}</span>
+          </div>
         )}
       </div>
 
