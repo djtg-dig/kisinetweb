@@ -134,7 +134,7 @@ async function proxyBackendRequest(request: NextRequest, context: RouteContext):
       headers: filterResponseHeaders(response.headers),
     });
   } catch {
-    return NextResponse.json({ detail: "Requête backend invalide ou indisponible." }, { status: 502 });
+    return NextResponse.json({ detail: "Requete invalide ou Serveur indisponible." }, { status: 502 });
   }
 }
 

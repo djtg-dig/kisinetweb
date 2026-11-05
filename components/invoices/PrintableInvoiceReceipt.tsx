@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import JsBarcode from "jsbarcode";
 
@@ -308,6 +308,19 @@ function TicketContent({ data }: { data: PrintReceiptData }) {
 export function PrintableInvoiceReceipt({ data, onPrintComplete }: PrintableInvoiceReceiptProps) {
   const hasPrinted = useRef(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [measurement, setMeasurement] = useState<{
+    data: PrintReceiptData;
+    pageHeightMm: number;
+  } | null>(null);
+  const pageHeightMm = measurement?.data === data ? measurement.pageHeightMm : null;
+  const handleMeasure = useCallback(
+    (heightMm: number) => {
+      if (data) {
+        setMeasurement({ data, pageHeightMm: heightMm });
+      }
+    },
+    [data],
+  );
 
   useEffect(() => {
     // Le portail utilise document.body uniquement apres le montage cote navigateur.
@@ -315,7 +328,7 @@ export function PrintableInvoiceReceipt({ data, onPrintComplete }: PrintableInvo
   }, []);
 
   useEffect(() => {
-    if (!data || hasPrinted.current) {
+    if (!data || !pageHeightMm || hasPrinted.current) {
       return;
     }
 
@@ -342,17 +355,63 @@ export function PrintableInvoiceReceipt({ data, onPrintComplete }: PrintableInvo
       window.cancelAnimationFrame(secondFrame);
       window.removeEventListener("afterprint", handleAfterPrint);
     };
-  }, [data, onPrintComplete]);
+  }, [data, onPrintComplete, pageHeightMm]);
 
   if (!data || !isMounted) {
     return null;
   }
 
   return createPortal(
-    <div id="invoice-print-root" aria-hidden="true">
-      <TicketContent data={data} />
+    <div
+      id="invoice-print-root"
+      aria-hidden="true"
+      data-paper-width={data.receiptPaperWidth}
+    >
+      {pageHeightMm && (
+        <style media="print">{`@page { size: ${data.receiptPaperWidth}mm ${pageHeightMm}mm; margin: 0; }`}</style>
+      )}
+      <MeasuredTicket
+        data={data}
+        onMeasure={handleMeasure}
+      />
     </div>,
     document.body,
+  );
+}
+
+function MeasuredTicket({
+  data,
+  onMeasure,
+}: {
+  data: PrintReceiptData;
+  onMeasure: (heightMm: number) => void;
+}) {
+  const ticketRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let firstFrame = 0;
+    let secondFrame = 0;
+
+    // Le second frame laisse aussi le code-barres SVG se dessiner avant la mesure.
+    firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        const heightPx = ticketRef.current?.scrollHeight || 0;
+        // CSS utilise 96 px par pouce. On ajoute 2 mm pour ne jamais couper le pied du ticket.
+        const heightMm = Math.max(70, Math.ceil((heightPx * 25.4) / 96) + 2);
+        onMeasure(heightMm);
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      window.cancelAnimationFrame(secondFrame);
+    };
+  }, [data, onMeasure]);
+
+  return (
+    <div ref={ticketRef}>
+      <TicketContent data={data} />
+    </div>
   );
 }
 

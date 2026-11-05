@@ -12,11 +12,6 @@
 }
 
 @media print {
-  @page {
-    margin: 0;
-    size: auto;
-  }
-
   html,
   body {
     margin: 0;
@@ -41,10 +36,20 @@
     position: absolute !important;
     left: 0 !important;
     top: 0 !important;
-    width: 100%;
+    /* La largeur est celle du rouleau, pas celle de la page par défaut du navigateur. */
     margin: 0;
     padding: 0;
     background: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  #invoice-print-root[data-paper-width="58"] {
+    width: 58mm;
+  }
+
+  #invoice-print-root[data-paper-width="80"] {
+    width: 80mm;
   }
 
   #invoice-print-root .ticket-80mm {
