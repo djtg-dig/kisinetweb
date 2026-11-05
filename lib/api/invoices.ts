@@ -1,5 +1,6 @@
 import { apiBaseUrl } from "@/lib/carri-account";
 import { apiFetch } from "@/lib/api/request";
+import { ApiError } from "@/lib/api/errors";
 
 export type InvoicePaymentStatus =
   | "UNPAID"
@@ -263,13 +264,25 @@ export async function createInvoicePayment(
   const data = parseJsonResponse(responseText);
 
   if (!response.ok) {
-    throw new Error(getApiErrorMessage(data, "Impossible d'enregistrer le paiement."));
+    throw new ApiError(
+      getApiErrorMessage(data, "Impossible d'enregistrer le paiement."),
+      extractErrorCode(data),
+      response.status,
+    );
   }
 
   return {
     statusCode: response.status,
     payment: data && typeof data === "object" ? data as InvoicePaymentResult["payment"] : {},
   };
+}
+
+function extractErrorCode(data: unknown): string | undefined {
+  if (!data || typeof data !== "object") {
+    return undefined;
+  }
+  const code = (data as { code?: unknown }).code;
+  return typeof code === "string" ? code : undefined;
 }
 
 async function fetchInvoicesJson<T>(path: string): Promise<T> {

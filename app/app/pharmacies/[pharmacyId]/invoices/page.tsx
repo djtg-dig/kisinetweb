@@ -21,6 +21,7 @@ import {
   type InvoiceSummary,
 } from "@/lib/api/invoices";
 import { SALES_CHOICES_STORAGE_KEY, type SalesChoiceOption } from "@/lib/api/sales-choices";
+import { describeApiError } from "@/lib/api/errors";
 import { PrintableInvoiceReceipt, type PrintReceiptData } from "@/components/invoices/PrintableInvoiceReceipt";
 import "@/components/invoices/invoice-receipt.css";
 
@@ -230,7 +231,7 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
       setFeedback({
         tone: "error",
         text: error instanceof Error
-          ? cleanUserErrorMessage(error.message)
+          ? cleanUserErrorMessage(describeApiError(error))
           : "Impossible de préparer la facture pour impression.",
       });
       setPrintingInvoiceReference("");
@@ -923,7 +924,7 @@ function InvoicePaymentDialog({
     } catch (error) {
       setErrorMessage(
         error instanceof Error
-          ? cleanUserErrorMessage(error.message)
+          ? cleanUserErrorMessage(describeApiError(error))
           : "Impossible d'enregistrer le paiement. Veuillez réessayer.",
       );
     } finally {

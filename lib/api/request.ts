@@ -8,6 +8,7 @@
 // détail technique (ni dans l'interface, ni dans la console du navigateur).
 
 import { NETWORK_ERROR_MESSAGE } from "./errors";
+import { ensureCsrfToken } from "@/lib/auth";
 
 // Point d'injection réservé aux tests unitaires : il permet de remplacer le
 // `fetch` natif par une implémentation simulée, sans backend. En production
@@ -29,7 +30,22 @@ export async function apiFetch(
   init?: RequestInit,
 ): Promise<Response> {
   try {
-    return await apiFetchImpl(input, init);
+    const method = (init?.method || "GET").toUpperCase();
+    const isMutation = ["POST", "PUT", "PATCH", "DELETE"].includes(method);
+    const headers = new Headers(init?.headers);
+
+    if (isMutation) {
+      const csrfToken = await ensureCsrfToken();
+      if (csrfToken && !headers.has("X-Kisinet-CSRF")) {
+        headers.set("X-Kisinet-CSRF", csrfToken);
+      }
+    }
+
+    return await apiFetchImpl(input, {
+      ...init,
+      headers,
+      ...(isMutation ? { credentials: "include" } : {}),
+    });
   } catch {
     // Le détail technique reste interne : on ne le journalise pas afin qu'il
     // n'apparaisse ni à l'utilisateur ni dans la console du navigateur. La page
