@@ -5,27 +5,15 @@ export type PlanElement = { label: string; value: string };
 export function buildPlanElements(plan: PharmacyPlan): PlanElement[] {
   const elements: PlanElement[] = [];
 
-  // Modele seat-based : tous les plans permettent d'ajouter autant
-  // d'utilisateurs que necessaire, la facturation suivant le nombre
-  // d'utilisateurs actifs.
-  elements.push({ label: "Utilisateurs", value: "Illimité" });
+  const usersLabel = plan.maxUsers === null
+    ? "Utilisateurs illimités"
+    : plan.maxUsers === 1
+      ? "1 utilisateur"
+      : "Jusqu'à " + plan.maxUsers + " utilisateurs";
+  elements.push({ label: "Utilisateurs", value: usersLabel + " (propriétaire compris)" });
 
   if (plan.unlimitedProducts) {
     elements.push({ label: "Produits", value: "Illimité" });
-  }
-
-  // Credits IA inclus par utilisateur et par mois (priorite au champ
-  // seat-based, repli sur l'ancien champ analysisCredits).
-  const aiCreditsPerUser = plan.includedAiCreditPerUserMonth
-    ? plan.includedAiCreditPerUserMonth
-    : plan.analysisCredits?.enabled
-      ? plan.analysisCredits.perUserMonthlyAnalysisCredits
-      : 0;
-  if (aiCreditsPerUser > 0) {
-    elements.push({
-      label: "Crédits IA inclus",
-      value: formatCredits(aiCreditsPerUser) + " / utilisateur / mois",
-    });
   }
 
   if (plan.unlimitedBranches) {
@@ -41,12 +29,6 @@ export function buildPlanElements(plan: PharmacyPlan): PlanElement[] {
   }
 
   return elements;
-}
-
-function formatCredits(value: number) {
-  return new Intl.NumberFormat("fr-FR", {
-    maximumFractionDigits: 0,
-  }).format(value);
 }
 
 export function PlanElements({ plan }: { plan: PharmacyPlan }) {

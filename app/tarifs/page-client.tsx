@@ -39,23 +39,14 @@ export default function TarifsPageClient({
                 Tarifs
               </span>
               <h1 className="mt-5 text-3xl font-bold leading-tight text-app-text sm:text-4xl lg:text-5xl">
-                Des plans préparés pour chaque étape
+                Des forfaits adaptés à chaque pharmacie
               </h1>
               <p className="mt-4 text-sm leading-6 text-app-muted sm:text-base">
-                Tous nos plans permettent d'ajouter autant d'utilisateurs que
-                nécessaire. La facturation dépend du nombre d'utilisateurs actifs,
-                et les crédits d'analyse IA inclus augmentent avec le nombre
-                d'utilisateurs.
+                Choisissez le forfait qui correspond à la taille de votre pharmacie.
+                Profitez de toutes les fonctionnalités essentielles de gestion, avec
+                des capacités adaptées à votre équipe et à vos besoins d’intégration.
               </p>
 
-              <div className="mt-6 rounded-2xl border border-primary-200 bg-primary-50/60 p-5 text-left text-sm sm:mx-auto sm:max-w-2xl">
-                <p className="font-semibold text-primary-700">Exemple</p>
-                <ul className="mt-2 space-y-1 text-app-muted">
-                  <li>10 utilisateurs actifs</li>
-                  <li>Prix mensuel = 10 × prix par utilisateur</li>
-                  <li>Crédits IA = 10 × crédits inclus par utilisateur</li>
-                </ul>
-              </div>
             </div>
 
             <div className="mt-12">
@@ -90,12 +81,12 @@ export default function TarifsPageClient({
                     <article
                       key={plan.id || plan.name}
                       className={`relative flex flex-col rounded-2xl border p-5 transition duration-200 hover:-translate-y-1 hover:shadow-soft sm:p-6 lg:p-7 ${
-                        plan.highlighted
+                        (plan.code === "STANDARD" || plan.highlighted)
                           ? "border-primary-600 bg-app-card shadow-soft ring-1 ring-primary-200"
                           : "border-app-border bg-app-card shadow-sm"
                       }`}
                     >
-                      {plan.highlighted && (
+                      {(plan.code === "STANDARD" || plan.highlighted) && (
                         <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary-600 px-4 py-1 text-xs font-semibold text-white shadow-sm">
                           Populaire
                         </span>
@@ -130,9 +121,9 @@ export default function TarifsPageClient({
 
                       <div className="mt-4 border-t border-app-border pt-4">
                         <p className="flex flex-wrap items-baseline gap-1 text-3xl font-bold text-app-text">
-                          {plan.pricePerUserMonth || plan.priceMonthly ? (
+                          {plan.priceMonthly || plan.pricePerUserMonth ? (
                             <>
-                              {plan.pricePerUserMonth || plan.priceMonthly}
+                              {plan.priceMonthly || plan.pricePerUserMonth}
                               {plan.currency ? (
                                 <span className="text-base font-medium text-app-muted">
                                   {plan.currency}
@@ -140,7 +131,7 @@ export default function TarifsPageClient({
                               ) : null}
                               <span className="text-sm font-medium text-app-muted">
                                 {" "}
-                                / utilisateur / mois
+                                / mois / pharmacie
                               </span>
                             </>
                           ) : (
@@ -155,7 +146,7 @@ export default function TarifsPageClient({
                         <LinkButton
                           href={"/tarifs/" + encodeURIComponent(plan.name)}
                           aria-label={"Sélectionner le plan " + plan.name}
-                          variant={plan.highlighted ? "primary" : "secondary"}
+                          variant={plan.code === "STANDARD" || plan.highlighted ? "primary" : "secondary"}
                           className="w-full"
                         >
                           Sélectionner
