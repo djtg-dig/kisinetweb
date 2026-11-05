@@ -927,6 +927,7 @@ Content-Type: application/json
 
 - `POST /api/sales/`
 - `GET /api/sales/?pharmacy_reference={pharmacy_id}`
+- `GET /api/sales/{invoice_reference}/?pharmacy_reference={pharmacy_id}`
 - `POST /api/sales/vision/` (analyse d'ordonnance, multipart `pharmacy_reference` + `image`)
 - `POST /api/sales/prescription-captures/` (sauvegarde de l'image d'ordonnance capturée, multipart `pharmacy_reference` optionnel + `image`)
 
@@ -1022,11 +1023,33 @@ Content-Type: application/json
   et `remaining_amount` pour les cartes.
 - **Pagination** : le frontend utilise `count`, `next` et `previous`, et conserve
   les filtres/recherche actifs lors des changements de page.
-- **Fonctionnalités non connectées faute d'endpoint dédié** : annulation de facture
-  et impression/téléchargement de reçu.
+- **Impression** : l'action « Imprimer » ouvre la page privée
+  `/app/print/invoices/[pharmacyId]/[invoiceReference]`. Cette page relit le
+  détail de la facture, vérifie `sale_view` puis refuse les statuts autres que
+  `PAID` et `OVERPAID` avant de présenter le ticket à l'utilisateur. Le bouton
+  « Imprimer ce ticket » déclenche ensuite l'impression depuis cette page
+  dédiée, sans créer de vente ni de paiement.
 - **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden`, `404 Not Found`,
   `500 Internal Server Error` côté API. Le frontend affiche un message convivial
   sans exposer la réponse technique brute.
+
+### GET /api/sales/{invoice_reference}/
+
+- **Objectif** : charger le détail et les lignes d'une facture existante pour
+  les pages de produits et l'aperçu privé du ticket.
+- **Méthode HTTP** : `GET`
+- **URL** : `/api/sales/{invoice_reference}/?pharmacy_reference={pharmacy_id}`
+- **Pages frontend** :
+  `/app/pharmacies/[pharmacyId]/invoices/[invoiceReference]/products` et
+  `/app/print/invoices/[pharmacyId]/[invoiceReference]`.
+- **Service frontend** : `getInvoiceDetail(pharmacyId, invoiceReference)` dans
+  `lib/api/invoices.ts`.
+- **Authentification et accès** : requis. La page d'impression vérifie d'abord
+  `GET /api/pharmacies/{pharmacy_id}/permissions/` et exige `sale_view`; le
+  backend reste responsable de l'autorisation réelle et de l'appartenance de la
+  facture à la pharmacie.
+- **Réponse utilisée** : la facture, ses montants, son statut de paiement et les
+  lignes de produits (`items`). Aucun champ n'est modifié par ce parcours.
 
 ### POST /api/sale-payments/
 

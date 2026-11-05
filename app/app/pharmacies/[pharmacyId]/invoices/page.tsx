@@ -6,12 +6,10 @@ import { LinkButton } from "@/components/ui/link-button";
 import {
   getPharmacyDetail,
   getPharmacyPermissions,
-  getPharmacyGeneralSettings,
   type PharmacyPermissions,
 } from "@/lib/api";
 import {
   createInvoicePayment,
-  getInvoiceDetail,
   getInvoiceMetadata,
   getPharmacyInvoices,
   type Invoice,
@@ -22,8 +20,6 @@ import {
 } from "@/lib/api/invoices";
 import { SALES_CHOICES_STORAGE_KEY, type SalesChoiceOption } from "@/lib/api/sales-choices";
 import { describeApiError } from "@/lib/api/errors";
-import { PrintableInvoiceReceipt, type PrintReceiptData } from "@/components/invoices/PrintableInvoiceReceipt";
-import "@/components/invoices/invoice-receipt.css";
 
 type InvoicesPageProps = {
   params: Promise<{ pharmacyId: string }>;
@@ -80,7 +76,6 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
   const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
   const [feedback, setFeedback] = useState<FeedbackMessage | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
-  const [printReceiptData, setPrintReceiptData] = useState<PrintReceiptData | null>(null);
   const [printingInvoiceReference, setPrintingInvoiceReference] = useState("");
 
   useEffect(() => {
@@ -204,7 +199,7 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
     setFilters((current) => cleanFilters({ ...current, page: String(page) }));
   }
 
-  async function printInvoice(invoice: Invoice) {
+  function printInvoice(invoice: Invoice) {
     if (!isInvoicePrintable(invoice)) {
       setFeedback({
         tone: "error",
@@ -215,27 +210,9 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
 
     setPrintingInvoiceReference(invoice.reference);
     setFeedback(null);
-    try {
-      const [invoiceDetail, settings] = await Promise.all([
-        getInvoiceDetail(pharmacyId, invoice.reference),
-        getPharmacyGeneralSettings(pharmacyId).catch(() => null),
-      ]);
-
-      setPrintReceiptData({
-        invoice: invoiceDetail,
-        pharmacy: { name: pharmacyName || "Pharmacie" },
-        currency,
-        receiptPaperWidth: settings?.receiptPaperWidth || 80,
-      });
-    } catch (error) {
-      setFeedback({
-        tone: "error",
-        text: error instanceof Error
-          ? cleanUserErrorMessage(describeApiError(error))
-          : "Impossible de préparer la facture pour impression.",
-      });
-      setPrintingInvoiceReference("");
-    }
+    const printPath = "/app/print/invoices/" + encodeURIComponent(pharmacyId)
+      + "/" + encodeURIComponent(invoice.reference);
+    window.location.assign(printPath);
   }
 
   return (
@@ -331,15 +308,6 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
           onSuccess={(
             statusCode: number,
             shouldPrint: boolean,
-            paymentData?: {
-              reference?: string;
-              amount?: string;
-              amount_received?: string;
-              change_amount?: string;
-              payment_method?: string;
-              received_by_email?: string;
-              paid_at?: string;
-            }
           ) => {
             setPaymentInvoice(null);
             setFeedback({
@@ -348,44 +316,10 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
             });
             setReloadKey((key) => key + 1);
 
-            if (shouldPrint && paymentData) {
-              getInvoiceDetail(pharmacyId, paymentInvoice.reference)
-                .then((invoiceDetail) => {
-                  return getPharmacyGeneralSettings(pharmacyId)
-                    .then((settings) => ({
-                      invoice: invoiceDetail,
-                      pharmacy: { name: pharmacyName },
-                      currency: currency,
-                      receiptPaperWidth: settings.receiptPaperWidth,
-                      paymentInfo: {
-                        reference: paymentData.reference || "",
-                        amount: paymentData.amount || "0",
-                        amountReceived: paymentData.amount_received || "0",
-                        changeAmount: paymentData.change_amount || "0",
-                        paymentMethod: paymentData.payment_method || "CASH",
-                        paidAt: paymentData.paid_at || new Date().toISOString(),
-                        cashierEmail: paymentData.received_by_email,
-                      },
-                    }))
-                    .catch(() => ({
-                      invoice: invoiceDetail,
-                      pharmacy: { name: pharmacyName },
-                      currency: currency,
-                      receiptPaperWidth: 80 as const,
-                      paymentInfo: {
-                        reference: paymentData.reference || "",
-                        amount: paymentData.amount || "0",
-                        amountReceived: paymentData.amount_received || "0",
-                        changeAmount: paymentData.change_amount || "0",
-                        paymentMethod: paymentData.payment_method || "CASH",
-                        paidAt: paymentData.paid_at || new Date().toISOString(),
-                        cashierEmail: paymentData.received_by_email,
-                      },
-                    }));
-                })
-                .then((printData) => {
-                  setPrintReceiptData(printData);
-                });
+            if (shouldPrint && statusCode >= 200 && statusCode < 300) {
+              const printPath = "/app/print/invoices/" + encodeURIComponent(pharmacyId)
+                + "/" + encodeURIComponent(paymentInvoice.reference);
+              window.location.assign(printPath);
             }
           }}
         />
@@ -397,13 +331,6 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
         </ToastMessage>
       )}
 
-      <PrintableInvoiceReceipt
-        data={printReceiptData}
-        onPrintComplete={() => {
-          setPrintReceiptData(null);
-          setPrintingInvoiceReference("");
-        }}
-      />
     </div>
   );
 }

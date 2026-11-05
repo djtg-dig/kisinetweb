@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useRef, type CSSProperties } from "react";
 import JsBarcode from "jsbarcode";
 
 type PrintReceiptData = {
@@ -40,11 +39,6 @@ type PrintReceiptData = {
     paidAt: string;
     cashierEmail?: string;
   };
-};
-
-type PrintableInvoiceReceiptProps = {
-  data: PrintReceiptData | null;
-  onPrintComplete: () => void;
 };
 
 function formatDateTime(value: string): string {
@@ -113,7 +107,7 @@ const PAYMENT_STATUS_LABELS: Record<string, string> = {
   OVERPAID: "Payée avec excédent",
 };
 
-function TicketContent({ data }: { data: PrintReceiptData }) {
+export function InvoiceReceiptTicket({ data }: { data: PrintReceiptData }) {
   const is58mm = data.receiptPaperWidth === 58;
   const currencyCode = data.currency || "USD";
   // Le reste a payer vient de la facture metier rechargee apres succes backend.
@@ -194,7 +188,7 @@ function TicketContent({ data }: { data: PrintReceiptData }) {
   };
 
   return (
-    <div className={`${paperClass}`} style={ticketStyle}>
+    <div className={`invoice-receipt ${paperClass}`} style={ticketStyle}>
       <div style={{ textAlign: "center", marginBottom: is58mm ? "2mm" : "3mm" }}>
         <div style={{ fontWeight: "bold", fontSize: is58mm ? "12px" : "14px" }}>
           {data.pharmacy.name}
@@ -301,116 +295,6 @@ function TicketContent({ data }: { data: PrintReceiptData }) {
       <div style={{ textAlign: "center", fontSize: is58mm ? "8px" : "9px" }}>
         Merci de votre visite.
       </div>
-    </div>
-  );
-}
-
-export function PrintableInvoiceReceipt({ data, onPrintComplete }: PrintableInvoiceReceiptProps) {
-  const hasPrinted = useRef(false);
-  const [isMounted, setIsMounted] = useState(false);
-  const [measurement, setMeasurement] = useState<{
-    data: PrintReceiptData;
-    pageHeightMm: number;
-  } | null>(null);
-  const pageHeightMm = measurement?.data === data ? measurement.pageHeightMm : null;
-  const handleMeasure = useCallback(
-    (heightMm: number) => {
-      if (data) {
-        setMeasurement({ data, pageHeightMm: heightMm });
-      }
-    },
-    [data],
-  );
-
-  useEffect(() => {
-    // Le portail utilise document.body uniquement apres le montage cote navigateur.
-    setIsMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (!data || !pageHeightMm || hasPrinted.current) {
-      return;
-    }
-
-    hasPrinted.current = true;
-
-    // Deux frames garantissent que le ticket cache est monte avant l'ouverture de l'aperçu.
-    let firstFrame = 0;
-    let secondFrame = 0;
-    const handleAfterPrint = () => {
-      hasPrinted.current = false;
-      onPrintComplete();
-    };
-
-    window.addEventListener("afterprint", handleAfterPrint, { once: true });
-
-    firstFrame = window.requestAnimationFrame(() => {
-      secondFrame = window.requestAnimationFrame(() => {
-        window.print();
-      });
-    });
-
-    return () => {
-      window.cancelAnimationFrame(firstFrame);
-      window.cancelAnimationFrame(secondFrame);
-      window.removeEventListener("afterprint", handleAfterPrint);
-    };
-  }, [data, onPrintComplete, pageHeightMm]);
-
-  if (!data || !isMounted) {
-    return null;
-  }
-
-  return createPortal(
-    <div
-      id="invoice-print-root"
-      aria-hidden="true"
-      data-paper-width={data.receiptPaperWidth}
-    >
-      {pageHeightMm && (
-        <style media="print">{`@page { size: ${data.receiptPaperWidth}mm ${pageHeightMm}mm; margin: 0; }`}</style>
-      )}
-      <MeasuredTicket
-        data={data}
-        onMeasure={handleMeasure}
-      />
-    </div>,
-    document.body,
-  );
-}
-
-function MeasuredTicket({
-  data,
-  onMeasure,
-}: {
-  data: PrintReceiptData;
-  onMeasure: (heightMm: number) => void;
-}) {
-  const ticketRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    let firstFrame = 0;
-    let secondFrame = 0;
-
-    // Le second frame laisse aussi le code-barres SVG se dessiner avant la mesure.
-    firstFrame = window.requestAnimationFrame(() => {
-      secondFrame = window.requestAnimationFrame(() => {
-        const heightPx = ticketRef.current?.scrollHeight || 0;
-        // CSS utilise 96 px par pouce. On ajoute 2 mm pour ne jamais couper le pied du ticket.
-        const heightMm = Math.max(70, Math.ceil((heightPx * 25.4) / 96) + 2);
-        onMeasure(heightMm);
-      });
-    });
-
-    return () => {
-      window.cancelAnimationFrame(firstFrame);
-      window.cancelAnimationFrame(secondFrame);
-    };
-  }, [data, onMeasure]);
-
-  return (
-    <div ref={ticketRef}>
-      <TicketContent data={data} />
     </div>
   );
 }

@@ -1,14 +1,8 @@
-@media screen {
-  /* Le ticket reste calculable dans le DOM, mais il ne pollue jamais la page normale. */
-  #invoice-print-root {
-    position: fixed;
-    left: -10000px;
-    top: 0;
-    width: auto;
-    height: auto;
-    overflow: hidden;
-    visibility: hidden;
-  }
+.invoice-receipt {
+  max-width: 100%;
+  margin: 0 auto;
+  background: #fff;
+  color: #000;
 }
 
 @media print {
@@ -17,57 +11,28 @@
     margin: 0;
     padding: 0;
     background: #fff !important;
-    width: 100%;
-    height: auto;
+    color: #000 !important;
   }
 
-  body > *:not(#invoice-print-root) {
-    /* Le reste de l'application sort du flux print pour eviter les pages vides. */
-    display: none !important;
-  }
-
-  #invoice-print-root,
-  #invoice-print-root * {
+  .invoice-receipt {
+    display: block !important;
     visibility: visible !important;
-  }
-
-  #invoice-print-root {
-    /* Au print, seul le ticket est replace dans la zone imprimable. */
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
-    /* La largeur est celle du rouleau, pas celle de la page par défaut du navigateur. */
+    position: static !important;
     margin: 0;
-    padding: 0;
-    background: #fff !important;
+    transform: none !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
-  #invoice-print-root[data-paper-width="58"] {
-    width: 58mm;
+  .invoice-receipt.ticket-80mm {
+    width: 76mm !important;
   }
 
-  #invoice-print-root[data-paper-width="80"] {
-    width: 80mm;
+  .invoice-receipt.ticket-58mm {
+    width: 54mm !important;
   }
 
-  #invoice-print-root .ticket-80mm {
-    width: 76mm;
-  }
-
-  #invoice-print-root .ticket-58mm {
-    width: 54mm;
-  }
-
-  #invoice-print-root svg {
-    max-width: 100% !important;
-    overflow: visible;
-  }
-
-  .toast-container,
-  [role="status"],
-  [role="alert"] {
+  .no-print {
     display: none !important;
   }
 }
