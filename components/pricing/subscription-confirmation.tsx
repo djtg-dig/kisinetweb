@@ -5,11 +5,9 @@ import { buildPlanElements } from "@/components/pricing/plan-elements";
 import type { PharmacyPlan, PharmacySummary } from "@/lib/api";
 
 export type ConfirmationTotals = {
-  /** Prix catalogue par utilisateur et par mois. */
+  /** Prix mensuel du forfait par pharmacie. */
   unitPrice: number;
-  /** Nombre d'utilisateurs valide retenu pour la commande. */
-  userCount: number;
-  /** Montant mensuel avant remise (prix unitaire x utilisateurs). */
+  /** Montant mensuel du forfait. */
   monthlyAmount: number;
   /** Duree d'engagement retenue, en mois. */
   durationMonths: number;
@@ -21,10 +19,6 @@ export type ConfirmationTotals = {
   discountAmount: number;
   /** Montant final a payer pour la periode. */
   totalAmount: number;
-  /** Credits IA inclus par utilisateur et par mois. */
-  aiCreditsPerUser: number;
-  /** Credits IA inclus au total (utilisateurs x credits). */
-  aiCreditsTotal: number;
 };
 
 export function SubscriptionConfirmation({
@@ -114,11 +108,7 @@ export function SubscriptionConfirmation({
                 <ConfirmationRow label="Pharmacie" value={selectedPharmacy.name} />
               )}
               <ConfirmationRow
-                label="Utilisateurs"
-                value={formatAmount(totals.userCount)}
-              />
-              <ConfirmationRow
-                label="Prix par utilisateur"
+                label="Prix mensuel"
                 value={formatMoney(totals.unitPrice, currency) + " / mois"}
               />
               <ConfirmationRow
@@ -131,18 +121,6 @@ export function SubscriptionConfirmation({
                   label="Durée choisie"
                   value={totals.durationMonths + " mois"}
                 />
-              )}
-              {totals.aiCreditsPerUser > 0 && (
-                <>
-                  <ConfirmationRow
-                    label="Crédits IA par utilisateur"
-                    value={formatCredits(totals.aiCreditsPerUser) + " / mois"}
-                  />
-                  <ConfirmationRow
-                    label="Total crédits IA inclus"
-                    value={formatCredits(totals.aiCreditsTotal) + " / mois"}
-                  />
-                </>
               )}
             </div>
 

@@ -70,7 +70,6 @@ export default function PlanDetailPage() {
   const { authenticated } = useSession();
 
   // Nombre d'utilisateurs actifs a inclure dans l'abonnement (modele seat-based).
-  const [userCountInput, setUserCountInput] = useState("1");
   const [step, setStep] = useState<CheckoutStep>("selection");
   // Verrou synchrone contre les doubles clics sur le bouton de paiement :
   // le state React est asynchrone et laisse passer deux clics rapproches.
@@ -172,18 +171,9 @@ export default function PlanDetailPage() {
     commitmentOptions.find((option) => option.months === 12) ||
     commitmentOptions[0];
   const orderSummary = useMemo(
-    () => buildOrderSummary(plan, selectedCommitment, Number(userCountInput)),
-    [plan, selectedCommitment, userCountInput],
+    () => buildOrderSummary(plan, selectedCommitment),
+    [plan, selectedCommitment],
   );
-  const parsedUserCount = Number(userCountInput);
-  const isUserCountValid =
-    userCountInput.trim() !== "" &&
-    Number.isFinite(parsedUserCount) &&
-    Number.isInteger(parsedUserCount) &&
-    parsedUserCount >= 1;
-  const userCountError = isUserCountValid
-    ? ""
-    : "Saisissez un nombre d'utilisateurs valide (au moins 1).";
 
   // Verifications bloquantes avant la confirmation de la commande.
   const validationErrors = useMemo(() => {
@@ -193,9 +183,6 @@ export default function PlanDetailPage() {
       errors.push("Aucun plan n'est sélectionné.");
     }
 
-    if (!isUserCountValid) {
-      errors.push("Le nombre d'utilisateurs est invalide : saisissez un entier supérieur ou égal à 1.");
-    }
 
     if (!selectedCommitment || selectedCommitment.months < 1) {
       errors.push("Aucune durée d'engagement n'est sélectionnée.");
@@ -208,7 +195,7 @@ export default function PlanDetailPage() {
     }
 
     return errors;
-  }, [isUserCountValid, plan, selectedCommitment, selectedPharmacy]);
+  }, [plan, selectedCommitment, selectedPharmacy]);
 
   const canConfirm = validationErrors.length === 0;
   const isPaymentBusy =
@@ -220,30 +207,18 @@ export default function PlanDetailPage() {
   // Le recapitulatif reprend les montants deja calcules : aucune nouvelle
   // logique metier n'est introduite ici.
   const confirmationTotals = useMemo<ConfirmationTotals>(() => {
-    const userCount = isUserCountValid ? parsedUserCount : 0;
-    // Source unique de verite : le prix unitaire par utilisateur. Le montant
-    // mensuel et le sous-total proviennent tous deux de `orderSummary`, deja
-    // calcule avec le nombre d'utilisateurs, afin d'eviter toute divergence.
-    const unitPrice = parseAmount(plan?.pricePerUserMonth ?? plan?.priceMonthly);
-    const aiCreditsPerUser = plan?.includedAiCreditPerUserMonth
-      ? plan.includedAiCreditPerUserMonth
-      : plan?.analysisCredits?.enabled
-        ? plan.analysisCredits.perUserMonthlyAnalysisCredits
-        : 0;
+    const unitPrice = parseAmount(plan?.priceMonthly ?? plan?.pricePerUserMonth);
 
     return {
       unitPrice,
-      userCount,
       monthlyAmount: orderSummary.monthlyPrice,
       durationMonths: selectedCommitment?.months ?? 0,
       subtotal: orderSummary.subtotal,
       discountPercentage: selectedCommitment?.discountPercentage ?? 0,
       discountAmount: orderSummary.discountAmount,
       totalAmount: orderSummary.totalAmount,
-      aiCreditsPerUser,
-      aiCreditsTotal: aiCreditsPerUser * userCount,
     };
-  }, [isUserCountValid, orderSummary, parsedUserCount, plan, selectedCommitment]);
+  }, [orderSummary, plan, selectedCommitment]);
   const currentPlanPath = planName ? "/tarifs/" + encodeURIComponent(planName) : "/tarifs";
   const createPharmacyHref =
     "/app/pharmacies/create?return_to=" + encodeURIComponent(currentPlanPath);
@@ -373,7 +348,6 @@ export default function PlanDetailPage() {
         pharmacyReference: selectedPharmacy.reference || selectedPharmacy.id,
         planCode: plan.code,
         planId: plan.id,
-        userCount: isUserCountValid ? parsedUserCount : undefined,
         durationMonths: selectedCommitment.months,
         currency: plan.currency || "USD",
       });
@@ -449,19 +423,11 @@ export default function PlanDetailPage() {
               <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
                 <div className="grid gap-6">
                   <PlanDetailsCard plan={plan} />
-                  <UserCountSection
-                    currency={plan.currency}
-                    error={userCountError}
-                    plan={plan}
-                    userCountInput={userCountInput}
-                    onUserCountChange={setUserCountInput}
-                  />
                   <CommitmentSelector
                     currency={plan.currency}
                     options={commitmentOptions}
                     plan={plan}
                     selectedMonths={selectedDurationMonths}
-                    userCount={parsedUserCount}
                     onSelect={setSelectedDurationMonths}
                   />
                   <PharmacySubscriptionSection
@@ -482,7 +448,6 @@ export default function PlanDetailPage() {
                     expiresAt={temporarySubscription.expiresAt}
                   />
                   <OrderSummary
-                    analysisCredits={plan.analysisCredits}
                     currency={plan.currency}
                     durationMonths={selectedCommitment.months}
                     monthlyPrice={orderSummary.monthlyPrice}
@@ -490,7 +455,6 @@ export default function PlanDetailPage() {
                     discountPercentage={selectedCommitment.discountPercentage}
                     planName={plan.name}
                     selectedPharmacy={selectedPharmacy}
-                    userCountError={userCountError}
                     onContinue={goToConfirmation}
                     disabled={!canConfirm || isPaymentBusy}
                     paymentMessage={paymentMessage}
@@ -553,7 +517,7 @@ function PlanDetailsCard({ plan }: { plan: PharmacyPlan }) {
               ) : null}
               <span className="text-base font-medium text-app-muted">
                 {" "}
-                / utilisateur / mois
+                / mois / pharmacie
               </span>
             </>
           ) : (
@@ -572,14 +536,12 @@ function CommitmentSelector({
   options,
   plan,
   selectedMonths,
-  userCount,
   onSelect,
 }: {
   currency?: string;
   options: CommitmentOption[];
   plan: PharmacyPlan;
   selectedMonths: number;
-  userCount: number;
   onSelect: (months: number) => void;
 }) {
   return (
@@ -595,7 +557,7 @@ function CommitmentSelector({
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {options.map((option) => {
-          const summary = buildOrderSummary(plan, option, userCount);
+          const summary = buildOrderSummary(plan, option);
           const isSelected = option.months === selectedMonths;
 
           return (
