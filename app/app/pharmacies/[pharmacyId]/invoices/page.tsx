@@ -82,7 +82,12 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
   const [feedback, setFeedback] = useState<FeedbackMessage | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [printingInvoiceReference, setPrintingInvoiceReference] = useState("");
+<<<<<<< HEAD
   const [printReceiptData, setPrintReceiptData] = useState<PrintReceiptData | null>(null);
+=======
+  const [previewReceiptData, setPreviewReceiptData] = useState<PrintReceiptData | null>(null);
+  const [previewingInvoiceReference, setPreviewingInvoiceReference] = useState("");
+>>>>>>> brouillon
 
   useEffect(() => {
     let isCurrent = true;
@@ -253,6 +258,42 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
     }
   }
 
+  async function previewInvoice(invoice: Invoice) {
+    if (!isInvoicePrintable(invoice)) {
+      setFeedback({ tone: "error", text: "Seules les factures payées peuvent être prévisualisées." });
+      return;
+    }
+
+    setPreviewingInvoiceReference(invoice.reference);
+    try {
+      const [invoiceDetail, settings] = await Promise.all([
+        getInvoiceDetail(pharmacyId, invoice.reference),
+        getPharmacyGeneralSettings(pharmacyId).catch(() => null),
+      ]);
+
+      if (!isInvoicePrintable(invoiceDetail)) {
+        setFeedback({ tone: "error", text: "Seules les factures payées peuvent être prévisualisées." });
+        return;
+      }
+
+      setPreviewReceiptData({
+        invoice: invoiceDetail,
+        pharmacy: { name: pharmacyName || "Pharmacie" },
+        currency,
+        receiptPaperWidth: settings?.receiptPaperWidth || 80,
+      });
+    } catch (error) {
+      setFeedback({
+        tone: "error",
+        text: error instanceof Error
+          ? cleanUserErrorMessage(describeApiError(error))
+          : "Impossible de préparer l'aperçu du ticket.",
+      });
+    } finally {
+      setPreviewingInvoiceReference("");
+    }
+  }
+
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-app-background text-app-text lg:min-h-[calc(100vh-4.5rem)]">
       <div className="invoice-page-content">
@@ -312,9 +353,11 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
               canCancel={Boolean(permissions.sale_cancel)}
               canOpenCashRegister={Boolean(permissions.sale_payment_create)}
               printingInvoiceReference={printingInvoiceReference}
+              previewingInvoiceReference={previewingInvoiceReference}
               onSelect={setSelectedInvoice}
               onCollect={setPaymentInvoice}
               onPrint={printInvoice}
+              onPreview={previewInvoice}
             />
             <PaginationControls
               currentPage={currentPage}
@@ -335,6 +378,7 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
           printingInvoiceReference={printingInvoiceReference}
           onClose={() => setSelectedInvoice(null)}
           onPrint={printInvoice}
+          onPreview={previewInvoice}
         />
       )}
 
@@ -369,10 +413,18 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
       )}
       </div>
 
+<<<<<<< HEAD
       {printReceiptData && (
         <InvoicePrintPreview
           data={printReceiptData}
           onClose={() => setPrintReceiptData(null)}
+=======
+      {previewReceiptData && (
+        <InvoicePreviewDialog
+          data={previewReceiptData}
+          pharmacyId={pharmacyId}
+          onClose={() => setPreviewReceiptData(null)}
+>>>>>>> brouillon
         />
       )}
 
@@ -380,6 +432,7 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
   );
 }
 
+<<<<<<< HEAD
 function InvoicePrintPreview({
   data,
   onClose,
@@ -400,6 +453,30 @@ function InvoicePrintPreview({
         aria-label="Aperçu du ticket de facture"
       >
         <header className="invoice-preview-controls flex items-center justify-between gap-3 border-b border-slate-200 p-4">
+=======
+function InvoicePreviewDialog({
+  data,
+  pharmacyId,
+  onClose,
+}: {
+  data: PrintReceiptData;
+  pharmacyId: string;
+  onClose: () => void;
+}) {
+  const printPath = "/app/print/invoices/" + encodeURIComponent(pharmacyId)
+    + "/" + encodeURIComponent(data.invoice.reference);
+
+  return (
+    <div className="fixed inset-0 z-[1200] flex items-center justify-center p-3 sm:p-6">
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/50"
+        aria-label="Fermer l'aperçu du ticket"
+        onClick={onClose}
+      />
+      <section className="relative flex max-h-[calc(100vh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl sm:max-h-[calc(100vh-3rem)]">
+        <header className="flex items-center justify-between gap-3 border-b border-slate-200 p-4">
+>>>>>>> brouillon
           <div>
             <h2 className="text-base font-bold text-slate-900">Aperçu du ticket</h2>
             <p className="mt-1 text-xs text-slate-600">Vérifiez le contenu avant impression.</p>
@@ -413,6 +490,7 @@ function InvoicePrintPreview({
           </button>
         </header>
 
+<<<<<<< HEAD
         <div className="invoice-preview-document min-h-0 overflow-y-auto bg-slate-100 p-4">
           <InvoiceReceiptTicket data={data} />
         </div>
@@ -421,6 +499,14 @@ function InvoicePrintPreview({
           <Button type="button" onClick={() => window.print()}>
             Imprimer ce ticket
           </Button>
+=======
+        <div className="min-h-0 overflow-y-auto bg-slate-100 p-4">
+          <InvoiceReceiptTicket data={data} />
+        </div>
+
+        <footer className="flex justify-end border-t border-slate-200 p-4">
+          <LinkButton href={printPath}>Ouvrir la page d'impression</LinkButton>
+>>>>>>> brouillon
         </footer>
       </section>
     </div>
@@ -529,9 +615,11 @@ function InvoicesList({
   canCancel,
   canOpenCashRegister,
   printingInvoiceReference,
+  previewingInvoiceReference,
   onSelect,
   onCollect,
   onPrint,
+  onPreview,
 }: {
   invoices: Invoice[];
   currency: string;
@@ -539,9 +627,11 @@ function InvoicesList({
   canCancel: boolean;
   canOpenCashRegister: boolean;
   printingInvoiceReference: string;
+  previewingInvoiceReference: string;
   onSelect: (invoice: Invoice) => void;
   onCollect: (invoice: Invoice) => void;
   onPrint: (invoice: Invoice) => void;
+  onPreview: (invoice: Invoice) => void;
 }) {
   return (
     <section className="rounded-lg border border-app-border bg-app-card shadow-sm">
@@ -559,9 +649,11 @@ function InvoicesList({
         canCancel={canCancel}
         canOpenCashRegister={canOpenCashRegister}
         printingInvoiceReference={printingInvoiceReference}
+        previewingInvoiceReference={previewingInvoiceReference}
         onSelect={onSelect}
         onCollect={onCollect}
         onPrint={onPrint}
+        onPreview={onPreview}
       />
       <MobileInvoicesList
         invoices={invoices}
@@ -569,9 +661,11 @@ function InvoicesList({
         canCancel={canCancel}
         canOpenCashRegister={canOpenCashRegister}
         printingInvoiceReference={printingInvoiceReference}
+        previewingInvoiceReference={previewingInvoiceReference}
         onSelect={onSelect}
         onCollect={onCollect}
         onPrint={onPrint}
+        onPreview={onPreview}
       />
     </section>
   );
@@ -583,9 +677,11 @@ function DesktopInvoicesTable({
   canCancel,
   canOpenCashRegister,
   printingInvoiceReference,
+  previewingInvoiceReference,
   onSelect,
   onCollect,
   onPrint,
+  onPreview,
 }: {
   invoices: Invoice[];
   currency: string;
@@ -593,9 +689,11 @@ function DesktopInvoicesTable({
   canCancel: boolean;
   canOpenCashRegister: boolean;
   printingInvoiceReference: string;
+  previewingInvoiceReference: string;
   onSelect: (invoice: Invoice) => void;
   onCollect: (invoice: Invoice) => void;
   onPrint: (invoice: Invoice) => void;
+  onPreview: (invoice: Invoice) => void;
 }) {
   return (
     <div className="hidden overflow-x-auto lg:block">
@@ -641,9 +739,11 @@ function DesktopInvoicesTable({
                   canCancel={canCancel}
                   canOpenCashRegister={canOpenCashRegister}
                   isPrinting={printingInvoiceReference === invoice.reference}
+                  isPreviewing={previewingInvoiceReference === invoice.reference}
                   onSelect={onSelect}
                   onCollect={onCollect}
                   onPrint={onPrint}
+                  onPreview={onPreview}
                 />
               </td>
             </tr>
@@ -660,18 +760,22 @@ function MobileInvoicesList({
   canCancel,
   canOpenCashRegister,
   printingInvoiceReference,
+  previewingInvoiceReference,
   onSelect,
   onCollect,
   onPrint,
+  onPreview,
 }: {
   invoices: Invoice[];
   currency: string;
   canCancel: boolean;
   canOpenCashRegister: boolean;
   printingInvoiceReference: string;
+  previewingInvoiceReference: string;
   onSelect: (invoice: Invoice) => void;
   onCollect: (invoice: Invoice) => void;
   onPrint: (invoice: Invoice) => void;
+  onPreview: (invoice: Invoice) => void;
 }) {
   return (
     <div className="grid gap-4 p-4 lg:hidden">
@@ -696,9 +800,11 @@ function MobileInvoicesList({
               canCancel={canCancel}
               canOpenCashRegister={canOpenCashRegister}
               isPrinting={printingInvoiceReference === invoice.reference}
+              isPreviewing={previewingInvoiceReference === invoice.reference}
               onSelect={onSelect}
               onCollect={onCollect}
               onPrint={onPrint}
+              onPreview={onPreview}
               compact
             />
           </div>
@@ -713,19 +819,23 @@ function InvoiceActions({
   canCancel,
   canOpenCashRegister,
   isPrinting,
+  isPreviewing,
   compact = false,
   onSelect,
   onCollect,
   onPrint,
+  onPreview,
 }: {
   invoice: Invoice;
   canCancel: boolean;
   canOpenCashRegister: boolean;
   isPrinting: boolean;
+  isPreviewing: boolean;
   compact?: boolean;
   onSelect: (invoice: Invoice) => void;
   onCollect: (invoice: Invoice) => void;
   onPrint: (invoice: Invoice) => void;
+  onPreview: (invoice: Invoice) => void;
 }) {
   const canCollectPayment =
     canOpenCashRegister &&
@@ -754,6 +864,10 @@ function InvoiceActions({
     if (action === "print") {
       onPrint(invoice);
     }
+
+    if (action === "preview") {
+      onPreview(invoice);
+    }
   }
 
   return (
@@ -768,6 +882,9 @@ function InvoiceActions({
         <option value="view">Voir le détail</option>
         <option value="print" disabled={!isInvoicePrintable(invoice) || isPrinting}>
           {isPrinting ? "Préparation de l'impression..." : "🖨 Imprimer la facture"}
+        </option>
+        <option value="preview" disabled={!isInvoicePrintable(invoice) || isPreviewing}>
+          {isPreviewing ? "Préparation de l'aperçu..." : "Prévisualiser le ticket"}
         </option>
         <option value="collect" disabled={!canCollectPayment}>
           Encaisser
@@ -789,6 +906,7 @@ function InvoiceDetailDialog({
   printingInvoiceReference,
   onClose,
   onPrint,
+  onPreview,
 }: {
   invoice: Invoice;
   pharmacyId: string;
@@ -796,6 +914,7 @@ function InvoiceDetailDialog({
   printingInvoiceReference: string;
   onClose: () => void;
   onPrint: (invoice: Invoice) => void;
+  onPreview: (invoice: Invoice) => void;
 }) {
   const invoiceProductsPath =
     "/app/pharmacies/" +
@@ -845,6 +964,11 @@ function InvoiceDetailDialog({
           <LinkButton href={invoiceProductsPath} onClick={onClose}>
             Voir les produits
           </LinkButton>
+          {isInvoicePrintable(invoice) && (
+            <Button type="button" variant="secondary" onClick={() => onPreview(invoice)}>
+              Prévisualiser
+            </Button>
+          )}
           {isInvoicePrintable(invoice) && (
             <Button
               type="button"

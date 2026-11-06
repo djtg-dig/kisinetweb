@@ -1023,10 +1023,21 @@ Content-Type: application/json
   et `remaining_amount` pour les cartes.
 - **Pagination** : le frontend utilise `count`, `next` et `previous`, et conserve
   les filtres/recherche actifs lors des changements de page.
+<<<<<<< HEAD
 - **Impression** : l'action « Imprimer » relit le détail de la facture et ouvre
   une modale de prévisualisation sur la liste. Elle refuse les statuts autres
   que `PAID` et `OVERPAID`; le bouton « Imprimer ce ticket » imprime ensuite le
   ticket visible, sans créer de vente ni de paiement.
+=======
+- **Impression** : l'action « Imprimer » ouvre la page privée
+  `/app/print/invoices/[pharmacyId]/[invoiceReference]`. Cette page relit le
+  détail de la facture, vérifie `sale_view` puis refuse les statuts autres que
+  `PAID` et `OVERPAID` avant de présenter le ticket à l'utilisateur. Le bouton
+  « Imprimer ce ticket » déclenche ensuite l'impression depuis cette page
+  dédiée, sans créer de vente ni de paiement.
+  L'action distincte « Prévisualiser le ticket » charge ce même détail dans une
+  modale, mais son bouton d'impression ouvre toujours la page dédiée validée.
+>>>>>>> brouillon
 - **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden`, `404 Not Found`,
   `500 Internal Server Error` côté API. Le frontend affiche un message convivial
   sans exposer la réponse technique brute.
