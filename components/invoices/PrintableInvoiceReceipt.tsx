@@ -103,8 +103,12 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
 };
 
 const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  DRAFT: "Brouillon",
+  UNPAID: "Non payée",
+  PARTIALLY_PAID: "Partiellement payée",
   PAID: "Payée",
-  OVERPAID: "Payée avec excédent",
+  OVERPAID: "Surpayée",
+  CANCELED: "Annulée",
 };
 
 export function InvoiceReceiptTicket({ data }: { data: PrintReceiptData }) {
@@ -120,8 +124,8 @@ export function InvoiceReceiptTicket({ data }: { data: PrintReceiptData }) {
         width: "54mm",
         padding: "2mm 1mm",
         fontFamily: "Arial, Helvetica, sans-serif",
-        fontSize: "9px",
-        lineHeight: "1.2",
+        fontSize: "8.5px",
+        lineHeight: "1.18",
         background: "#fff",
         color: "#000",
         boxSizing: "border-box",
@@ -130,8 +134,8 @@ export function InvoiceReceiptTicket({ data }: { data: PrintReceiptData }) {
         width: "76mm",
         padding: "3mm 2mm",
         fontFamily: "Arial, Helvetica, sans-serif",
-        fontSize: "10px",
-        lineHeight: "1.3",
+        fontSize: "9.5px",
+        lineHeight: "1.25",
         background: "#fff",
         color: "#000",
         boxSizing: "border-box",
@@ -143,7 +147,7 @@ export function InvoiceReceiptTicket({ data }: { data: PrintReceiptData }) {
   };
 
   const labelStyle: CSSProperties = {
-    fontSize: is58mm ? "8px" : "9px",
+    fontSize: is58mm ? "7.5px" : "8.5px",
     color: "#555",
     marginBottom: is58mm ? "1mm" : "1.5mm",
   };
@@ -163,7 +167,7 @@ export function InvoiceReceiptTicket({ data }: { data: PrintReceiptData }) {
   };
 
   const productQtyStyle: CSSProperties = {
-    fontSize: is58mm ? "8px" : "9px",
+    fontSize: is58mm ? "7.5px" : "8.5px",
     color: "#333",
     whiteSpace: "nowrap",
   };
@@ -175,25 +179,36 @@ export function InvoiceReceiptTicket({ data }: { data: PrintReceiptData }) {
   };
 
   const totalRowStyle: CSSProperties = {
-    display: "flex",
-    justifyContent: "space-between",
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) max-content",
+    columnGap: "3mm",
+    alignItems: "baseline",
     marginBottom: is58mm ? "1mm" : "1.5mm",
   };
 
   const grandTotalStyle: CSSProperties = {
-    display: "flex",
-    justifyContent: "space-between",
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) max-content",
+    columnGap: "3mm",
+    alignItems: "baseline",
     fontWeight: "bold",
     fontSize: is58mm ? "11px" : "12px",
   };
 
+  const pharmacyHeader = formatPharmacyHeader(data.pharmacy.name);
+
   return (
     <div className={`invoice-receipt ${paperClass}`} style={ticketStyle}>
       <div style={{ textAlign: "center", marginBottom: is58mm ? "2mm" : "3mm" }}>
-        <div style={{ fontWeight: "bold", fontSize: is58mm ? "12px" : "14px" }}>
-          {data.pharmacy.name}
+        {pharmacyHeader.showLabel && (
+          <div style={{ fontSize: is58mm ? "8px" : "9px", fontWeight: "bold", letterSpacing: "0.2mm" }}>
+            PHARMACIE
+          </div>
+        )}
+        <div style={{ fontWeight: "bold", fontSize: is58mm ? "11px" : "13px", marginTop: pharmacyHeader.showLabel ? "0.5mm" : 0 }}>
+          {pharmacyHeader.name}
         </div>
-        <div style={{ fontWeight: "bold", marginTop: is58mm ? "2mm" : "2.5mm", fontSize: is58mm ? "11px" : "13px" }}>
+        <div style={{ fontWeight: "bold", marginTop: is58mm ? "1.5mm" : "2mm", fontSize: is58mm ? "9px" : "11px" }}>
           FACTURE
         </div>
       </div>
@@ -235,7 +250,7 @@ export function InvoiceReceiptTicket({ data }: { data: PrintReceiptData }) {
         {data.invoice.items.map((item, index) => (
           <div key={index} style={{ marginBottom: is58mm ? "2mm" : "2.5mm" }}>
             <div style={productNameStyle}>{item.productName}</div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: "0.5mm" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) max-content", columnGap: "3mm", alignItems: "baseline", marginTop: "0.5mm" }}>
               <span style={productQtyStyle}>
                 {item.quantity} x {formatMoney(item.unitPrice, currencyCode)}
               </span>
@@ -283,7 +298,7 @@ export function InvoiceReceiptTicket({ data }: { data: PrintReceiptData }) {
       <div style={{ textAlign: "center", marginBottom: is58mm ? "2mm" : "2.5mm" }}>
         <BarcodeForPrint value={data.invoice.reference} />
         <div style={{
-          fontSize: is58mm ? "9px" : "10px",
+          fontSize: is58mm ? "8px" : "9px",
           fontFamily: "monospace",
           marginTop: "1mm",
           letterSpacing: "0.3mm",
@@ -292,11 +307,25 @@ export function InvoiceReceiptTicket({ data }: { data: PrintReceiptData }) {
         </div>
       </div>
 
-      <div style={{ textAlign: "center", fontSize: is58mm ? "8px" : "9px" }}>
+      <div style={{ textAlign: "center", fontSize: is58mm ? "7.5px" : "8.5px" }}>
         Merci de votre visite.
       </div>
     </div>
   );
+}
+
+function formatPharmacyHeader(name: string): { name: string; showLabel: boolean } {
+  const trimmedName = name.trim() || "Pharmacie";
+  const nameWithoutLeadingLabel = trimmedName.replace(/^pharmacie\b[\s:-]*/i, "").trim();
+
+  if (nameWithoutLeadingLabel && nameWithoutLeadingLabel !== trimmedName) {
+    return { name: nameWithoutLeadingLabel, showLabel: true };
+  }
+
+  return {
+    name: trimmedName,
+    showLabel: !/\bpharmacie\b/i.test(trimmedName),
+  };
 }
 
 export type { PrintReceiptData };

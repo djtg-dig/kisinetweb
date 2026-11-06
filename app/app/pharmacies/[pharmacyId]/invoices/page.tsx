@@ -1,15 +1,18 @@
 "use client";
 
 import { useEffect, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/ui/link-button";
 import {
   getPharmacyDetail,
+  getPharmacyGeneralSettings,
   getPharmacyPermissions,
   type PharmacyPermissions,
 } from "@/lib/api";
 import {
   createInvoicePayment,
+  getInvoiceDetail,
   getInvoiceMetadata,
   getPharmacyInvoices,
   type Invoice,
@@ -20,6 +23,8 @@ import {
 } from "@/lib/api/invoices";
 import { SALES_CHOICES_STORAGE_KEY, type SalesChoiceOption } from "@/lib/api/sales-choices";
 import { describeApiError } from "@/lib/api/errors";
+import { InvoiceReceiptTicket, type PrintReceiptData } from "@/components/invoices/PrintableInvoiceReceipt";
+import "@/components/invoices/invoice-receipt.css";
 
 type InvoicesPageProps = {
   params: Promise<{ pharmacyId: string }>;
@@ -42,11 +47,20 @@ const defaultStatusOptions: { value: string; label: string }[] = [
   { value: "UNPAID", label: "Non payée" },
   { value: "PARTIALLY_PAID", label: "Partiellement payée" },
   { value: "PAID", label: "Payée" },
-  { value: "OVERPAID", label: "Payée avec excédent" },
+  { value: "OVERPAID", label: "Surpayée" },
   { value: "CONFIRMED", label: "Confirmée" },
   { value: "CANCELED", label: "Annulée" },
   { value: "DRAFT", label: "Brouillon" },
 ];
+
+const invoiceStatusLabels: Record<string, string> = {
+  DRAFT: "Brouillon",
+  UNPAID: "Non payée",
+  PARTIALLY_PAID: "Partiellement payée",
+  PAID: "Payée",
+  OVERPAID: "Surpayée",
+  CANCELED: "Annulée",
+};
 
 const defaultPaymentMethodOptions: SalesChoiceOption[] = [
   { value: "CASH", label: "Espèces" },
@@ -77,6 +91,7 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
   const [feedback, setFeedback] = useState<FeedbackMessage | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [printingInvoiceReference, setPrintingInvoiceReference] = useState("");
+  const [printReceiptData, setPrintReceiptData] = useState<PrintReceiptData | null>(null);
 
   useEffect(() => {
     let isCurrent = true;
@@ -208,11 +223,43 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
       return;
     }
 
-    setPrintingInvoiceReference(invoice.reference);
+    void openPrintPreview(invoice.reference);
+  }
+
+  async function openPrintPreview(invoiceReference: string) {
+    setPrintingInvoiceReference(invoiceReference);
     setFeedback(null);
-    const printPath = "/app/print/invoices/" + encodeURIComponent(pharmacyId)
-      + "/" + encodeURIComponent(invoice.reference);
-    window.location.assign(printPath);
+
+    try {
+      const [invoice, settings] = await Promise.all([
+        getInvoiceDetail(pharmacyId, invoiceReference),
+        getPharmacyGeneralSettings(pharmacyId).catch(() => null),
+      ]);
+
+      if (!isInvoicePrintable(invoice)) {
+        setFeedback({
+          tone: "error",
+          text: "Seules les factures payées peuvent être imprimées comme facture définitive.",
+        });
+        return;
+      }
+
+      setPrintReceiptData({
+        invoice,
+        pharmacy: { name: pharmacyName || "Pharmacie" },
+        currency,
+        receiptPaperWidth: settings?.receiptPaperWidth || 80,
+      });
+    } catch (error) {
+      setFeedback({
+        tone: "error",
+        text: error instanceof Error
+          ? cleanUserErrorMessage(describeApiError(error))
+          : "Impossible de préparer la facture pour impression.",
+      });
+    } finally {
+      setPrintingInvoiceReference("");
+    }
   }
 
   return (
@@ -317,9 +364,7 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
             setReloadKey((key) => key + 1);
 
             if (shouldPrint && statusCode >= 200 && statusCode < 300) {
-              const printPath = "/app/print/invoices/" + encodeURIComponent(pharmacyId)
-                + "/" + encodeURIComponent(paymentInvoice.reference);
-              window.location.assign(printPath);
+              void openPrintPreview(paymentInvoice.reference);
             }
           }}
         />
@@ -331,7 +376,86 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
         </ToastMessage>
       )}
 
+      {printReceiptData && (
+        <InvoicePrintPreview
+          data={printReceiptData}
+          onClose={() => setPrintReceiptData(null)}
+        />
+      )}
+
     </div>
+  );
+}
+
+function InvoicePrintPreview({
+  data,
+  onClose,
+}: {
+  data: PrintReceiptData;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    document.body.classList.add("invoice-print-preview-open");
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.classList.remove("invoice-print-preview-open");
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [onClose]);
+
+  function handlePrint() {
+    // Deux frames garantissent que le ticket et son code-barres sont peints avant
+    // l'ouverture du dialogue natif, notamment sur les navigateurs Android.
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => window.print());
+    });
+  }
+
+  return createPortal(
+    <div className="invoice-print-preview fixed inset-0 z-[1200] flex items-center justify-center p-3 sm:p-6">
+      <button
+        type="button"
+        className="invoice-preview-backdrop absolute inset-0 bg-black/50"
+        aria-label="Fermer l'aperçu d'impression"
+        onClick={onClose}
+      />
+      <section
+        className="invoice-preview-panel relative flex max-h-[calc(100vh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl sm:max-h-[calc(100vh-3rem)]"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Aperçu du ticket de facture"
+      >
+        <header className="invoice-preview-controls flex items-center justify-between gap-3 border-b border-slate-200 p-4">
+          <div>
+            <h2 className="text-base font-bold text-slate-900">Aperçu du ticket</h2>
+            <p className="mt-1 text-xs text-slate-600">Vérifiez le contenu avant impression.</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Fermer
+          </button>
+        </header>
+
+        <div className="invoice-preview-document min-h-0 overflow-y-auto bg-slate-100 p-4">
+          <InvoiceReceiptTicket data={data} />
+        </div>
+
+        <footer className="invoice-preview-controls flex justify-end border-t border-slate-200 p-4">
+          <Button type="button" onClick={handlePrint}>Imprimer ce ticket</Button>
+        </footer>
+      </section>
+    </div>,
+    document.body,
   );
 }
 
@@ -1224,7 +1348,10 @@ function buildStatusOptions(
 
     seen.add(option.value);
     return true;
-  });
+  }).map((option) => ({
+    ...option,
+    label: invoiceStatusLabels[option.value] || option.label,
+  }));
 }
 
 function cleanFilters(filters: InvoiceFilters): InvoiceFilters {
@@ -1321,17 +1448,7 @@ function getStatusClass(status: InvoicePaymentStatus) {
 }
 
 function getStatusLabel(status: InvoicePaymentStatus) {
-  const labels: Record<InvoicePaymentStatus, string> = {
-    UNPAID: "Non payée",
-    PARTIALLY_PAID: "Partiellement payée",
-    PAID: "Payée",
-    OVERPAID: "Payée avec excédent",
-    CANCELED: "Annulée",
-    DRAFT: "Brouillon",
-    UNKNOWN: "Inconnu",
-  };
-
-  return labels[status];
+  return invoiceStatusLabels[status] || "Inconnu";
 }
 
 function formatCurrency(value: number, currency: string) {

@@ -5,6 +5,10 @@
   color: #000;
 }
 
+body.invoice-print-preview-open {
+  overflow: hidden;
+}
+
 @media print {
   html,
   body {
@@ -12,6 +16,36 @@
     padding: 0;
     background: #fff !important;
     color: #000 !important;
+    overflow: visible !important;
+  }
+
+  /* La modale est rendue directement sous body. Tous les éléments de Kisinet
+     sont donc exclus du document imprimé, y compris la navigation et le footer. */
+  body.invoice-print-preview-open > *:not(.invoice-print-preview) {
+    display: none !important;
+  }
+
+  body.invoice-print-preview-open .invoice-print-preview,
+  body.invoice-print-preview-open .invoice-preview-panel,
+  body.invoice-print-preview-open .invoice-preview-document {
+    display: block !important;
+    position: static !important;
+    inset: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    transform: none !important;
+  }
+
+  body.invoice-print-preview-open .invoice-preview-backdrop,
+  body.invoice-print-preview-open .invoice-preview-controls {
+    display: none !important;
   }
 
   .invoice-receipt {
