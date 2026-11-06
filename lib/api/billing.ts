@@ -35,42 +35,6 @@ export type SeatRole = "OWNER" | "MANAGER" | "PHARMACIST" | "EMPLOYEE";
 // Types du domaine
 // --------------------------------------------------------------------------- //
 
-/**
- * Plan de la facturation par siege (`GET /api/paiements/plans/`, endpoint
- * legacy conserve pour compatibilite ; le contrat public officiel des plans
- * reste `GET /api/paiements/pharmacy-plans/`, expose par `lib/api.ts`).
- *
- * Attention : `currency` est ici un identifiant numerique (cle etrangere vers
- * `/api/paiements/currencies/`), et non un code ISO comme dans l'ancienne API.
- * `features` est un objet de booleens, et non un tableau `{label, enabled}`.
- *
- * Prix : `pricePerUserMonth` est le prix par utilisateur et par mois (seule
- * donnee tarifaire d'un plan). Le montant reel d'un abonnement n'est PAS une
- * propriete du plan : il vaut `monthlyAmount` cote abonnement
- * (`PharmacySubscriptionSeatBilling` dans `lib/api.ts`). Le champ deprecie
- * `monthlyPrice` (`pricePerUserMonth * minBillableUsers`, simple prix plancher)
- * a ete retire pour eviter de l'afficher comme un montant facture.
- */
-export type PharmacyPlan = {
-  id: number;
-  code: string;
-  name: string;
-  description: string;
-  version: number;
-  pricePerUserMonth: string;
-  includedAiCreditPerUserMonth: number;
-  currency: number | null;
-  minBillableUsers: number;
-  features: Record<string, boolean>;
-  isActive: boolean;
-  /** @deprecated Informatif : `null` signifie illimite. */
-  maxUsers: number | null;
-  /** @deprecated Derive de `maxUsers === null`. */
-  unlimitedUsers: boolean;
-  createdAt: string;
-  updatedAt: string;
-};
-
 /** Portefeuille de credits achetes (`GET /api/paiements/pharmacies/{ref}/wallet/`). */
 export type CreditWallet = {
   id: number;
@@ -222,33 +186,8 @@ export type CreateCreditPurchasePayload = {
 };
 
 // --------------------------------------------------------------------------- //
-// Endpoints : plans et packs (catalogue)
+// Endpoints : packs (catalogue)
 // --------------------------------------------------------------------------- //
-export async function getBillingPlans(
-  filters: { code?: string; search?: string; ordering?: string } = {},
-): Promise<PharmacyPlan[]> {
-  const params = new URLSearchParams();
-  appendFilter(params, "code", filters.code);
-  appendFilter(params, "search", filters.search);
-  appendFilter(params, "ordering", filters.ordering);
-
-  const data = await fetchBillingJson<unknown>(
-    "/api/paiements/plans/" + buildQuery(params),
-    "Impossible de charger les plans.",
-  );
-
-  return toRecordList(data).map(normalizePlan);
-}
-
-export async function getBillingPlan(code: string): Promise<PharmacyPlan> {
-  const data = await fetchBillingJson<unknown>(
-    "/api/paiements/plans/" + encodeURIComponent(code) + "/",
-    "Impossible de charger le plan.",
-  );
-
-  return normalizePlan(toRecord(data));
-}
-
 export async function getCreditPacks(filters: CreditPackFilters = {}): Promise<CreditPack[]> {
   const params = new URLSearchParams();
   appendFilter(params, "search", filters.search);
@@ -515,29 +454,6 @@ export async function getAdminCreditPurchases(
 // --------------------------------------------------------------------------- //
 // Normalisation
 // --------------------------------------------------------------------------- //
-function normalizePlan(item: UnknownRecord): PharmacyPlan {
-  return {
-    id: toInteger(item.id),
-    code: toText(item.code),
-    name: toText(item.name),
-    description: toText(item.description),
-    version: toInteger(item.version),
-    pricePerUserMonth: toDecimal(item.price_per_user_month),
-    includedAiCreditPerUserMonth: toInteger(item.included_ai_credit_per_user_month),
-    currency: toNullableInteger(item.currency),
-    minBillableUsers: toInteger(item.min_billable_users),
-    features: toBooleanMap(item.features),
-    isActive: Boolean(item.is_active),
-    maxUsers: toNullableInteger(item.max_users),
-    unlimitedUsers:
-      item.unlimited_users === undefined
-        ? item.max_users === null || item.max_users === undefined
-        : Boolean(item.unlimited_users),
-    createdAt: toText(item.created_at),
-    updatedAt: toText(item.updated_at),
-  };
-}
-
 function normalizeCreditWallet(item: UnknownRecord): CreditWallet {
   const balance = toInteger(item.balance);
 
@@ -795,16 +711,6 @@ function toNullableInteger(value: unknown): number | null {
 
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
-}
-
-function toBooleanMap(value: unknown): Record<string, boolean> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return {};
-  }
-
-  return Object.fromEntries(
-    Object.entries(value as UnknownRecord).map(([key, entry]) => [key, Boolean(entry)]),
-  );
 }
 
 // --------------------------------------------------------------------------- //
