@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/ui/link-button";
 import {
@@ -12,7 +13,10 @@ import {
 import {
   createInvoicePayment,
   getInvoiceDetail,
+<<<<<<< HEAD
   getInvoicePaymentStatusLabel,
+=======
+>>>>>>> main
   getInvoiceMetadata,
   getPharmacyInvoices,
   type Invoice,
@@ -53,6 +57,15 @@ const defaultStatusOptions: { value: string; label: string }[] = [
   { value: "DRAFT", label: "Brouillon" },
 ];
 
+const invoiceStatusLabels: Record<string, string> = {
+  DRAFT: "Brouillon",
+  UNPAID: "Non payée",
+  PARTIALLY_PAID: "Partiellement payée",
+  PAID: "Payée",
+  OVERPAID: "Surpayée",
+  CANCELED: "Annulée",
+};
+
 const defaultPaymentMethodOptions: SalesChoiceOption[] = [
   { value: "CASH", label: "Espèces" },
   { value: "MOBILE_MONEY", label: "Mobile Money" },
@@ -83,11 +96,15 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
   const [reloadKey, setReloadKey] = useState(0);
   const [printingInvoiceReference, setPrintingInvoiceReference] = useState("");
 <<<<<<< HEAD
+<<<<<<< HEAD
   const [printReceiptData, setPrintReceiptData] = useState<PrintReceiptData | null>(null);
 =======
   const [previewReceiptData, setPreviewReceiptData] = useState<PrintReceiptData | null>(null);
   const [previewingInvoiceReference, setPreviewingInvoiceReference] = useState("");
 >>>>>>> brouillon
+=======
+  const [printReceiptData, setPrintReceiptData] = useState<PrintReceiptData | null>(null);
+>>>>>>> main
 
   useEffect(() => {
     let isCurrent = true;
@@ -219,7 +236,11 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
       return;
     }
 
+<<<<<<< HEAD
     openPrintPreview(invoice.reference);
+=======
+    void openPrintPreview(invoice.reference);
+>>>>>>> main
   }
 
   async function openPrintPreview(invoiceReference: string) {
@@ -256,6 +277,7 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
     } finally {
       setPrintingInvoiceReference("");
     }
+<<<<<<< HEAD
   }
 
   async function previewInvoice(invoice: Invoice) {
@@ -292,6 +314,8 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
     } finally {
       setPreviewingInvoiceReference("");
     }
+=======
+>>>>>>> main
   }
 
   return (
@@ -414,10 +438,14 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
       </div>
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> main
       {printReceiptData && (
         <InvoicePrintPreview
           data={printReceiptData}
           onClose={() => setPrintReceiptData(null)}
+<<<<<<< HEAD
 =======
       {previewReceiptData && (
         <InvoicePreviewDialog
@@ -509,7 +537,84 @@ function InvoicePreviewDialog({
 >>>>>>> brouillon
         </footer>
       </section>
+=======
+        />
+      )}
+
+>>>>>>> main
     </div>
+  );
+}
+
+function InvoicePrintPreview({
+  data,
+  onClose,
+}: {
+  data: PrintReceiptData;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    document.body.classList.add("invoice-print-preview-open");
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.classList.remove("invoice-print-preview-open");
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [onClose]);
+
+  function handlePrint() {
+    // Deux frames garantissent que le ticket et son code-barres sont peints avant
+    // l'ouverture du dialogue natif, notamment sur les navigateurs Android.
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => window.print());
+    });
+  }
+
+  return createPortal(
+    <div className="invoice-print-preview fixed inset-0 z-[1200] flex items-center justify-center p-3 sm:p-6">
+      <button
+        type="button"
+        className="invoice-preview-backdrop absolute inset-0 bg-black/50"
+        aria-label="Fermer l'aperçu d'impression"
+        onClick={onClose}
+      />
+      <section
+        className="invoice-preview-panel relative flex max-h-[calc(100vh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl sm:max-h-[calc(100vh-3rem)]"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Aperçu du ticket de facture"
+      >
+        <header className="invoice-preview-controls flex items-center justify-between gap-3 border-b border-slate-200 p-4">
+          <div>
+            <h2 className="text-base font-bold text-slate-900">Aperçu du ticket</h2>
+            <p className="mt-1 text-xs text-slate-600">Vérifiez le contenu avant impression.</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Fermer
+          </button>
+        </header>
+
+        <div className="invoice-preview-document min-h-0 overflow-y-auto bg-slate-100 p-4">
+          <InvoiceReceiptTicket data={data} />
+        </div>
+
+        <footer className="invoice-preview-controls flex justify-end border-t border-slate-200 p-4">
+          <Button type="button" onClick={handlePrint}>Imprimer ce ticket</Button>
+        </footer>
+      </section>
+    </div>,
+    document.body,
   );
 }
 
@@ -1440,7 +1545,10 @@ function buildStatusOptions(
 
     seen.add(option.value);
     return true;
-  });
+  }).map((option) => ({
+    ...option,
+    label: invoiceStatusLabels[option.value] || option.label,
+  }));
 }
 
 function cleanFilters(filters: InvoiceFilters): InvoiceFilters {
@@ -1536,6 +1644,13 @@ function getStatusClass(status: InvoicePaymentStatus) {
   return base + " bg-orange-50 text-orange-700 ring-orange-100";
 }
 
+<<<<<<< HEAD
+=======
+function getStatusLabel(status: InvoicePaymentStatus) {
+  return invoiceStatusLabels[status] || "Inconnu";
+}
+
+>>>>>>> main
 function formatCurrency(value: number, currency: string) {
   return new Intl.NumberFormat("fr-FR", {
     style: "currency",
