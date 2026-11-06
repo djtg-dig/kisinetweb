@@ -1023,12 +1023,10 @@ Content-Type: application/json
   et `remaining_amount` pour les cartes.
 - **Pagination** : le frontend utilise `count`, `next` et `previous`, et conserve
   les filtres/recherche actifs lors des changements de page.
-- **Impression** : l'action « Imprimer » ouvre la page privée
-  `/app/print/invoices/[pharmacyId]/[invoiceReference]`. Cette page relit le
-  détail de la facture, vérifie `sale_view` puis refuse les statuts autres que
-  `PAID` et `OVERPAID` avant de présenter le ticket à l'utilisateur. Le bouton
-  « Imprimer ce ticket » déclenche ensuite l'impression depuis cette page
-  dédiée, sans créer de vente ni de paiement.
+- **Impression** : l'action « Imprimer » relit le détail de la facture et ouvre
+  une modale de prévisualisation sur la liste. Elle refuse les statuts autres
+  que `PAID` et `OVERPAID`; le bouton « Imprimer ce ticket » imprime ensuite le
+  ticket visible, sans créer de vente ni de paiement.
 - **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden`, `404 Not Found`,
   `500 Internal Server Error` côté API. Le frontend affiche un message convivial
   sans exposer la réponse technique brute.
@@ -1040,14 +1038,13 @@ Content-Type: application/json
 - **Méthode HTTP** : `GET`
 - **URL** : `/api/sales/{invoice_reference}/?pharmacy_reference={pharmacy_id}`
 - **Pages frontend** :
-  `/app/pharmacies/[pharmacyId]/invoices/[invoiceReference]/products` et
-  `/app/print/invoices/[pharmacyId]/[invoiceReference]`.
+  `/app/pharmacies/[pharmacyId]/invoices/[invoiceReference]/products` et la
+  modale d'impression de `/app/pharmacies/[pharmacyId]/invoices`.
 - **Service frontend** : `getInvoiceDetail(pharmacyId, invoiceReference)` dans
   `lib/api/invoices.ts`.
-- **Authentification et accès** : requis. La page d'impression vérifie d'abord
-  `GET /api/pharmacies/{pharmacy_id}/permissions/` et exige `sale_view`; le
-  backend reste responsable de l'autorisation réelle et de l'appartenance de la
-  facture à la pharmacie.
+- **Authentification et accès** : requis. La page Factures exige `sale_view`
+  avant d'afficher l'action; le backend reste responsable de l'autorisation
+  réelle et de l'appartenance de la facture à la pharmacie.
 - **Réponse utilisée** : la facture, ses montants, son statut de paiement et les
   lignes de produits (`items`). Aucun champ n'est modifié par ce parcours.
 

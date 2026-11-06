@@ -1,7 +1,7 @@
 import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
 
-import { createInvoicePayment } from "./invoices.ts";
+import { createInvoicePayment, getInvoicePaymentStatusLabel } from "./invoices.ts";
 import { setApiFetchImpl } from "./request.ts";
 import { ApiError, CSRF_ERROR_MESSAGE, describeApiError } from "./errors.ts";
 
@@ -67,4 +67,14 @@ test("un refus CSRF de paiement reste distinct d'un refus métier", async () => 
     }),
     (error: unknown) => error instanceof ApiError && describeApiError(error) === CSRF_ERROR_MESSAGE,
   );
+});
+
+test("les statuts de facture ont des libellés français stables", () => {
+  assert.equal(getInvoicePaymentStatusLabel("DRAFT"), "Brouillon");
+  assert.equal(getInvoicePaymentStatusLabel("UNPAID"), "Non payée");
+  assert.equal(getInvoicePaymentStatusLabel("PARTIALLY_PAID"), "Partiellement payée");
+  assert.equal(getInvoicePaymentStatusLabel("PAID"), "Payée");
+  assert.equal(getInvoicePaymentStatusLabel("OVERPAID"), "Surpayée");
+  assert.equal(getInvoicePaymentStatusLabel("CANCELED"), "Annulée");
+  assert.equal(getInvoicePaymentStatusLabel("UNKNOWN"), "Inconnu");
 });

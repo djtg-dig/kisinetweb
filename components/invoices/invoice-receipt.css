@@ -24,6 +24,32 @@
     print-color-adjust: exact;
   }
 
+  /* La page courante reste visible à l'écran, mais seul le ticket part à l'impression. */
+  .invoice-page-content,
+  .invoice-preview-backdrop,
+  .invoice-preview-controls {
+    display: none !important;
+  }
+
+  .invoice-print-preview,
+  .invoice-preview-panel,
+  .invoice-preview-document {
+    display: block !important;
+    visibility: visible !important;
+    position: static !important;
+    inset: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    transform: none !important;
+  }
+
   .invoice-receipt.ticket-80mm {
     width: 76mm !important;
   }

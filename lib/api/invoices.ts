@@ -11,6 +11,21 @@ export type InvoicePaymentStatus =
   | "DRAFT"
   | "UNKNOWN";
 
+const INVOICE_PAYMENT_STATUS_LABELS: Record<InvoicePaymentStatus, string> = {
+  DRAFT: "Brouillon",
+  UNPAID: "Non payée",
+  PARTIALLY_PAID: "Partiellement payée",
+  PAID: "Payée",
+  OVERPAID: "Surpayée",
+  CANCELED: "Annulée",
+  UNKNOWN: "Inconnu",
+};
+
+/** Libellé utilisateur partagé, sans modifier la valeur technique de l'API. */
+export function getInvoicePaymentStatusLabel(status: InvoicePaymentStatus | string): string {
+  return INVOICE_PAYMENT_STATUS_LABELS[status as InvoicePaymentStatus] || "Inconnu";
+}
+
 export type InvoiceStatusOption = {
   value: string;
   label: string;
