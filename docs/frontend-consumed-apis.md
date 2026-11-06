@@ -1029,6 +1029,8 @@ Content-Type: application/json
   `PAID` et `OVERPAID` avant de présenter le ticket à l'utilisateur. Le bouton
   « Imprimer ce ticket » déclenche ensuite l'impression depuis cette page
   dédiée, sans créer de vente ni de paiement.
+  L'action distincte « Prévisualiser le ticket » charge ce même détail dans une
+  modale, mais son bouton d'impression ouvre toujours la page dédiée validée.
 - **Erreurs possibles** : `401 Unauthorized`, `403 Forbidden`, `404 Not Found`,
   `500 Internal Server Error` côté API. Le frontend affiche un message convivial
   sans exposer la réponse technique brute.
