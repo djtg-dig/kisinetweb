@@ -5,11 +5,14 @@ import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/ui/link-button";
 import {
   getPharmacyDetail,
+  getPharmacyGeneralSettings,
   getPharmacyPermissions,
   type PharmacyPermissions,
 } from "@/lib/api";
 import {
   createInvoicePayment,
+  getInvoiceDetail,
+  getInvoicePaymentStatusLabel,
   getInvoiceMetadata,
   getPharmacyInvoices,
   type Invoice,
@@ -20,6 +23,8 @@ import {
 } from "@/lib/api/invoices";
 import { SALES_CHOICES_STORAGE_KEY, type SalesChoiceOption } from "@/lib/api/sales-choices";
 import { describeApiError } from "@/lib/api/errors";
+import { InvoiceReceiptTicket, type PrintReceiptData } from "@/components/invoices/PrintableInvoiceReceipt";
+import "@/components/invoices/invoice-receipt.css";
 
 type InvoicesPageProps = {
   params: Promise<{ pharmacyId: string }>;
@@ -42,7 +47,7 @@ const defaultStatusOptions: { value: string; label: string }[] = [
   { value: "UNPAID", label: "Non payée" },
   { value: "PARTIALLY_PAID", label: "Partiellement payée" },
   { value: "PAID", label: "Payée" },
-  { value: "OVERPAID", label: "Payée avec excédent" },
+  { value: "OVERPAID", label: "Surpayée" },
   { value: "CONFIRMED", label: "Confirmée" },
   { value: "CANCELED", label: "Annulée" },
   { value: "DRAFT", label: "Brouillon" },
@@ -77,6 +82,8 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
   const [feedback, setFeedback] = useState<FeedbackMessage | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [printingInvoiceReference, setPrintingInvoiceReference] = useState("");
+  const [previewReceiptData, setPreviewReceiptData] = useState<PrintReceiptData | null>(null);
+  const [previewingInvoiceReference, setPreviewingInvoiceReference] = useState("");
 
   useEffect(() => {
     let isCurrent = true;
@@ -213,6 +220,42 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
     const printPath = "/app/print/invoices/" + encodeURIComponent(pharmacyId)
       + "/" + encodeURIComponent(invoice.reference);
     window.location.assign(printPath);
+  }
+
+  async function previewInvoice(invoice: Invoice) {
+    if (!isInvoicePrintable(invoice)) {
+      setFeedback({ tone: "error", text: "Seules les factures payées peuvent être prévisualisées." });
+      return;
+    }
+
+    setPreviewingInvoiceReference(invoice.reference);
+    try {
+      const [invoiceDetail, settings] = await Promise.all([
+        getInvoiceDetail(pharmacyId, invoice.reference),
+        getPharmacyGeneralSettings(pharmacyId).catch(() => null),
+      ]);
+
+      if (!isInvoicePrintable(invoiceDetail)) {
+        setFeedback({ tone: "error", text: "Seules les factures payées peuvent être prévisualisées." });
+        return;
+      }
+
+      setPreviewReceiptData({
+        invoice: invoiceDetail,
+        pharmacy: { name: pharmacyName || "Pharmacie" },
+        currency,
+        receiptPaperWidth: settings?.receiptPaperWidth || 80,
+      });
+    } catch (error) {
+      setFeedback({
+        tone: "error",
+        text: error instanceof Error
+          ? cleanUserErrorMessage(describeApiError(error))
+          : "Impossible de préparer l'aperçu du ticket.",
+      });
+    } finally {
+      setPreviewingInvoiceReference("");
+    }
   }
 
   return (
