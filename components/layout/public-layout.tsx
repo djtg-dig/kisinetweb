@@ -24,6 +24,7 @@ const navLinks = [
   { label: "Pharmacies", href: "/pharmacies" },
   { label: "Fonctionnalités", href: "/#fonctionnalites" },
   { label: "Tarifs", href: "/tarifs" },
+  { label: "Guide", href: "/guide" },
   { label: "FAQ", href: "/#faq" },
   { label: "Contact", href: "/contact" },
 ];
@@ -151,7 +152,7 @@ function PublicNavbar({ userMenu }: PublicNavbarProps) {
           <span className="text-lg font-bold text-app-text">Kisi<span className="text-accent-800">net</span></span>
         </a>
 
-        <div className="hidden items-center gap-6 text-sm font-medium text-app-muted md:flex">
+        <div className="hidden items-center gap-6 text-sm font-medium text-app-muted lg:flex">
           {navLinks.map((link) => (
             <a key={link.href} href={link.href} className="hover:text-primary-700">
               {link.label}
@@ -176,7 +177,7 @@ function PublicNavbar({ userMenu }: PublicNavbarProps) {
               Se connecter
             </LinkButton>
           )}
-          <div ref={mobileNavRef} className="relative md:hidden">
+          <div ref={mobileNavRef} className="relative lg:hidden">
             <button
               type="button"
               aria-expanded={isMobileNavOpen}
