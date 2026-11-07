@@ -103,18 +103,6 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   OTHER: "Autre",
 };
 
-<<<<<<< HEAD
-=======
-const PAYMENT_STATUS_LABELS: Record<string, string> = {
-  DRAFT: "Brouillon",
-  UNPAID: "Non payée",
-  PARTIALLY_PAID: "Partiellement payée",
-  PAID: "Payée",
-  OVERPAID: "Surpayée",
-  CANCELED: "Annulée",
-};
-
->>>>>>> main
 export function InvoiceReceiptTicket({ data }: { data: PrintReceiptData }) {
   const is58mm = data.receiptPaperWidth === 58;
   const currencyCode = data.currency || "USD";

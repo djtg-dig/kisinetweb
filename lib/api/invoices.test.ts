@@ -76,8 +76,5 @@ test("les statuts de facture ont des libellés français stables", () => {
   assert.equal(getInvoicePaymentStatusLabel("PAID"), "Payée");
   assert.equal(getInvoicePaymentStatusLabel("OVERPAID"), "Surpayée");
   assert.equal(getInvoicePaymentStatusLabel("CANCELED"), "Annulée");
-<<<<<<< HEAD
   assert.equal(getInvoicePaymentStatusLabel("UNKNOWN"), "Inconnu");
-=======
->>>>>>> brouillon
 });

@@ -21,11 +21,7 @@ const INVOICE_PAYMENT_STATUS_LABELS: Record<InvoicePaymentStatus, string> = {
   UNKNOWN: "Inconnu",
 };
 
-<<<<<<< HEAD
-/** Libellé utilisateur partagé, sans modifier la valeur technique de l'API. */
-=======
 /** Libellé utilisateur partagé, sans changer les valeurs échangées avec l'API. */
->>>>>>> brouillon
 export function getInvoicePaymentStatusLabel(status: InvoicePaymentStatus | string): string {
   return INVOICE_PAYMENT_STATUS_LABELS[status as InvoicePaymentStatus] || "Inconnu";
 }
