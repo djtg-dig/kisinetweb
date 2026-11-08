@@ -1454,9 +1454,8 @@ Le client `createCreditPurchase()` supporte aussi l'initiation pawaPay sur
 `pack_id`, `provider_code: "PAWAPAY"`, `country`, `phone_number` et
 `operator`. La réponse d'initiation est uniquement
 `{ "payment_reference", "status": "PENDING" }` : elle ne crédite pas le
-portefeuille. L'écran `/app/pharmacies/{pharmacy_id}/settings/ai` l'affiche
-seulement quand le feature flag est actif et indique l'attente de confirmation;
-il ne recrée jamais une demande après un timeout.
+portefeuille. Aucun écran d'achat de crédits ne doit être affiché tant que le
+backend ne fournit pas un portefeuille personnel indépendant de la pharmacie.
 
 Les endpoints de licences utilisateur existent côté backend (`GET
 /api/paiements/user-license-plans/`, `POST /api/paiements/user-license-purchases/`
@@ -1481,7 +1480,6 @@ Endpoints consommés:
 | --- | --- |
 | Crédits IA restants d'un utilisateur | `GET /api/paiements/pharmacies/{pharmacy_id}/users/{user_reference}/ai-credits/` (page vente « Scanner avec l'IA » et page `settings/me` « Mon espace ») |
 | Crédits IA restants d'une pharmacie | `GET /api/paiements/pharmacies/{pharmacy_id}/ai-credits/` |
-| Initier un achat Mobile Money pawaPay | `POST /api/paiements/pharmacies/{pharmacy_id}/credit-purchases/` |
 
 Paramètres de chemin:
 
