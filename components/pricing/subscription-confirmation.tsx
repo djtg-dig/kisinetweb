@@ -26,6 +26,7 @@ export function SubscriptionConfirmation({
   disabled,
   isSubmitting,
   paymentMessage,
+  paymentProvider,
   paymentTone,
   plan,
   selectedPharmacy,
@@ -39,6 +40,7 @@ export function SubscriptionConfirmation({
   disabled: boolean;
   isSubmitting: boolean;
   paymentMessage: string;
+  paymentProvider: "AGREGATEUR" | "PAWAPAY";
   paymentTone: "error" | "success" | "neutral";
   plan: PharmacyPlan;
   selectedPharmacy: PharmacySummary | null;
@@ -67,8 +69,8 @@ export function SubscriptionConfirmation({
           Confirmez votre commande
         </h1>
         <p className="mt-2 text-sm leading-6 text-app-muted">
-          Vérifiez le récapitulatif ci-dessous avant d&apos;être redirigé vers le paiement
-          sécurisé. Aucun montant n&apos;est débité à cette étape.
+          Vérifiez le récapitulatif ci-dessous avant de lancer le paiement. Aucun montant
+          n&apos;est débité à cette étape.
         </p>
       </header>
 
@@ -116,6 +118,10 @@ export function SubscriptionConfirmation({
                 value={formatMoney(totals.monthlyAmount, currency)}
               />
               <ConfirmationRow label="Devise" value={currency || "—"} />
+              <ConfirmationRow
+                label="Moyen de paiement"
+                value={paymentProvider === "PAWAPAY" ? "pawaPay Mobile Money" : "iKeePay"}
+              />
               {totals.durationMonths > 0 && (
                 <ConfirmationRow
                   label="Durée choisie"

@@ -14,7 +14,7 @@ export interface ReferredPharmacy {
   status: "ACTIVE" | "CANCELLED";
   created_at: string;
   subscription_status: "ACTIVE" | "EXPIRED" | "CANCELED" | "PENDING" | null;
-  subscription_plan_code: "BASIC" | "PRO" | "ENTERPRISE" | null;
+  subscription_plan_code: "BASIC" | "STANDARD" | "ENTERPRISE" | string | null;
   subscription_plan_name: string | null;
   subscription_is_active: boolean;
   subscription_is_trial: boolean;

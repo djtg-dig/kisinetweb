@@ -18,7 +18,7 @@ type PageState = "loading" | "ready" | "error";
  * Affiche pour chaque pharmacie :
  * - Nom et référence
  * - Statut de l'abonnement (actif, en essai, expiré)
- * - Plan actuel (BASIC, PRO, ENTERPRISE)
+ * - Plan actuel (BASIC, STANDARD, ENTERPRISE)
  * - Date d'expiration
  * - Commissions gagnées
  * - Paiements totaux

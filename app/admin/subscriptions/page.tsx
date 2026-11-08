@@ -186,7 +186,7 @@ export default function AdminSubscriptionsPage() {
               ["", "Tous"],
               ["BASIC", "BASIC"],
               ["PREMIUM", "PREMIUM"],
-              ["PRO", "PRO"],
+              ["STANDARD", "STANDARD"],
             ]}
           />
           <FilterSelect

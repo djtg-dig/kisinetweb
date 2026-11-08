@@ -1167,6 +1167,8 @@ export type AgregateurSubscriptionCheckout = {
   subscription?: unknown;
 };
 
+export type SubscriptionPaymentProvider = "AGREGATEUR" | "PAWAPAY";
+
 /**
  * Champs seat-based ajoutes sur l'abonnement par le backend.
  * Tous optionnels : l'ancienne reponse d'abonnement reste valide.
@@ -1310,7 +1312,8 @@ export async function getPharmacyPlan(name: string): Promise<PharmacyPlan> {
 }
 
 /**
- * Initialise le paiement d'un abonnement (facturation par siege).
+ * Initialise un paiement d'abonnement. Le montant est toujours calculé par le
+ * backend à partir du forfait fixe et de la durée sélectionnée.
  *
  * Le frontend ne transmet que les informations de la commande : identifiant du
  * plan, nombre d'utilisateurs, duree et devise. Le backend reste la seule
@@ -1322,10 +1325,15 @@ export async function initiateAgregateurSubscriptionCheckout(payload: {
   planCode: string;
   durationMonths: number;
   currency: string;
-  /** Identifiant numerique du plan seat-based, quand il est connu. */
+  providerCode?: SubscriptionPaymentProvider;
+  /** Requis par pawaPay. Le backend attend le code ISO alpha-2. */
+  country?: string;
+  /** Requis par pawaPay. */
+  phoneNumber?: string;
+  /** Requis par pawaPay, par exemple AIRTEL_COD. */
+  operator?: string;
+  /** Identifiant numerique du plan, quand il est connu. */
   planId?: number;
-  /** Nombre d'utilisateurs actifs factures (modele seat-based). */
-  userCount?: number;
 }): Promise<AgregateurSubscriptionCheckout> {
   const pharmacyReference = payload.pharmacyReference.trim();
   if (!pharmacyReference) {
@@ -1340,11 +1348,9 @@ export async function initiateAgregateurSubscriptionCheckout(payload: {
     throw new Error("La durée d'abonnement sélectionnée est invalide.");
   }
 
-  if (
-    payload.userCount !== undefined &&
-    (!Number.isInteger(payload.userCount) || payload.userCount < 1)
-  ) {
-    throw new Error("Le nombre d'utilisateurs doit être un entier supérieur ou égal à 1.");
+  const providerCode = payload.providerCode || "AGREGATEUR";
+  if (providerCode === "PAWAPAY" && (!payload.country || !payload.phoneNumber || !payload.operator)) {
+    throw new Error("Le pays, l'opérateur et le numéro Mobile Money sont requis pour pawaPay.");
   }
 
   const body: UnknownRecord = {
@@ -1352,16 +1358,17 @@ export async function initiateAgregateurSubscriptionCheckout(payload: {
     plan_code: payload.planCode,
     duration_months: payload.durationMonths,
     currency: payload.currency,
+    provider_code: providerCode,
   };
 
-  // Champs seat-based : envoyes uniquement quand ils sont connus, afin de
-  // rester compatible avec l'ancien contrat de l'endpoint.
   if (Number.isFinite(payload.planId) && Number(payload.planId) > 0) {
     body.plan_id = Number(payload.planId);
   }
 
-  if (payload.userCount !== undefined) {
-    body.user_count = payload.userCount;
+  if (providerCode === "PAWAPAY") {
+    body.country = payload.country?.trim().toUpperCase();
+    body.phone_number = payload.phoneNumber?.trim();
+    body.operator = payload.operator?.trim().toUpperCase();
   }
 
   const data = await postJson<UnknownRecord>(
@@ -1373,9 +1380,9 @@ export async function initiateAgregateurSubscriptionCheckout(payload: {
   const payment = normalizeSubscriptionPayment((data.payment || {}) as UnknownRecord);
   const checkoutUrl = String(data.checkout_url || "");
 
-  // Le backend a repondu 2xx mais sans URL de paiement : on evite d'ouvrir un
-  // ecran de paiement vide et on remonte une erreur explicite.
-  if (!checkoutUrl) {
+  // pawaPay est un dépôt Mobile Money sans checkout hébergé. Seul le parcours
+  // historique AGREGATEUR exige une URL à ouvrir dans une iframe.
+  if (providerCode === "AGREGATEUR" && !checkoutUrl) {
     throw new Error(
       "Le serveur n'a pas renvoyé d'URL de paiement. Réessayez dans quelques instants.",
     );
