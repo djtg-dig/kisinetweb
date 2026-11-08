@@ -66,11 +66,11 @@ test("normalise un timeout réseau du scan en indisponibilité IA", async () => 
 });
 
 test("normalise un corps de réponse interrompu en indisponibilité IA", async () => {
-  setApiFetchImpl(async () => ({
-    ok: false,
-    status: 502,
-    text: async () => { throw new TypeError("stream interrupted"); },
-  }) as Response);
+  const interruptedResponse = new Response(null, { status: 502 });
+  Object.defineProperty(interruptedResponse, "text", {
+    value: async () => { throw new TypeError("stream interrupted"); },
+  });
+  setApiFetchImpl(async () => interruptedResponse);
 
   await assert.rejects(
     () => analyzePrescription("PH12345678", image()),
