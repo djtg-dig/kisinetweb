@@ -1454,8 +1454,12 @@ Le client `createCreditPurchase()` supporte aussi l'initiation pawaPay sur
 `pack_id`, `provider_code: "PAWAPAY"`, `country`, `phone_number` et
 `operator`. La réponse d'initiation est uniquement
 `{ "payment_reference", "status": "PENDING" }` : elle ne crédite pas le
-portefeuille. Aucun écran d'achat de crédits ne doit être affiché tant que le
-backend ne fournit pas un portefeuille personnel indépendant de la pharmacie.
+portefeuille. L'écran personnel `/app/compte/credits-ia` est affiché avec le
+portefeuille global de l'utilisateur. Comme l'endpoint d'initiation conserve
+une pharmacie dans son URL, il demande une pharmacie à laquelle l'utilisateur
+est autorisé; ce choix ne désigne pas le bénéficiaire des crédits, qui reste
+toujours l'utilisateur authentifié côté backend. Il ne crée aucune nouvelle
+demande après une réponse en attente ou une erreur réseau.
 
 Les endpoints de licences utilisateur existent côté backend (`GET
 /api/paiements/user-license-plans/`, `POST /api/paiements/user-license-purchases/`

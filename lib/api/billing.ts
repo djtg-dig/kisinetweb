@@ -221,6 +221,31 @@ export async function getCreditPack(packId: number | string): Promise<CreditPack
   return normalizeCreditPack(toRecord(data));
 }
 
+/** Portefeuille personnel de l'utilisateur authentifié. */
+export async function getMyCreditWallet(): Promise<CreditWallet> {
+  const data = await fetchBillingJson<unknown>(
+    "/api/paiements/my-credit-wallet/",
+    "Impossible de charger votre portefeuille de crédits.",
+  );
+  return normalizeCreditWallet(toRecord(data));
+}
+
+export async function getMyCreditPurchases(): Promise<CreditPurchase[]> {
+  const data = await fetchBillingJson<unknown>(
+    "/api/paiements/my-credit-purchases/",
+    "Impossible de charger vos achats de crédits.",
+  );
+  return toRecordList(data).map(normalizeCreditPurchase);
+}
+
+export async function getMyCreditLedger(): Promise<CreditLedgerEntry[]> {
+  const data = await fetchBillingJson<unknown>(
+    "/api/paiements/my-credit-ledger/",
+    "Impossible de charger vos mouvements de crédits.",
+  );
+  return toRecordList(data).map(normalizeCreditLedgerEntry);
+}
+
 // --------------------------------------------------------------------------- //
 // Endpoints : portefeuille et journal des credits
 // --------------------------------------------------------------------------- //

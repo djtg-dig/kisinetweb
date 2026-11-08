@@ -165,6 +165,13 @@ export default function AccountPage() {
               {/* Rubrique 1 : Mes infos personnelles */}
               <PersonalInfoSection profile={profile} />
 
+              <section className="rounded-lg border border-app-border bg-app-card p-6 shadow-sm">
+                <p className="text-sm font-semibold text-primary-700">Intelligence artificielle</p>
+                <h2 className="mt-2 text-xl font-bold text-app-text">Mes crédits IA</h2>
+                <p className="mt-3 text-sm text-app-muted">Consultez votre solde personnel et vos mouvements.</p>
+                <LinkButton href="/app/compte/credits-ia" variant="secondary" className="mt-4">Gérer mes crédits IA</LinkButton>
+              </section>
+
               {/* Rubrique 2 : Parrainage (aperçu du solde) */}
               <ReferralSection wallets={wallets} />
 
