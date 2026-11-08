@@ -48,8 +48,10 @@ type WithdrawalDialogProps = {
     country: string;
     phone_number: string;
     operator: string;
+    providerCode: "IKEEPAY" | "PAWAPAY";
   }) => void;
   isSubmitting: boolean;
+  pawaPayEnabled: boolean;
   // Message d'erreur/succès à afficher dans la modal (déjà humanisé
   // par le parent).
   message?: string;
@@ -65,12 +67,14 @@ export function WithdrawalDialog({
   wallet,
   onSubmit,
   isSubmitting,
+  pawaPayEnabled,
   message,
 }: WithdrawalDialogProps) {
   const [amount, setAmount] = useState("");
   const [country, setCountry] = useState<string>("CD");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [operator, setOperator] = useState<string>(WITHDRAWAL_OPERATORS[0]?.code || "");
+  const [providerCode, setProviderCode] = useState<"IKEEPAY" | "PAWAPAY">("IKEEPAY");
   const [touched, setTouched] = useState(false);
 
   // Réinitialise le formulaire à l'ouverture. Indispensable pour éviter
@@ -82,6 +86,7 @@ export function WithdrawalDialog({
       setCountry("CD");
       setPhoneNumber("");
       setOperator(WITHDRAWAL_OPERATORS[0]?.code || "");
+      setProviderCode("IKEEPAY");
       setTouched(false);
     }
   }, [open]);
@@ -129,6 +134,7 @@ export function WithdrawalDialog({
       country: country.trim().toUpperCase(),
       phone_number: phoneNumber.trim(),
       operator: operator.trim().toUpperCase(),
+      providerCode,
     });
   }
 
@@ -256,6 +262,26 @@ export function WithdrawalDialog({
             ))}
           </select>
         </label>
+
+        {pawaPayEnabled && (
+          <label className="block text-sm font-semibold text-app-text">
+            Service de paiement
+            <select
+              value={providerCode}
+              onChange={(event) => setProviderCode(event.target.value as "IKEEPAY" | "PAWAPAY")}
+              className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-card px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
+            >
+              <option value="IKEEPAY">iKeePay</option>
+              <option value="PAWAPAY">pawaPay</option>
+            </select>
+          </label>
+        )}
+
+        {providerCode === "PAWAPAY" && (
+          <p className="rounded-md border border-app-border bg-app-surface px-3 py-2 text-sm text-app-muted">
+            Confirmez le retrait sur votre téléphone. Les fonds restent réservés jusqu’à la confirmation du backend.
+          </p>
+        )}
 
         {/* Aperçu local non-comptable : seules les valeurs du backend
             après soumission font foi. */}

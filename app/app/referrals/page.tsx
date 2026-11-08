@@ -13,6 +13,7 @@ import { maskPhoneNumber } from "@/lib/referrals/withdrawal-display";
 import { evaluateWalletWithdrawability } from "@/lib/referrals/withdrawability";
 import {
   createReferralWithdrawal,
+  getReferralWithdrawal,
   getReferralPayoutAccounts,
   getReferralCommissions,
   getReferralOverview,
@@ -26,6 +27,8 @@ import {
 } from "@/lib/api/referrals";
 
 type PageState = "loading" | "anonymous" | "ready" | "error";
+const PAWAPAY_ENABLED = process.env.NEXT_PUBLIC_PAWAPAY_ENABLED === "true";
+const FINAL_WITHDRAWAL_STATUSES = new Set(["PAID", "FAILED", "REJECTED", "CANCELLED"]);
 
 async function fetchReferralDashboard() {
   const [overview, commissionList, withdrawalList, referredList, payoutAccountList] = await Promise.all([
@@ -151,6 +154,7 @@ export default function ReferralsPage() {
     country: string;
     phone_number: string;
     operator: string;
+    providerCode: "IKEEPAY" | "PAWAPAY";
   }) {
     setIsSubmitting(true);
     setMessage("");
@@ -163,10 +167,12 @@ export default function ReferralsPage() {
         country: payload.country,
         phone_number: payload.phone_number,
         operator: payload.operator,
+        provider_code: payload.providerCode,
       });
       setIsWithdrawalModalOpen(false);
       setLastWithdrawalRef(created.reference);
-      setLastWithdrawalStatus(created.status);
+      const resolved = await pollReferralWithdrawalStatus(created);
+      setLastWithdrawalStatus(resolved.status);
       // On rafraîchit le dashboard pour récupérer le nouveau solde
       // disponible (available_balance a été décrémenté de
       // total_reserved_amount, pas de amount seul).
@@ -174,17 +180,17 @@ export default function ReferralsPage() {
       // On choisit le ton du message en fonction du statut retourné :
       // REQUESTED / PROCESSING -> info, PAID -> success, FAILED -> error.
       const kind: "info" | "success" | "error" =
-        created.status === "PAID"
+        resolved.status === "PAID"
           ? "success"
-          : created.status === "FAILED" || created.status === "REJECTED"
+          : resolved.status === "FAILED" || resolved.status === "REJECTED"
             ? "error"
             : "info";
       setMessageKind(kind);
-      const statusLabel = withdrawalStatusLabel(created.status);
+      const statusLabel = withdrawalStatusLabel(resolved.status);
       setMessage(
-        created.status === "PROCESSING"
+        resolved.status === "PROCESSING"
           ? `Votre retrait a été transmis. Référence : ${created.reference} — Retrait en cours de traitement.`
-          : created.status === "REQUESTED"
+          : resolved.status === "REQUESTED"
             ? `Votre retrait a été transmis. Référence : ${created.reference} — Préparation en cours.`
             : `Votre retrait (${created.reference}) est : ${statusLabel}.`,
       );
@@ -344,6 +350,7 @@ export default function ReferralsPage() {
           onClose={() => setIsWithdrawalModalOpen(false)}
           wallet={activeWallet}
           isSubmitting={isSubmitting}
+          pawaPayEnabled={PAWAPAY_ENABLED}
           message={messageKind === "error" ? message : ""}
           onSubmit={handleWithdrawalSubmit}
         />
@@ -362,6 +369,21 @@ export default function ReferralsPage() {
       </section>
     </MainLayout>
   );
+}
+
+async function pollReferralWithdrawalStatus(initial: ReferralWithdrawal): Promise<ReferralWithdrawal> {
+  let current = initial;
+  // Consultation bornée : elle ne crée jamais une seconde demande et laisse le
+  // backend réconcilier un éventuel timeout fournisseur.
+  for (let attempt = 0; attempt < 4 && !FINAL_WITHDRAWAL_STATUSES.has(current.status); attempt += 1) {
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 2_000));
+    try {
+      current = await getReferralWithdrawal(initial.reference);
+    } catch {
+      return current;
+    }
+  }
+  return current;
 }
 
 function WalletOverview({ wallets }: { wallets: ReferralWalletSummary[] }) {

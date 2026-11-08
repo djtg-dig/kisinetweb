@@ -135,6 +135,8 @@ export type CreateReferralWithdrawalPayload = {
   country?: string;
   phone_number?: string;
   operator?: string;
+  /** iKeePay reste le défaut backend ; pawaPay est toujours explicite. */
+  provider_code?: "IKEEPAY" | "PAWAPAY";
 };
 
 export async function getReferralOverview(): Promise<ReferralWalletSummary[]> {
@@ -200,6 +202,12 @@ export async function updateReferralPayoutAccount(
 
 export async function getReferralWithdrawals(): Promise<ReferralWithdrawal[]> {
   return fetchReferralJson<ReferralWithdrawal[]>("/api/paiements/referral-withdrawals/");
+}
+
+export async function getReferralWithdrawal(reference: string): Promise<ReferralWithdrawal> {
+  return fetchReferralJson<ReferralWithdrawal>(
+    "/api/paiements/referral-withdrawals/" + encodeURIComponent(reference) + "/",
+  );
 }
 
 export async function createReferralWithdrawal(

@@ -180,9 +180,20 @@ export type SeatHistoryFilters = {
 
 export type CreateCreditPurchasePayload = {
   packId: number;
-  /** Reference idempotente du paiement : un rejeu ne recredite pas deux fois. */
-  paymentReference: string;
+  /** Référence d'un paiement historique déjà validé par le backend. */
+  paymentReference?: string;
   currency?: string;
+  /** Uniquement pour l'initiation Mobile Money pawaPay. */
+  providerCode?: "PAWAPAY";
+  country?: string;
+  phoneNumber?: string;
+  operator?: string;
+};
+
+/** Réponse d'initiation pawaPay : aucun crédit n'est encore attribué. */
+export type CreditPurchasePaymentInitiation = {
+  paymentReference: string;
+  status: string;
 };
 
 // --------------------------------------------------------------------------- //
@@ -272,14 +283,21 @@ export async function getCreditPurchase(
 /**
  * Initie un achat de credits.
  *
- * NOTE backend : la route POST est actuellement masquee par la vue de liste
- * (deux `path()` identiques dans `apps/paiements/urls.py`), l'API repond donc
- * `405`. La fonction est fournie pour etre prete des la correction backend.
+ * Pour pawaPay, l'API retourne seulement la référence et l'état PENDING : le
+ * portefeuille ne doit être actualisé qu'après une confirmation backend.
  */
 export async function createCreditPurchase(
   pharmacyReference: string,
   payload: CreateCreditPurchasePayload,
-): Promise<CreditPurchase> {
+): Promise<CreditPurchase | CreditPurchasePaymentInitiation> {
+  const providerCode = payload.providerCode;
+  if (providerCode === "PAWAPAY" && (!payload.country || !payload.phoneNumber || !payload.operator)) {
+    throw new Error("Le pays, l'opérateur et le numéro Mobile Money sont requis pour pawaPay.");
+  }
+  if (!providerCode && !payload.paymentReference) {
+    throw new Error("La référence du paiement confirmé est requise.");
+  }
+
   const data = await fetchBillingJson<unknown>(
     pharmacyPath(pharmacyReference, "credit-purchases"),
     "Impossible d'initier l'achat de credits.",
@@ -288,13 +306,28 @@ export async function createCreditPurchase(
       body: JSON.stringify({
         pack_id: payload.packId,
         pharmacy_reference: pharmacyReference,
-        payment_reference: payload.paymentReference,
+        ...(providerCode ? { provider_code: providerCode } : { payment_reference: payload.paymentReference }),
         ...(payload.currency ? { currency: payload.currency.toUpperCase() } : {}),
+        ...(providerCode === "PAWAPAY"
+          ? {
+              country: payload.country?.trim().toUpperCase(),
+              phone_number: payload.phoneNumber?.trim(),
+              operator: payload.operator?.trim().toUpperCase(),
+            }
+          : {}),
       }),
     },
   );
 
-  return normalizeCreditPurchase(toRecord(data));
+  const record = toRecord(data);
+  if (providerCode === "PAWAPAY") {
+    return {
+      paymentReference: toText(record.payment_reference),
+      status: toText(record.status),
+    };
+  }
+
+  return normalizeCreditPurchase(record);
 }
 
 // --------------------------------------------------------------------------- //

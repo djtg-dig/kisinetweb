@@ -1,20 +1,34 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
-import { getPharmacyAiCredits, type PharmacyAiCredits } from "@/lib/api/billing";
+import {
+  createCreditPurchase,
+  getCreditPacks,
+  getPharmacyAiCredits,
+  type CreditPack,
+  type PharmacyAiCredits,
+} from "@/lib/api/billing";
 
 type AiSettingsPageProps = {
   params: Promise<{ pharmacyId: string }>;
 };
 
 type PageState = "loading" | "ready" | "error";
+const PAWAPAY_ENABLED = process.env.NEXT_PUBLIC_PAWAPAY_ENABLED === "true";
+const PAWAPAY_OPERATORS = ["AIRTEL_COD", "ORANGE_COD", "VODACOM_MPESA_COD"];
 
 export default function PharmacyAiSettingsPage({ params }: AiSettingsPageProps) {
   const [pharmacyId, setPharmacyId] = useState("");
   const [state, setState] = useState<PageState>("loading");
   const [errorMessage, setErrorMessage] = useState("");
   const [credits, setCredits] = useState<PharmacyAiCredits | null>(null);
+  const [packs, setPacks] = useState<CreditPack[]>([]);
+  const [selectedPackId, setSelectedPackId] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [operator, setOperator] = useState(PAWAPAY_OPERATORS[0]);
+  const [purchaseMessage, setPurchaseMessage] = useState("");
+  const [isPurchasing, setIsPurchasing] = useState(false);
 
   useEffect(() => {
     async function readParams() {
@@ -62,6 +76,34 @@ export default function PharmacyAiSettingsPage({ params }: AiSettingsPageProps) 
       isCurrent = false;
     };
   }, [pharmacyId]);
+
+  useEffect(() => {
+    if (!PAWAPAY_ENABLED) return;
+    getCreditPacks().then((data) => {
+      setPacks(data.filter((pack) => pack.isActive));
+      setSelectedPackId(String(data.find((pack) => pack.isActive)?.id || ""));
+    }).catch(() => setPurchaseMessage("Les packs de crédits sont momentanément indisponibles."));
+  }, []);
+
+  async function initiatePawaPayCreditPurchase(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const packId = Number(selectedPackId);
+    if (!Number.isInteger(packId) || !phoneNumber.trim()) return;
+    setIsPurchasing(true);
+    setPurchaseMessage("");
+    try {
+      const result = await createCreditPurchase(pharmacyId, {
+        packId, providerCode: "PAWAPAY", country: "CD", phoneNumber, operator,
+      });
+      if ("paymentReference" in result) {
+        setPurchaseMessage(`Paiement en attente de confirmation sur votre téléphone (référence ${result.paymentReference}). Les crédits seront ajoutés par le backend après confirmation.`);
+      }
+    } catch (error) {
+      setPurchaseMessage(error instanceof Error ? error.message : "Impossible d'initier le paiement.");
+    } finally {
+      setIsPurchasing(false);
+    }
+  }
 
   const basePath = "/app/pharmacies/" + pharmacyId;
 
@@ -137,6 +179,29 @@ export default function PharmacyAiSettingsPage({ params }: AiSettingsPageProps) 
               </div>
             </div>
           </article>
+
+          {PAWAPAY_ENABLED && (
+            <article className="rounded-lg border border-app-border bg-app-card p-5">
+              <h2 className="text-lg font-bold text-app-text">Acheter des crédits IA avec pawaPay</h2>
+              <p className="mt-2 text-sm leading-6 text-app-muted">
+                Le paiement est confirmé sur votre téléphone. Les crédits ne sont ajoutés qu'après confirmation du backend.
+              </p>
+              <form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={initiatePawaPayCreditPurchase}>
+                <select value={selectedPackId} onChange={(event) => setSelectedPackId(event.target.value)} required className="min-h-11 rounded-md border border-app-border bg-app-card px-3 text-sm">
+                  <option value="">Choisir un pack</option>
+                  {packs.map((pack) => <option key={pack.id} value={pack.id}>{pack.name} — {pack.creditAmount.toLocaleString("fr-FR")} crédits</option>)}
+                </select>
+                <input value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} required inputMode="tel" placeholder="Numéro Mobile Money" className="min-h-11 rounded-md border border-app-border bg-app-card px-3 text-sm" />
+                <select value={operator} onChange={(event) => setOperator(event.target.value)} className="min-h-11 rounded-md border border-app-border bg-app-card px-3 text-sm">
+                  {PAWAPAY_OPERATORS.map((code) => <option key={code} value={code}>{code}</option>)}
+                </select>
+                <button type="submit" disabled={isPurchasing || !selectedPackId || !phoneNumber.trim()} className="min-h-11 rounded-md bg-primary-600 px-4 text-sm font-semibold text-white disabled:opacity-50">
+                  {isPurchasing ? "Initialisation..." : "Payer avec pawaPay"}
+                </button>
+              </form>
+              {purchaseMessage && <p className="mt-3 text-sm text-app-muted" role="status">{purchaseMessage}</p>}
+            </article>
+          )}
 
           <article className="rounded-lg border border-app-border bg-app-card p-5">
             <h2 className="text-lg font-bold text-app-text">À savoir</h2>

@@ -1416,19 +1416,53 @@ Endpoints consommés:
 Flux agrégateur:
 
 1. `/tarifs/[name]` appelle l'endpoint de checkout avec `pharmacy_reference`,
-   `plan_code`, `plan_id`, `user_count`, `duration_months` et `currency`.
-   `plan_id` et `user_count` (facturation par utilisateur) ne sont envoyés que
-   lorsqu'ils sont connus, afin de rester compatibles avec l'ancien contrat.
-   Le frontend ne transmet jamais de montant : le backend reste la seule source
-   de vérité pour le montant, les remises et les crédits IA inclus.
+   `plan_code`, `plan_id`, `duration_months` et `currency`. Le frontend ne
+   transmet jamais de montant ni de nombre d'utilisateurs : les forfaits sont
+   facturés à prix fixe par pharmacie. Le backend reste la seule source de
+   vérité pour le montant et les remises ; les crédits IA sont achetés séparément.
 2. Le backend crée un paiement `PENDING` et renvoie `checkout_url`.
-3. Le frontend ouvre `checkout_url` dans une iframe agrégateur.
-4. Le message frontend `agregateur-success` affiche une confirmation en cours mais ne
-   valide pas l'abonnement.
-5. Le frontend relit le reçu jusqu'au statut backend `VALIDATED`, produit par le
-   webhook `/api/webhook/`.
+3. Le frontend ouvre `checkout_url` dans une iframe agrégateur et relit immédiatement
+   le reçu à intervalle borné. Cela évite de laisser l'interface en ouverture si
+   l'iframe ne transmet aucun message.
+4. Le message frontend `agregateur-success` indique aussi une confirmation en cours,
+   mais ne valide jamais l'abonnement.
+5. Seul le statut backend `VALIDATED`, produit par le webhook `/api/webhook/`, active
+   l'abonnement. À l'expiration de la consultation, le frontend affiche « Paiement en
+   attente de confirmation » sans inventer de succès ni d'échec.
 
 Statuts paiement consommés: `PENDING`, `VALIDATED`, `CANCELED`, `REFUNDED`.
+
+### pawaPay Mobile Money (activation locale contrôlée)
+
+Le parcours d'abonnement peut utiliser le même endpoint d'initialisation avec
+`provider_code: "PAWAPAY"`, `country: "CD"`, `operator` (`AIRTEL_COD`,
+`ORANGE_COD` ou `VODACOM_MPESA_COD`) et `phone_number`. Il ne reçoit pas de
+checkout hébergé : `checkout_url` est nul. L'interface ne l'affiche que si
+`NEXT_PUBLIC_PAWAPAY_ENABLED=true`, prévu pour le test local; cette variable ne
+remplace jamais la configuration fournisseur côté backend.
+
+Une réponse d'initiation crée seulement un paiement `PENDING`. Le frontend
+informe l'utilisateur qu'une confirmation Mobile Money peut être demandée sur
+son téléphone, relit le reçu à intervalle borné et n'affiche un succès qu'après
+le statut backend `VALIDATED`. Un timeout ou une erreur de lecture reste
+« en attente de confirmation » : aucune seconde transaction n'est créée
+automatiquement. Aucun montant, frais ou limite opérateur n'est calculé côté
+frontend.
+
+Le client `createCreditPurchase()` supporte aussi l'initiation pawaPay sur
+`POST /api/paiements/pharmacies/{pharmacy_id}/credit-purchases/` avec
+`pack_id`, `provider_code: "PAWAPAY"`, `country`, `phone_number` et
+`operator`. La réponse d'initiation est uniquement
+`{ "payment_reference", "status": "PENDING" }` : elle ne crédite pas le
+portefeuille. L'écran `/app/pharmacies/{pharmacy_id}/settings/ai` l'affiche
+seulement quand le feature flag est actif et indique l'attente de confirmation;
+il ne recrée jamais une demande après un timeout.
+
+Les endpoints de licences utilisateur existent côté backend (`GET
+/api/paiements/user-license-plans/`, `POST /api/paiements/user-license-purchases/`
+et `GET /api/paiements/user-license-purchases/{reference}/`) mais aucune
+interface de licence n'est encore présente dans ce frontend. Ils ne sont donc
+pas appelés et aucun parcours fictif n'est affiché.
 
 ## Crédits IA (scan d'ordonnance)
 
@@ -1447,6 +1481,7 @@ Endpoints consommés:
 | --- | --- |
 | Crédits IA restants d'un utilisateur | `GET /api/paiements/pharmacies/{pharmacy_id}/users/{user_reference}/ai-credits/` (page vente « Scanner avec l'IA » et page `settings/me` « Mon espace ») |
 | Crédits IA restants d'une pharmacie | `GET /api/paiements/pharmacies/{pharmacy_id}/ai-credits/` |
+| Initier un achat Mobile Money pawaPay | `POST /api/paiements/pharmacies/{pharmacy_id}/credit-purchases/` |
 
 Paramètres de chemin:
 
@@ -1529,7 +1564,9 @@ Payload envoyé depuis `/app/referrals` pour un retrait.
 > **Retrait libre** : les retraits sont initiés librement par
 > l'utilisateur. Après validation automatique (solde, frais, minimum,
 > maximum, destination), Kisinet réserve les fonds et soumet
-> immédiatement le payout à iKeePay. **Aucune approbation
+> immédiatement le payout au fournisseur sélectionné. iKeePay reste le choix
+> par défaut ; pawaPay n'est proposé que lorsque
+> `NEXT_PUBLIC_PAWAPAY_ENABLED=true`. **Aucune approbation
 > administrative n'est requise.** Le statut normal observé après un
 > POST réussi est `PROCESSING` (En cours).
 
@@ -1543,9 +1580,15 @@ Deux modes acceptés par le backend (le frontend doit en choisir un seul) :
   "currency": "USD",
   "country": "CD",
   "phone_number": "+243 999 123 456",
-  "operator": "AIRTEL"
+  "operator": "AIRTEL_COD",
+  "provider_code": "PAWAPAY"
 }
 ```
+
+Après la création, l'interface consulte au plus quatre fois (toutes les deux
+secondes) `GET /api/paiements/referral-withdrawals/{reference}/`. Un timeout ou
+une erreur de consultation conserve le dernier statut serveur et n'envoie jamais
+un second `POST`; la réconciliation reste entièrement côté backend.
 
 **Mode compte sauvegardé** (réutilise un `ReferralPayoutAccount`) :
 
