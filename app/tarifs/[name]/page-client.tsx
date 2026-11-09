@@ -45,6 +45,9 @@ const PAWAPAY_OPERATORS = [
 
 const pawapayAvailable = process.env.NEXT_PUBLIC_PAWAPAY_ENABLED === "true";
 const optgatewayAvailable = process.env.NEXT_PUBLIC_OPTGATEWAY_ENABLED === "true";
+const initialPaymentProvider: SubscriptionPaymentProvider = optgatewayAvailable
+  ? "OPTGATEWAY"
+  : "AGREGATEUR";
 
 type CommitmentOption = {
   months: number;
@@ -79,7 +82,7 @@ export default function PlanDetailPage() {
   const [checkoutUrl, setCheckoutUrl] = useState("");
   const [activePayment, setActivePayment] = useState<PharmacySubscriptionPayment | null>(null);
   const [toastMessage, setToastMessage] = useState("");
-  const [paymentProvider, setPaymentProvider] = useState<SubscriptionPaymentProvider>("AGREGATEUR");
+  const [paymentProvider, setPaymentProvider] = useState<SubscriptionPaymentProvider>(initialPaymentProvider);
   const [pawapayPhoneNumber, setPawapayPhoneNumber] = useState("");
   const [pawapayOperator, setPawapayOperator] = useState("");
   const { authenticated, loading: sessionLoading } = useSession();
