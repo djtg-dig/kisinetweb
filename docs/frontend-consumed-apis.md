@@ -1461,6 +1461,11 @@ est autorisé; ce choix ne désigne pas le bénéficiaire des crédits, qui rest
 toujours l'utilisateur authentifié côté backend. Il ne crée aucune nouvelle
 demande après une réponse en attente ou une erreur réseau.
 
+Le journal personnel expose les types backend `MONTHLY_ALLOCATION`, `PURCHASE`,
+`CONSUMPTION`, `EXPIRATION` et `ADJUSTMENT`. `amount` est toujours positif :
+le frontend déduit son signe du type. Une allocation `INCLUDED` est présentée
+comme une attribution historique, jamais comme un achat.
+
 Les endpoints de licences utilisateur existent côté backend (`GET
 /api/paiements/user-license-plans/`, `POST /api/paiements/user-license-purchases/`
 et `GET /api/paiements/user-license-purchases/{reference}/`) mais aucune

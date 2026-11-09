@@ -16,9 +16,11 @@ import {
   type CreditWallet,
 } from "@/lib/api/billing";
 import { getUserPharmacies, type PharmacySummary } from "@/lib/api";
+import { getCreditLedgerDisplay } from "@/lib/credit-ledger-display";
 
 const PAWAPAY_OPERATORS = ["AIRTEL_COD", "ORANGE_COD", "VODACOM_MPESA_COD"] as const;
 const pawapayEnabled = process.env.NEXT_PUBLIC_PAWAPAY_ENABLED === "true";
+const optgatewayEnabled = process.env.NEXT_PUBLIC_OPTGATEWAY_ENABLED === "true";
 
 export default function PersonalAiCreditsPage() {
   const [wallet, setWallet] = useState<CreditWallet | null>(null);
@@ -68,6 +70,25 @@ export default function PersonalAiCreditsPage() {
     }
   }
 
+  async function submitOPTGatewayPurchase(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (isSubmitting || !selectedPharmacy || !selectedPack) return;
+    setIsSubmitting(true);
+    setPaymentMessage("");
+    try {
+      const initiated = await createCreditPurchase(selectedPharmacy, {
+        packId: Number(selectedPack), providerCode: "OPTGATEWAY", country: "CD",
+      });
+      if (!("paymentReference" in initiated) || !initiated.checkoutUrl) {
+        throw new Error("La session de paiement sécurisée est indisponible. Réessayez plus tard.");
+      }
+      window.location.assign(initiated.checkoutUrl);
+    } catch (reason) {
+      setPaymentMessage(reason instanceof Error ? reason.message : "Impossible d'initier l'achat.");
+      setIsSubmitting(false);
+    }
+  }
+
   return (
     <MainLayout>
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
@@ -95,10 +116,18 @@ export default function PersonalAiCreditsPage() {
               <button type="submit" disabled={isSubmitting || !selectedPharmacy || !selectedPack} className="rounded bg-primary-700 px-4 py-2 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">{isSubmitting ? "Initiation…" : "Payer par Mobile Money"}</button>
               {paymentMessage && <p className="text-sm text-app-muted" role="status">{paymentMessage}</p>}
             </form>}
-            {!pawapayEnabled && <p className="mt-5 text-sm text-app-muted">Le paiement Mobile Money est indisponible dans cet environnement.</p>}
+            {optgatewayEnabled && <form className="mt-6 grid gap-4 border-t border-app-border pt-5" onSubmit={submitOPTGatewayPurchase}>
+              <h3 className="font-semibold text-app-text">Payer avec OPTGateway</h3>
+              <label className="text-sm text-app-text">Pharmacie autorisée<select required value={selectedPharmacy} onChange={(event) => setSelectedPharmacy(event.target.value)} className="mt-1 block w-full rounded border border-app-border bg-app-card p-2"><option value="">Sélectionnez une pharmacie</option>{pharmacies.map((pharmacy) => <option key={pharmacy.id} value={pharmacy.id}>{pharmacy.name}</option>)}</select></label>
+              <label className="text-sm text-app-text">Pack<select required value={selectedPack} onChange={(event) => setSelectedPack(event.target.value)} className="mt-1 block w-full rounded border border-app-border bg-app-card p-2">{packs.map((pack) => <option key={pack.id} value={pack.id}>{pack.name} — {pack.creditAmount} crédits</option>)}</select></label>
+              <p className="text-sm text-app-muted">Vous choisirez votre moyen de paiement sur la page sécurisée. Les crédits seront ajoutés uniquement après confirmation du backend.</p>
+              <button type="submit" disabled={isSubmitting || !selectedPharmacy || !selectedPack} className="rounded bg-primary-700 px-4 py-2 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">{isSubmitting ? "Initiation…" : "Continuer vers OPTGateway"}</button>
+              {paymentMessage && <p className="text-sm text-app-muted" role="status">{paymentMessage}</p>}
+            </form>}
+            {!pawapayEnabled && !optgatewayEnabled && <p className="mt-5 text-sm text-app-muted">Le paiement en ligne est indisponible dans cet environnement.</p>}
           </section>
           <History title="Achats" empty="Aucun achat confirmé." rows={purchases.map((purchase) => `${purchase.credits} crédits — ${purchase.amount}`)} />
-          <History title="Mouvements" empty="Aucun mouvement." rows={ledger.map((entry) => `${entry.entryType} : ${entry.amount} crédits`)} />
+          <LedgerHistory entries={ledger} />
         </>}
       </main>
     </MainLayout>
@@ -107,3 +136,6 @@ export default function PersonalAiCreditsPage() {
 
 function Card({ label, value }: { label: string; value: string }) { return <article className="rounded-lg border border-app-border bg-app-card p-5"><p className="text-sm text-app-muted">{label}</p><p className="mt-2 text-2xl font-bold text-primary-700">{value}</p></article>; }
 function History({ title, empty, rows }: { title: string; empty: string; rows: string[] }) { return <section className="mt-6 rounded-lg border border-app-border bg-app-card p-5"><h2 className="text-lg font-bold text-app-text">{title}</h2>{rows.length ? <ul className="mt-3 space-y-2 text-sm text-app-muted">{rows.map((row, index) => <li key={index}>{row}</li>)}</ul> : <p className="mt-3 text-sm text-app-muted">{empty}</p>}</section>; }
+function LedgerHistory({ entries }: { entries: CreditLedgerEntry[] }) {
+  return <section className="mt-6 rounded-lg border border-app-border bg-app-card p-5"><h2 className="text-lg font-bold text-app-text">Mouvements</h2>{entries.length ? <ul className="mt-3 space-y-3">{entries.map((entry) => { const movement = getCreditLedgerDisplay(entry); return <li key={entry.id} className="flex items-start justify-between gap-4 border-b border-app-border pb-3 last:border-0"><div><p className="font-medium text-app-text">{movement.title}</p><p className="mt-1 text-sm text-app-muted">{movement.description}</p></div><p className={movement.direction === "credit" ? "font-semibold text-green-700" : movement.direction === "debit" ? "font-semibold text-red-700" : "font-semibold text-app-muted"}>{movement.amount}</p></li>; })}</ul> : <p className="mt-3 text-sm text-app-muted">Aucun mouvement.</p>}</section>;
+}
