@@ -55,3 +55,15 @@ test("refuse une initiation pawaPay incomplète avant tout appel réseau", async
     /Mobile Money sont requis/,
   );
 });
+
+test("initie OPTGateway avec le pays et utilise uniquement l'URL retournée", async () => {
+  installCsrfCookie();
+  let sent: Record<string, unknown> | undefined;
+  setApiFetchImpl(async (_input, init) => {
+    sent = JSON.parse(String(init?.body)) as Record<string, unknown>;
+    return Response.json({ payment_reference: "PAYOPT123", status: "PENDING", checkout_url: "https://pay.optgateway.com/pay/cs_test_1" }, { status: 201 });
+  });
+  const result = await createCreditPurchase("PH12345678", { packId: 7, providerCode: "OPTGATEWAY", country: "cd" });
+  assert.deepEqual(result, { paymentReference: "PAYOPT123", status: "PENDING", checkoutUrl: "https://pay.optgateway.com/pay/cs_test_1" });
+  assert.deepEqual(sent, { pack_id: 7, pharmacy_reference: "PH12345678", provider_code: "OPTGATEWAY", country: "CD" });
+});

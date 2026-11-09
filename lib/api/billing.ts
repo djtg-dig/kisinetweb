@@ -183,8 +183,8 @@ export type CreateCreditPurchasePayload = {
   /** Référence d'un paiement historique déjà validé par le backend. */
   paymentReference?: string;
   currency?: string;
-  /** Uniquement pour l'initiation Mobile Money pawaPay. */
-  providerCode?: "PAWAPAY";
+  /** Fournisseur d'encaissement explicite; le backend reste décisionnaire. */
+  providerCode?: "PAWAPAY" | "OPTGATEWAY";
   country?: string;
   phoneNumber?: string;
   operator?: string;
@@ -194,6 +194,7 @@ export type CreateCreditPurchasePayload = {
 export type CreditPurchasePaymentInitiation = {
   paymentReference: string;
   status: string;
+  checkoutUrl?: string;
 };
 
 // --------------------------------------------------------------------------- //
@@ -319,6 +320,9 @@ export async function createCreditPurchase(
   if (providerCode === "PAWAPAY" && (!payload.country || !payload.phoneNumber || !payload.operator)) {
     throw new Error("Le pays, l'opérateur et le numéro Mobile Money sont requis pour pawaPay.");
   }
+  if (providerCode === "OPTGATEWAY" && !payload.country) {
+    throw new Error("Le pays est requis pour OPTGateway.");
+  }
   if (!providerCode && !payload.paymentReference) {
     throw new Error("La référence du paiement confirmé est requise.");
   }
@@ -339,7 +343,9 @@ export async function createCreditPurchase(
               phone_number: payload.phoneNumber?.trim(),
               operator: payload.operator?.trim().toUpperCase(),
             }
-          : {}),
+          : providerCode === "OPTGATEWAY"
+            ? { country: payload.country?.trim().toUpperCase() }
+            : {}),
       }),
     },
   );
@@ -350,6 +356,9 @@ export async function createCreditPurchase(
       paymentReference: toText(record.payment_reference),
       status: toText(record.status),
     };
+  }
+  if (providerCode === "OPTGATEWAY") {
+    return { paymentReference: toText(record.payment_reference), status: toText(record.status), checkoutUrl: toText(record.checkout_url) };
   }
 
   return normalizeCreditPurchase(record);

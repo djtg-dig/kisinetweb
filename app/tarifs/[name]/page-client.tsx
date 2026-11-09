@@ -44,6 +44,7 @@ const PAWAPAY_OPERATORS = [
 ] as const;
 
 const pawapayAvailable = process.env.NEXT_PUBLIC_PAWAPAY_ENABLED === "true";
+const optgatewayAvailable = process.env.NEXT_PUBLIC_OPTGATEWAY_ENABLED === "true";
 
 type CommitmentOption = {
   months: number;
@@ -433,6 +434,8 @@ export default function PlanDetailPage() {
               phoneNumber: pawapayPhoneNumber,
               operator: pawapayOperator,
             }
+          : paymentProvider === "OPTGATEWAY"
+            ? { country: "CD" }
           : {}),
       });
       setActivePayment(checkout.payment);
@@ -441,6 +444,12 @@ export default function PlanDetailPage() {
         setPaymentMessage(
           "Votre demande Mobile Money est prise en charge. Confirmez-la sur votre téléphone si votre opérateur vous le demande. Le statut reste en attente de confirmation serveur.",
         );
+      } else if (paymentProvider === "OPTGATEWAY") {
+        if (!checkout.checkoutUrl) {
+          throw new Error("Le serveur n'a pas renvoyé de session OPTGateway.");
+        }
+        window.location.assign(checkout.checkoutUrl);
+        return;
       } else {
         setCheckoutUrl(checkout.checkoutUrl);
         setPaymentState("opening");
@@ -537,6 +546,7 @@ export default function PlanDetailPage() {
                   />
                   <PaymentProviderSection
                     pawapayAvailable={pawapayAvailable}
+                    optgatewayAvailable={optgatewayAvailable}
                     pawapayOperator={pawapayOperator}
                     pawapayPhoneNumber={pawapayPhoneNumber}
                     provider={paymentProvider}
@@ -808,6 +818,7 @@ function PharmacySubscriptionSection({
 
 function PaymentProviderSection({
   pawapayAvailable,
+  optgatewayAvailable,
   pawapayOperator,
   pawapayPhoneNumber,
   provider,
@@ -816,6 +827,7 @@ function PaymentProviderSection({
   onProviderChange,
 }: {
   pawapayAvailable: boolean;
+  optgatewayAvailable: boolean;
   pawapayOperator: string;
   pawapayPhoneNumber: string;
   provider: SubscriptionPaymentProvider;
@@ -852,6 +864,20 @@ function PaymentProviderSection({
           >
             <span className="block font-bold text-app-text">pawaPay</span>
             <span className="mt-1 block text-sm leading-5 text-app-muted">Dépôt Mobile Money en RDC.</span>
+          </button>
+        )}
+        {optgatewayAvailable && (
+          <button
+            type="button"
+            onClick={() => onProviderChange("OPTGATEWAY")}
+            className={`rounded-lg border p-4 text-left transition focus:outline-none focus:ring-4 focus:ring-primary-100 ${
+              provider === "OPTGATEWAY"
+                ? "border-primary-600 bg-primary-50 ring-1 ring-primary-200"
+                : "border-app-border bg-app-background/60 hover:border-primary-200"
+            }`}
+          >
+            <span className="block font-bold text-app-text">OPTGateway</span>
+            <span className="mt-1 block text-sm leading-5 text-app-muted">Paiement hébergé sécurisé.</span>
           </button>
         )}
       </div>

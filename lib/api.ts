@@ -1167,7 +1167,7 @@ export type AgregateurSubscriptionCheckout = {
   subscription?: unknown;
 };
 
-export type SubscriptionPaymentProvider = "AGREGATEUR" | "PAWAPAY";
+export type SubscriptionPaymentProvider = "AGREGATEUR" | "PAWAPAY" | "OPTGATEWAY";
 
 /**
  * Champs seat-based ajoutes sur l'abonnement par le backend.
@@ -1326,7 +1326,7 @@ export async function initiateAgregateurSubscriptionCheckout(payload: {
   durationMonths: number;
   currency: string;
   providerCode?: SubscriptionPaymentProvider;
-  /** Requis par pawaPay. Le backend attend le code ISO alpha-2. */
+  /** Requis par pawaPay et OPTGateway. Le backend attend le code ISO alpha-2. */
   country?: string;
   /** Requis par pawaPay. */
   phoneNumber?: string;
@@ -1352,6 +1352,9 @@ export async function initiateAgregateurSubscriptionCheckout(payload: {
   if (providerCode === "PAWAPAY" && (!payload.country || !payload.phoneNumber || !payload.operator)) {
     throw new Error("Le pays, l'opérateur et le numéro Mobile Money sont requis pour pawaPay.");
   }
+  if (providerCode === "OPTGATEWAY" && !payload.country) {
+    throw new Error("Le pays est requis pour OPTGateway.");
+  }
 
   const body: UnknownRecord = {
     pharmacy_reference: pharmacyReference,
@@ -1369,6 +1372,8 @@ export async function initiateAgregateurSubscriptionCheckout(payload: {
     body.country = payload.country?.trim().toUpperCase();
     body.phone_number = payload.phoneNumber?.trim();
     body.operator = payload.operator?.trim().toUpperCase();
+  } else if (providerCode === "OPTGATEWAY") {
+    body.country = payload.country?.trim().toUpperCase();
   }
 
   const data = await postJson<UnknownRecord>(
@@ -1382,7 +1387,7 @@ export async function initiateAgregateurSubscriptionCheckout(payload: {
 
   // pawaPay est un dépôt Mobile Money sans checkout hébergé. Seul le parcours
   // historique AGREGATEUR exige une URL à ouvrir dans une iframe.
-  if (providerCode === "AGREGATEUR" && !checkoutUrl) {
+  if ((providerCode === "AGREGATEUR" || providerCode === "OPTGATEWAY") && !checkoutUrl) {
     throw new Error(
       "Le serveur n'a pas renvoyé d'URL de paiement. Réessayez dans quelques instants.",
     );
