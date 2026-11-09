@@ -60,10 +60,7 @@ const fallbackCommitmentOptions: CommitmentOption[] = [
   { months: 1, discountPercentage: 0 },
 ];
 
-const temporarySubscription = {
-  planName: "Basic",
-  expiresAt: "10 août 2026",
-};
+const PLAN_RANK: Record<string, number> = { BASIC: 1, STANDARD: 2, ENTERPRISE: 3 };
 
 export default function PlanDetailPage() {
   const params = useParams<{ name?: string }>();
@@ -194,6 +191,7 @@ export default function PlanDetailPage() {
 
   const selectedPharmacy =
     pharmacies.find((pharmacy) => pharmacy.id === selectedPharmacyId) || null;
+  const subscriptionPurchaseError = getSubscriptionPurchaseError(selectedPharmacy, plan?.code);
   const commitmentOptions = useMemo(
     () => buildCommitmentOptions(plan?.durations),
     [plan?.durations],
@@ -225,6 +223,9 @@ export default function PlanDetailPage() {
     } else if (!selectedPharmacy.reference && !selectedPharmacy.id) {
       errors.push("La référence de la pharmacie sélectionnée est introuvable.");
     }
+    if (subscriptionPurchaseError) {
+      errors.push(subscriptionPurchaseError);
+    }
 
     if (paymentProvider === "PAWAPAY") {
       if (!pawapayOperator) {
@@ -236,7 +237,7 @@ export default function PlanDetailPage() {
     }
 
     return errors;
-  }, [pawapayOperator, pawapayPhoneNumber, paymentProvider, plan, selectedCommitment, selectedPharmacy]);
+  }, [pawapayOperator, pawapayPhoneNumber, paymentProvider, plan, selectedCommitment, selectedPharmacy, subscriptionPurchaseError]);
 
   const canConfirm = validationErrors.length === 0;
   const isPaymentBusy =
@@ -561,10 +562,14 @@ export default function PlanDetailPage() {
 
                 <aside className="grid gap-6 lg:sticky lg:top-28 lg:self-start">
                   <CurrentSubscriptionCard
-                    // Une future API remplacera ces donnees temporaires.
-                    planName={temporarySubscription.planName}
-                    expiresAt={temporarySubscription.expiresAt}
+                    planName={selectedPharmacy?.planName || "Aucun forfait actif"}
+                    expiresAt={formatSubscriptionExpiry(selectedPharmacy?.subscriptionExpiresAt)}
                   />
+                  {subscriptionPurchaseError && (
+                    <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium leading-6 text-amber-800">
+                      {subscriptionPurchaseError} Le serveur vérifiera à nouveau cette règle avant la création et la confirmation du paiement.
+                    </p>
+                  )}
                   <OrderSummary
                     currency={plan.currency}
                     durationMonths={selectedCommitment.months}
@@ -1166,6 +1171,45 @@ function canManageSubscription(pharmacy: PharmacySummary) {
   }
 
   return ["OWNER", "PROPRIETAIRE", "PROPRIÉTAIRE", "ADMIN", "MANAGER", "GERANT", "GÉRANT"].includes(role);
+}
+
+function getSubscriptionPurchaseError(pharmacy: PharmacySummary | null, requestedPlan?: string) {
+  if (!pharmacy || !requestedPlan || !isPaidSubscriptionActive(pharmacy)) {
+    return "";
+  }
+
+  const currentPlan = (pharmacy.planName || "").toUpperCase();
+  const currentRank = PLAN_RANK[currentPlan] || 0;
+  const requestedRank = PLAN_RANK[requestedPlan.toUpperCase()] || 0;
+  if (!currentRank || !requestedRank) {
+    return "";
+  }
+  if (requestedRank === currentRank) {
+    return "Votre pharmacie bénéficie déjà de ce forfait jusqu'à son expiration.";
+  }
+  if (requestedRank < currentRank) {
+    return "Un forfait inférieur ne peut pas être acheté tant que l'abonnement actuel est valide.";
+  }
+  return "";
+}
+
+function isPaidSubscriptionActive(pharmacy: PharmacySummary) {
+  if (pharmacy.subscriptionStatus !== "ACTIVE" || !pharmacy.subscriptionExpiresAt) {
+    return false;
+  }
+  const expiry = new Date(pharmacy.subscriptionExpiresAt);
+  return !Number.isNaN(expiry.getTime()) && expiry.getTime() > Date.now();
+}
+
+function formatSubscriptionExpiry(value?: string) {
+  if (!value) {
+    return "Aucune expiration connue";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Expiration indisponible";
+  }
+  return new Intl.DateTimeFormat("fr-FR", { dateStyle: "long" }).format(date);
 }
 
 function formatRole(role?: string) {

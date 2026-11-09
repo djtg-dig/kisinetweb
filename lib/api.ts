@@ -30,6 +30,8 @@ export type PharmacySummary = {
   longitude?: string;
   planName?: string;
   subscriptionStatus?: string;
+  subscriptionExpiresAt?: string;
+  subscriptionIsActive?: boolean;
   trialEndsAt?: string;
 };
 
@@ -506,6 +508,8 @@ function normalizePharmacy(item: UnknownRecord): PharmacySummary {
     longitude: address?.longitude === undefined || address?.longitude === null ? undefined : String(address.longitude),
     planName: getText(subscription?.plan_name) ?? getText(subscription?.plan_code),
     subscriptionStatus: getText(subscription?.status),
+    subscriptionExpiresAt: getText(subscription?.expires_at),
+    subscriptionIsActive: subscription?.is_active === undefined ? undefined : Boolean(subscription.is_active),
     trialEndsAt: getText(subscription?.trial_ends_at),
   };
 }
