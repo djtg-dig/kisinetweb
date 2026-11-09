@@ -172,6 +172,13 @@ export default function AccountPage() {
                 <LinkButton href="/app/compte/credits-ia" variant="secondary" className="mt-4">Gérer mes crédits IA</LinkButton>
               </section>
 
+              <section className="rounded-lg border border-app-border bg-app-card p-6 shadow-sm">
+                <p className="text-sm font-semibold text-primary-700">Pharmacies</p>
+                <h2 className="mt-2 text-xl font-bold text-app-text">Ma licence utilisateur</h2>
+                <p className="mt-3 text-sm text-app-muted">Consultez votre droit de création de pharmacies et vos achats de licence.</p>
+                <LinkButton href="/app/compte/licence" variant="secondary" className="mt-4">Gérer ma licence</LinkButton>
+              </section>
+
               {/* Rubrique 2 : Parrainage (aperçu du solde) */}
               <ReferralSection wallets={wallets} />
 

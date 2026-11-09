@@ -1169,6 +1169,38 @@ export type AgregateurSubscriptionCheckout = {
 
 export type SubscriptionPaymentProvider = "AGREGATEUR" | "PAWAPAY" | "OPTGATEWAY";
 
+export type UserLicensePlan = { code: string; name: string; price: string; currency: string; maxPharmacies: number | null; isUnlimited: boolean };
+export type UserLicensePurchase = { reference: string; plan: UserLicensePlan; amount: string; currency: string; providerCode: string; providerReference: string; checkoutUrl: string; status: string; activatedAt: string | null };
+
+function normalizeUserLicensePlan(item: UnknownRecord): UserLicensePlan {
+  return { code: String(item.code || ""), name: String(item.name || ""), price: String(item.price || ""), currency: String(item.currency || ""), maxPharmacies: item.max_pharmacies == null ? null : Number(item.max_pharmacies), isUnlimited: Boolean(item.is_unlimited) };
+}
+
+function normalizeUserLicensePurchase(item: UnknownRecord): UserLicensePurchase {
+  return { reference: String(item.reference || ""), plan: normalizeUserLicensePlan(getRecord(item.plan) || {}), amount: String(item.amount || ""), currency: String(item.currency || ""), providerCode: String(item.provider_code || ""), providerReference: String(item.provider_reference || ""), checkoutUrl: String(item.checkout_url || ""), status: String(item.status || ""), activatedAt: getText(item.activated_at) || null };
+}
+
+export async function getUserLicensePlans(): Promise<UserLicensePlan[]> {
+  const data = await fetchPublicApiJson<unknown>("/api/paiements/user-license-plans/", "Impossible de charger les licences.");
+  const record = getRecord(data);
+  const rows = Array.isArray(data) ? data : Array.isArray(record?.results) ? record.results : [];
+  return rows.map(getRecord).filter((row): row is UnknownRecord => row !== null).map(normalizeUserLicensePlan);
+}
+
+export async function getUserLicensePurchases(): Promise<UserLicensePurchase[]> {
+  const data = await fetchApiJson<unknown>("/api/paiements/user-license-purchases/", "Impossible de charger vos achats de licence.");
+  const record = getRecord(data);
+  const rows = Array.isArray(data) ? data : Array.isArray(record?.results) ? record.results : [];
+  return rows.map(getRecord).filter((row): row is UnknownRecord => row !== null).map(normalizeUserLicensePurchase);
+}
+
+export async function createOPTGatewayUserLicensePurchase(planCode: string, idempotencyKey: string): Promise<UserLicensePurchase> {
+  const data = await postJson<UnknownRecord>("/api/paiements/user-license-purchases/", "Impossible d'initialiser l'achat de licence.", {
+    plan_code: planCode, country: "CD", provider_code: "OPTGATEWAY", idempotency_key: idempotencyKey,
+  });
+  return normalizeUserLicensePurchase(data);
+}
+
 /**
  * Champs seat-based ajoutes sur l'abonnement par le backend.
  * Tous optionnels : l'ancienne reponse d'abonnement reste valide.
