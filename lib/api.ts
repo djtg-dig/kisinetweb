@@ -1173,6 +1173,18 @@ export type AgregateurSubscriptionCheckout = {
   subscription?: unknown;
 };
 
+export function getSafeOPTGatewayCheckoutUrl(value: string): string {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" || url.hostname !== "pay.optgateway.com" || url.username || url.password) {
+      throw new Error("URL de paiement OPTGateway inattendue.");
+    }
+    return url.toString();
+  } catch {
+    throw new Error("URL de paiement OPTGateway invalide.");
+  }
+}
+
 export type UserLicensePlan = { code: string; name: string; price: string; currency: string; maxPharmacies: number | null; isUnlimited: boolean };
 export type UserLicensePurchase = { reference: string; plan: UserLicensePlan; amount: string; currency: string; providerCode: string; providerReference: string; checkoutUrl: string; status: string; activatedAt: string | null };
 
@@ -1395,7 +1407,7 @@ export async function initiateAgregateurSubscriptionCheckout(payload: {
   );
 
   const payment = normalizeSubscriptionPayment((data.payment || {}) as UnknownRecord);
-  const checkoutUrl = String(data.checkout_url || "");
+  const checkoutUrl = getSafeOPTGatewayCheckoutUrl(String(data.checkout_url || ""));
 
   if (!checkoutUrl) {
     throw new Error(

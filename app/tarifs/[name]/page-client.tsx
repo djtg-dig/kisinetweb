@@ -14,11 +14,9 @@ import {
   type ConfirmationTotals,
 } from "@/components/pricing/subscription-confirmation";
 import {
-  getPharmacySubscriptionPayment,
   getPharmacyPlan,
   getUserPharmacies,
   initiateAgregateurSubscriptionCheckout,
-  type PharmacySubscriptionPayment,
   type PharmacyPlan,
   type PharmacyPlanDuration,
   type PharmacySummary,
@@ -62,8 +60,6 @@ export default function PlanDetailPage() {
   const [pharmacyErrorMessage, setPharmacyErrorMessage] = useState("");
   const [paymentState, setPaymentState] = useState<PaymentState>("idle");
   const [paymentMessage, setPaymentMessage] = useState("");
-  const [checkoutUrl, setCheckoutUrl] = useState("");
-  const [activePayment, setActivePayment] = useState<PharmacySubscriptionPayment | null>(null);
   const [toastMessage, setToastMessage] = useState("");
   const { authenticated, loading: sessionLoading } = useSession();
 
@@ -72,16 +68,6 @@ export default function PlanDetailPage() {
   // Verrou synchrone contre les doubles clics sur le bouton de paiement :
   // le state React est asynchrone et laisse passer deux clics rapproches.
   const isStartingPaymentRef = useRef(false);
-  const isPollingPaymentRef = useRef(false);
-  const pollingRunRef = useRef(0);
-
-  useEffect(() => {
-    return () => {
-      pollingRunRef.current += 1;
-      isPollingPaymentRef.current = false;
-    };
-  }, []);
-
   useEffect(() => {
     let isMounted = true;
 
@@ -249,102 +235,6 @@ export default function PlanDetailPage() {
     setActivePharmacyId(pharmacyId);
   }
 
-  useEffect(() => {
-    if (!checkoutUrl) {
-      return;
-    }
-
-    function handleAgregateurMessage(event: MessageEvent) {
-      const legacyPrefix = "ikee" + "pay";
-      const message = String(event.data || "");
-
-      if (message === "agregateur-ready" || message === legacyPrefix + "-ready") {
-        setPaymentState("paying");
-        setPaymentMessage("");
-      }
-
-      if (message === "agregateur-close" || message === legacyPrefix + "-close") {
-        closeAgregateurCheckout();
-      }
-
-      if (message === "agregateur-success" || message === legacyPrefix + "-success") {
-        const payment = activePayment;
-        const pharmacyReference = selectedPharmacy?.reference || selectedPharmacy?.id || "";
-        closeAgregateurCheckout();
-        setPaymentState("confirming");
-        setPaymentMessage("Paiement reçu. Confirmation serveur en cours...");
-        if (payment && pharmacyReference) {
-          void pollPaymentConfirmation(payment.id, pharmacyReference);
-        }
-      }
-    }
-
-    window.addEventListener("message", handleAgregateurMessage);
-    return () => window.removeEventListener("message", handleAgregateurMessage);
-  }, [activePayment, checkoutUrl, selectedPharmacy]);
-
-  function closeAgregateurCheckout() {
-    setCheckoutUrl("");
-  }
-
-  async function pollPaymentConfirmation(paymentId: number, pharmacyReference: string) {
-    if (isPollingPaymentRef.current) {
-      return;
-    }
-
-    isPollingPaymentRef.current = true;
-    const pollingRun = ++pollingRunRef.current;
-
-    try {
-      for (let attempt = 0; attempt < 10; attempt += 1) {
-        if (attempt > 0) {
-          await wait(3000);
-        }
-
-        if (pollingRun !== pollingRunRef.current) {
-          return;
-        }
-
-        const payment = await getPharmacySubscriptionPayment(paymentId, pharmacyReference);
-        if (pollingRun !== pollingRunRef.current) {
-          return;
-        }
-        setActivePayment(payment);
-        if (payment.status === "VALIDATED") {
-          setCheckoutUrl("");
-          setPaymentState("validated");
-          setPaymentMessage("Paiement confirmé. Votre abonnement est actif.");
-          return;
-        }
-
-        if (["CANCELED", "FAILED", "REFUNDED"].includes(payment.status)) {
-          setCheckoutUrl("");
-          setPaymentState("error");
-          setPaymentMessage("Le paiement n'a pas été confirmé. Aucun abonnement n'a été activé.");
-          return;
-        }
-      }
-
-      setPaymentState("confirming");
-      setPaymentMessage(
-        "Le paiement est encore en cours de confirmation. Vous pouvez vérifier le statut dans quelques instants.",
-      );
-    } catch (error) {
-      // Une erreur de lecture ne prouve pas l'échec du paiement. L'utilisateur
-      // peut fermer l'iframe puis consulter son statut plus tard.
-      setPaymentState("confirming");
-      setPaymentMessage(
-        error instanceof Error
-          ? "Le statut du paiement reste à confirmer : " + error.message
-          : "Le statut du paiement reste à confirmer. Réessayez dans quelques instants.",
-      );
-    } finally {
-      if (pollingRun === pollingRunRef.current) {
-        isPollingPaymentRef.current = false;
-      }
-    }
-  }
-
   function goToConfirmation() {
     if (sessionLoading) {
       setToastMessage("Vérification de votre connexion en cours...");
@@ -406,14 +296,9 @@ export default function PlanDetailPage() {
         durationMonths: selectedCommitment.months,
         currency: plan.currency || "USD",
       });
-      setActivePayment(checkout.payment);
-      setCheckoutUrl(checkout.checkoutUrl);
       setPaymentState("opening");
-      setPaymentMessage("Ouverture du paiement sécurisé...");
-      void pollPaymentConfirmation(
-        checkout.payment.id,
-        selectedPharmacy.reference || selectedPharmacy.id,
-      );
+      setPaymentMessage("Redirection vers le paiement sécurisé...");
+      window.location.assign(checkout.checkoutUrl);
     } catch (error) {
       // On affiche le message metier renvoye par le backend et on ne retombe
       // sur un message generique que s'il n'y en a aucun.
@@ -530,12 +415,6 @@ export default function PlanDetailPage() {
             )}
           </div>
         </section>
-        {checkoutUrl && (
-          <AgregateurCheckoutModal
-            checkoutUrl={checkoutUrl}
-            onClose={closeAgregateurCheckout}
-          />
-        )}
         {toastMessage && (
           <ToastMessage
             tone="warning"
@@ -884,35 +763,6 @@ function OrderSummary({
   );
 }
 
-function AgregateurCheckoutModal({
-  checkoutUrl,
-  onClose,
-}: {
-  checkoutUrl: string;
-  onClose: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-0 backdrop-blur-sm sm:p-6">
-      <div className="relative h-full w-full max-w-[450px] sm:h-[85vh]">
-        <button
-          type="button"
-          onClick={onClose}
-          className="absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-xl font-bold text-app-text shadow-sm transition hover:bg-red-50 hover:text-red-600 sm:-top-12 sm:right-0 sm:bg-transparent sm:text-white sm:shadow-none"
-          aria-label="Fermer le paiement"
-        >
-          ×
-        </button>
-        <iframe
-          title="Paiement sécurisé"
-          src={checkoutUrl}
-          allow="payment"
-          className="h-full w-full border-0 bg-transparent sm:rounded-[2rem]"
-        />
-      </div>
-    </div>
-  );
-}
-
 function SummaryRow({
   label,
   strong = false,
@@ -1058,10 +908,6 @@ function formatRole(role?: string) {
   }
 
   return "Membre " + role;
-}
-
-function wait(milliseconds: number) {
-  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 }
 
 function buildLoginHref(returnPath: string) {
