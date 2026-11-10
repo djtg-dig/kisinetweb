@@ -10,6 +10,7 @@ import {
 type PharmacyDashboardProps = {
   data: PharmacyDashboardData;
   permissions: PharmacyPermissions;
+  subscriptionLabel?: string;
 };
 
 const quickActions = [
@@ -90,7 +91,7 @@ function DashboardAction({
   );
 }
 
-export function PharmacyDashboard({ data, permissions }: PharmacyDashboardProps) {
+export function PharmacyDashboard({ data, permissions, subscriptionLabel }: PharmacyDashboardProps) {
   const pharmacyId = data.pharmacy.id;
   const currency = data.pharmacy.devise || "USD";
   const alerts = [
@@ -116,7 +117,7 @@ export function PharmacyDashboard({ data, permissions }: PharmacyDashboardProps)
               <p className="text-sm font-semibold text-primary-700">Tableau de bord</p>
               <h1 className="mt-2 text-3xl font-bold text-app-text">{data.pharmacy.name}</h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-app-muted">
-                Bonjour, voici un aperçu des activité d'aujourd'hui.
+                {subscriptionLabel || "—"}
               </p>
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
