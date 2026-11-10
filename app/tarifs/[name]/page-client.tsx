@@ -903,7 +903,7 @@ function AgregateurCheckoutModal({
           ×
         </button>
         <iframe
-          title="Paiement sécurisé agrégateur"
+          title="Paiement sécurisé"
           src={checkoutUrl}
           allow="payment"
           className="h-full w-full border-0 bg-transparent sm:rounded-[2rem]"

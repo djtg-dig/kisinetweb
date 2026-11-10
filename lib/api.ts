@@ -1173,8 +1173,6 @@ export type AgregateurSubscriptionCheckout = {
   subscription?: unknown;
 };
 
-export type SubscriptionPaymentProvider = "AGREGATEUR" | "PAWAPAY" | "OPTGATEWAY";
-
 export type UserLicensePlan = { code: string; name: string; price: string; currency: string; maxPharmacies: number | null; isUnlimited: boolean };
 export type UserLicensePurchase = { reference: string; plan: UserLicensePlan; amount: string; currency: string; providerCode: string; providerReference: string; checkoutUrl: string; status: string; activatedAt: string | null };
 
@@ -1363,13 +1361,6 @@ export async function initiateAgregateurSubscriptionCheckout(payload: {
   planCode: string;
   durationMonths: number;
   currency: string;
-  providerCode?: SubscriptionPaymentProvider;
-  /** Requis par pawaPay et OPTGateway. Le backend attend le code ISO alpha-2. */
-  country?: string;
-  /** Requis par pawaPay. */
-  phoneNumber?: string;
-  /** Requis par pawaPay, par exemple AIRTEL_COD. */
-  operator?: string;
   /** Identifiant numerique du plan, quand il est connu. */
   planId?: number;
 }): Promise<AgregateurSubscriptionCheckout> {
@@ -1386,14 +1377,6 @@ export async function initiateAgregateurSubscriptionCheckout(payload: {
     throw new Error("La durée d'abonnement sélectionnée est invalide.");
   }
 
-  const providerCode = payload.providerCode;
-  if (providerCode === "PAWAPAY" && (!payload.country || !payload.phoneNumber || !payload.operator)) {
-    throw new Error("Le pays, l'opérateur et le numéro Mobile Money sont requis pour pawaPay.");
-  }
-  if (providerCode === "OPTGATEWAY" && !payload.country) {
-    throw new Error("Le pays est requis pour OPTGateway.");
-  }
-
   const body: UnknownRecord = {
     pharmacy_reference: pharmacyReference,
     plan_code: payload.planCode,
@@ -1401,23 +1384,8 @@ export async function initiateAgregateurSubscriptionCheckout(payload: {
     currency: payload.currency,
   };
 
-  // L'absence de fournisseur est volontaire : le backend choisit la route
-  // active selon sa configuration. Les anciens appelants explicites restent
-  // supportés pour les parcours qui en ont encore besoin.
-  if (providerCode) {
-    body.provider_code = providerCode;
-  }
-
   if (Number.isFinite(payload.planId) && Number(payload.planId) > 0) {
     body.plan_id = Number(payload.planId);
-  }
-
-  if (providerCode === "PAWAPAY") {
-    body.country = payload.country?.trim().toUpperCase();
-    body.phone_number = payload.phoneNumber?.trim();
-    body.operator = payload.operator?.trim().toUpperCase();
-  } else if (providerCode === "OPTGATEWAY") {
-    body.country = payload.country?.trim().toUpperCase();
   }
 
   const data = await postJson<UnknownRecord>(
@@ -1429,9 +1397,7 @@ export async function initiateAgregateurSubscriptionCheckout(payload: {
   const payment = normalizeSubscriptionPayment((data.payment || {}) as UnknownRecord);
   const checkoutUrl = String(data.checkout_url || "");
 
-  // pawaPay est un dépôt Mobile Money sans checkout hébergé. Seul le parcours
-  // historique AGREGATEUR exige une URL à ouvrir dans une iframe.
-  if ((providerCode === "AGREGATEUR" || providerCode === "OPTGATEWAY") && !checkoutUrl) {
+  if (!checkoutUrl) {
     throw new Error(
       "Le serveur n'a pas renvoyé d'URL de paiement. Réessayez dans quelques instants.",
     );
