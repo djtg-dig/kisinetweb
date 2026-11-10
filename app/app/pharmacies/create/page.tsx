@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/ui/link-button";
@@ -15,6 +15,7 @@ import {
   type CurrencyOption,
 } from "@/lib/api";
 import { setActivePharmacyId } from "@/lib/auth";
+import { isPharmacyLicenseLimitError } from "@/lib/license-limit";
 
 type FormState = {
   name: string;
@@ -30,6 +31,7 @@ type FormState = {
 
 type FormField = keyof FormState;
 type FieldErrors = Partial<Record<FormField, string>>;
+type LicenseModalMode = "limit" | "unavailable";
 
 const initialFormState: FormState = {
   name: "",
@@ -65,6 +67,7 @@ export default function CreatePharmacyPage() {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [touchedFields, setTouchedFields] = useState<Partial<Record<FormField, boolean>>>({});
   const [toast, setToast] = useState<{ tone: "error"; message: string } | null>(null);
+  const [licenseModalMode, setLicenseModalMode] = useState<LicenseModalMode | null>(null);
 
   function updateField(field: FormField, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -371,6 +374,13 @@ export default function CreatePharmacyPage() {
 
       window.location.href = "/app/pharmacies/" + pharmacy.id + "/dashboard";
     } catch (error) {
+      if (isPharmacyLicenseLimitError(error)) {
+        setToast(null);
+        setIsSubmitting(false);
+        setLicenseModalMode("limit");
+        return;
+      }
+
       const safeMessage = getSafeSubmissionError(error);
       applyBackendErrors(safeMessage);
       showError(safeMessage);
@@ -564,7 +574,125 @@ export default function CreatePharmacyPage() {
           </aside>
         </form>
       </section>
+
+      <LicenseModal
+        mode={licenseModalMode}
+        onClose={() => setLicenseModalMode(null)}
+        onPurchase={() => setLicenseModalMode("unavailable")}
+      />
     </MainLayout>
+  );
+}
+
+function LicenseModal({
+  mode,
+  onClose,
+  onPurchase,
+}: {
+  mode: LicenseModalMode | null;
+  onClose: () => void;
+  onPurchase: () => void;
+}) {
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!mode) {
+      previousFocusRef.current?.focus();
+      previousFocusRef.current = null;
+      return;
+    }
+
+    if (!previousFocusRef.current) {
+      previousFocusRef.current = document.activeElement as HTMLElement | null;
+    }
+  }, [mode]);
+
+  useEffect(() => {
+    if (!mode) {
+      return;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    window.requestAnimationFrame(() => closeButtonRef.current?.focus());
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [mode, onClose]);
+
+  if (!mode) {
+    return null;
+  }
+
+  const unavailable = mode === "unavailable";
+  return (
+    <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/45 p-4">
+      <button
+        type="button"
+        aria-label="Fermer la fenêtre"
+        className="absolute inset-0 cursor-default"
+        onClick={onClose}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="license-modal-title"
+        className="relative w-full max-w-md rounded-xl border border-app-border bg-app-card p-6 shadow-soft"
+      >
+        <div className="flex items-start justify-between gap-4">
+          <h2 id="license-modal-title" className="text-lg font-bold text-app-text">
+            {unavailable ? "Service temporairement indisponible" : "Limite de licence atteinte"}
+          </h2>
+          <button
+            ref={closeButtonRef}
+            type="button"
+            onClick={onClose}
+            aria-label="Fermer"
+            className="rounded-md border border-app-border bg-app-surface px-2.5 py-1.5 text-sm text-app-muted transition hover:text-app-text focus:outline-none focus:ring-4 focus:ring-primary-100"
+          >
+            ✕
+          </button>
+        </div>
+
+        {unavailable ? (
+          <p className="mt-4 text-sm leading-6 text-app-muted">
+            L'achat de licences supplémentaires sera disponible prochainement. Nous configurons actuellement ce service.
+          </p>
+        ) : (
+          <>
+            <p className="mt-4 text-sm leading-6 text-app-text">
+              Votre licence actuelle ne permet pas de créer une pharmacie supplémentaire.
+            </p>
+            <p className="mt-3 text-sm leading-6 text-app-muted">
+              Pour créer plus d'une pharmacie, vous devez disposer d'une licence supplémentaire.
+            </p>
+          </>
+        )}
+
+        <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          {!unavailable && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex min-h-11 items-center justify-center rounded-md border border-app-border bg-app-surface px-5 py-2.5 text-sm font-semibold text-app-text transition hover:bg-primary-50 focus:outline-none focus:ring-4 focus:ring-primary-100"
+            >
+              Plus tard
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={unavailable ? onClose : onPurchase}
+            className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-700 focus:outline-none focus:ring-4 focus:ring-primary-100"
+          >
+            {unavailable ? "Fermer" : "Acheter une licence"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

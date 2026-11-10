@@ -32,6 +32,7 @@ export type PharmacySummary = {
   subscriptionStatus?: string;
   subscriptionExpiresAt?: string;
   subscriptionIsActive?: boolean;
+  subscriptionIsTrialActive?: boolean;
   trialEndsAt?: string;
 };
 
@@ -510,6 +511,7 @@ function normalizePharmacy(item: UnknownRecord): PharmacySummary {
     subscriptionStatus: getText(subscription?.status),
     subscriptionExpiresAt: getText(subscription?.expires_at),
     subscriptionIsActive: subscription?.is_active === undefined ? undefined : Boolean(subscription.is_active),
+    subscriptionIsTrialActive: subscription?.is_trial_active === undefined ? undefined : Boolean(subscription.is_trial_active),
     trialEndsAt: getText(subscription?.trial_ends_at),
   };
 }

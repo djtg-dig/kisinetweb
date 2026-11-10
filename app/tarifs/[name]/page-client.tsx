@@ -25,6 +25,7 @@ import {
   type SubscriptionPaymentProvider,
 } from "@/lib/api";
 import { carriAccountLoginUrl } from "@/lib/carri-account";
+import { getSubscriptionPurchaseError } from "@/lib/subscription-policy";
 import {
   getActivePharmacyId,
   setActivePharmacyId,
@@ -59,8 +60,6 @@ type CommitmentOption = {
 const fallbackCommitmentOptions: CommitmentOption[] = [
   { months: 1, discountPercentage: 0 },
 ];
-
-const PLAN_RANK: Record<string, number> = { BASIC: 1, STANDARD: 2, ENTERPRISE: 3 };
 
 export default function PlanDetailPage() {
   const params = useParams<{ name?: string }>();
@@ -1171,34 +1170,6 @@ function canManageSubscription(pharmacy: PharmacySummary) {
   }
 
   return ["OWNER", "PROPRIETAIRE", "PROPRIÉTAIRE", "ADMIN", "MANAGER", "GERANT", "GÉRANT"].includes(role);
-}
-
-function getSubscriptionPurchaseError(pharmacy: PharmacySummary | null, requestedPlan?: string) {
-  if (!pharmacy || !requestedPlan || !isPaidSubscriptionActive(pharmacy)) {
-    return "";
-  }
-
-  const currentPlan = (pharmacy.planName || "").toUpperCase();
-  const currentRank = PLAN_RANK[currentPlan] || 0;
-  const requestedRank = PLAN_RANK[requestedPlan.toUpperCase()] || 0;
-  if (!currentRank || !requestedRank) {
-    return "";
-  }
-  if (requestedRank === currentRank) {
-    return "Votre pharmacie bénéficie déjà de ce forfait jusqu'à son expiration.";
-  }
-  if (requestedRank < currentRank) {
-    return "Un forfait inférieur ne peut pas être acheté tant que l'abonnement actuel est valide.";
-  }
-  return "";
-}
-
-function isPaidSubscriptionActive(pharmacy: PharmacySummary) {
-  if (pharmacy.subscriptionStatus !== "ACTIVE" || !pharmacy.subscriptionExpiresAt) {
-    return false;
-  }
-  const expiry = new Date(pharmacy.subscriptionExpiresAt);
-  return !Number.isNaN(expiry.getTime()) && expiry.getTime() > Date.now();
 }
 
 function formatSubscriptionExpiry(value?: string) {
