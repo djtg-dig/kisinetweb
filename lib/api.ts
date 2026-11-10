@@ -1437,6 +1437,23 @@ export async function getPharmacySubscriptionPayment(
   return normalizeSubscriptionPayment(data);
 }
 
+export async function getPharmacySubscriptionPayments(
+  pharmacyReference: string,
+): Promise<PharmacySubscriptionPayment[]> {
+  const params = new URLSearchParams({ pharmacy_reference: pharmacyReference });
+  const data = await fetchApiJson<unknown>(
+    "/api/paiements/subscription-payments/?" + params.toString(),
+    "Impossible de charger l'historique des paiements.",
+  );
+  const record = getRecord(data);
+  const rows = Array.isArray(data) ? data : Array.isArray(record?.results) ? record.results : [];
+
+  return rows
+    .map(getRecord)
+    .filter((row): row is UnknownRecord => row !== null)
+    .map(normalizeSubscriptionPayment);
+}
+
 export async function getCitiesOrProvinces(country: string): Promise<CityOrProvinceOption[]> {
   const params = new URLSearchParams();
   if (country) {
