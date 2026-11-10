@@ -1386,7 +1386,7 @@ export async function initiateAgregateurSubscriptionCheckout(payload: {
     throw new Error("La durée d'abonnement sélectionnée est invalide.");
   }
 
-  const providerCode = payload.providerCode || "AGREGATEUR";
+  const providerCode = payload.providerCode;
   if (providerCode === "PAWAPAY" && (!payload.country || !payload.phoneNumber || !payload.operator)) {
     throw new Error("Le pays, l'opérateur et le numéro Mobile Money sont requis pour pawaPay.");
   }
@@ -1399,8 +1399,14 @@ export async function initiateAgregateurSubscriptionCheckout(payload: {
     plan_code: payload.planCode,
     duration_months: payload.durationMonths,
     currency: payload.currency,
-    provider_code: providerCode,
   };
+
+  // L'absence de fournisseur est volontaire : le backend choisit la route
+  // active selon sa configuration. Les anciens appelants explicites restent
+  // supportés pour les parcours qui en ont encore besoin.
+  if (providerCode) {
+    body.provider_code = providerCode;
+  }
 
   if (Number.isFinite(payload.planId) && Number(payload.planId) > 0) {
     body.plan_id = Number(payload.planId);

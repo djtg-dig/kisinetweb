@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { buildPlanElements } from "@/components/pricing/plan-elements";
-import type { PharmacyPlan, PharmacySummary, SubscriptionPaymentProvider } from "@/lib/api";
+import type { PharmacyPlan, PharmacySummary } from "@/lib/api";
 
 export type ConfirmationTotals = {
   /** Prix mensuel du forfait par pharmacie. */
@@ -26,7 +26,6 @@ export function SubscriptionConfirmation({
   disabled,
   isSubmitting,
   paymentMessage,
-  paymentProvider,
   paymentTone,
   plan,
   selectedPharmacy,
@@ -40,7 +39,6 @@ export function SubscriptionConfirmation({
   disabled: boolean;
   isSubmitting: boolean;
   paymentMessage: string;
-  paymentProvider: SubscriptionPaymentProvider;
   paymentTone: "error" | "success" | "neutral";
   plan: PharmacyPlan;
   selectedPharmacy: PharmacySummary | null;
@@ -118,10 +116,6 @@ export function SubscriptionConfirmation({
                 value={formatMoney(totals.monthlyAmount, currency)}
               />
               <ConfirmationRow label="Devise" value={currency || "—"} />
-              <ConfirmationRow
-                label="Moyen de paiement"
-                value={paymentProvider === "PAWAPAY" ? "pawaPay Mobile Money" : paymentProvider === "OPTGATEWAY" ? "OPTGateway" : "iKeePay"}
-              />
               {totals.durationMonths > 0 && (
                 <ConfirmationRow
                   label="Durée choisie"

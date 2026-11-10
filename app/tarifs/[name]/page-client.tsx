@@ -22,7 +22,6 @@ import {
   type PharmacyPlan,
   type PharmacyPlanDuration,
   type PharmacySummary,
-  type SubscriptionPaymentProvider,
 } from "@/lib/api";
 import { carriAccountLoginUrl } from "@/lib/carri-account";
 import { getSubscriptionPurchaseError } from "@/lib/subscription-policy";
@@ -37,18 +36,6 @@ type PharmacyState = "idle" | "unauthenticated" | "loading" | "error" | "empty" 
 type PaymentState = "idle" | "starting" | "opening" | "paying" | "confirming" | "validated" | "error";
 // Etape du parcours : selection des options puis confirmation avant paiement.
 type CheckoutStep = "selection" | "confirmation";
-
-const PAWAPAY_OPERATORS = [
-  { value: "AIRTEL_COD", label: "Airtel Money" },
-  { value: "ORANGE_COD", label: "Orange Money" },
-  { value: "VODACOM_MPESA_COD", label: "Vodacom M-Pesa" },
-] as const;
-
-const pawapayAvailable = process.env.NEXT_PUBLIC_PAWAPAY_ENABLED === "true";
-const optgatewayAvailable = process.env.NEXT_PUBLIC_OPTGATEWAY_ENABLED === "true";
-const initialPaymentProvider: SubscriptionPaymentProvider = optgatewayAvailable
-  ? "OPTGATEWAY"
-  : "AGREGATEUR";
 
 type CommitmentOption = {
   months: number;
@@ -78,9 +65,6 @@ export default function PlanDetailPage() {
   const [checkoutUrl, setCheckoutUrl] = useState("");
   const [activePayment, setActivePayment] = useState<PharmacySubscriptionPayment | null>(null);
   const [toastMessage, setToastMessage] = useState("");
-  const [paymentProvider, setPaymentProvider] = useState<SubscriptionPaymentProvider>(initialPaymentProvider);
-  const [pawapayPhoneNumber, setPawapayPhoneNumber] = useState("");
-  const [pawapayOperator, setPawapayOperator] = useState("");
   const { authenticated, loading: sessionLoading } = useSession();
 
   // Nombre d'utilisateurs actifs a inclure dans l'abonnement (modele seat-based).
@@ -226,17 +210,8 @@ export default function PlanDetailPage() {
       errors.push(subscriptionPurchaseError);
     }
 
-    if (paymentProvider === "PAWAPAY") {
-      if (!pawapayOperator) {
-        errors.push("Sélectionnez votre opérateur Mobile Money.");
-      }
-      if (!/^\d{8,15}$/.test(pawapayPhoneNumber.replace(/\D/g, ""))) {
-        errors.push("Saisissez un numéro Mobile Money international valide.");
-      }
-    }
-
     return errors;
-  }, [pawapayOperator, pawapayPhoneNumber, paymentProvider, plan, selectedCommitment, selectedPharmacy, subscriptionPurchaseError]);
+  }, [plan, selectedCommitment, selectedPharmacy, subscriptionPurchaseError]);
 
   const canConfirm = validationErrors.length === 0;
   const isPaymentBusy =
@@ -430,34 +405,11 @@ export default function PlanDetailPage() {
         planId: plan.id,
         durationMonths: selectedCommitment.months,
         currency: plan.currency || "USD",
-        providerCode: paymentProvider,
-        ...(paymentProvider === "PAWAPAY"
-          ? {
-              country: "CD",
-              phoneNumber: pawapayPhoneNumber,
-              operator: pawapayOperator,
-            }
-          : paymentProvider === "OPTGATEWAY"
-            ? { country: "CD" }
-          : {}),
       });
       setActivePayment(checkout.payment);
-      if (paymentProvider === "PAWAPAY") {
-        setPaymentState("confirming");
-        setPaymentMessage(
-          "Votre demande Mobile Money est prise en charge. Confirmez-la sur votre téléphone si votre opérateur vous le demande. Le statut reste en attente de confirmation serveur.",
-        );
-      } else if (paymentProvider === "OPTGATEWAY") {
-        if (!checkout.checkoutUrl) {
-          throw new Error("Le serveur n'a pas renvoyé de session OPTGateway.");
-        }
-        window.location.assign(checkout.checkoutUrl);
-        return;
-      } else {
-        setCheckoutUrl(checkout.checkoutUrl);
-        setPaymentState("opening");
-        setPaymentMessage("Ouverture du paiement sécurisé...");
-      }
+      setCheckoutUrl(checkout.checkoutUrl);
+      setPaymentState("opening");
+      setPaymentMessage("Ouverture du paiement sécurisé...");
       void pollPaymentConfirmation(
         checkout.payment.id,
         selectedPharmacy.reference || selectedPharmacy.id,
@@ -516,7 +468,6 @@ export default function PlanDetailPage() {
                       ? "success"
                       : "neutral"
                 }
-                paymentProvider={paymentProvider}
                 plan={plan}
                 selectedPharmacy={selectedPharmacy}
                 submitLabel={buildPaymentButtonLabel(paymentState)}
@@ -547,16 +498,7 @@ export default function PlanDetailPage() {
                     selectedPharmacyId={selectedPharmacyId}
                     onSelectPharmacy={selectPharmacy}
                   />
-                  <PaymentProviderSection
-                    pawapayAvailable={pawapayAvailable}
-                    optgatewayAvailable={optgatewayAvailable}
-                    pawapayOperator={pawapayOperator}
-                    pawapayPhoneNumber={pawapayPhoneNumber}
-                    provider={paymentProvider}
-                    onOperatorChange={setPawapayOperator}
-                    onPhoneNumberChange={setPawapayPhoneNumber}
-                    onProviderChange={setPaymentProvider}
-                  />
+                  <SecurePaymentSection />
                 </div>
 
                 <aside className="grid gap-6 lg:sticky lg:top-28 lg:self-start">
@@ -823,92 +765,13 @@ function PharmacySubscriptionSection({
   );
 }
 
-function PaymentProviderSection({
-  pawapayAvailable,
-  optgatewayAvailable,
-  pawapayOperator,
-  pawapayPhoneNumber,
-  provider,
-  onOperatorChange,
-  onPhoneNumberChange,
-  onProviderChange,
-}: {
-  pawapayAvailable: boolean;
-  optgatewayAvailable: boolean;
-  pawapayOperator: string;
-  pawapayPhoneNumber: string;
-  provider: SubscriptionPaymentProvider;
-  onOperatorChange: (value: string) => void;
-  onPhoneNumberChange: (value: string) => void;
-  onProviderChange: (value: SubscriptionPaymentProvider) => void;
-}) {
+function SecurePaymentSection() {
   return (
     <section className="rounded-lg border border-app-border bg-app-card p-5 shadow-sm sm:p-7">
-      <p className="text-sm font-semibold uppercase tracking-wide text-app-muted">Paiement</p>
-      <h2 className="mt-2 text-xl font-bold text-app-text">Choisissez votre moyen de paiement</h2>
-      <div className="mt-5 grid gap-3 sm:grid-cols-2">
-        <button
-          type="button"
-          onClick={() => onProviderChange("AGREGATEUR")}
-          className={`rounded-lg border p-4 text-left transition focus:outline-none focus:ring-4 focus:ring-primary-100 ${
-            provider === "AGREGATEUR"
-              ? "border-primary-600 bg-primary-50 ring-1 ring-primary-200"
-              : "border-app-border bg-app-background/60 hover:border-primary-200"
-          }`}
-        >
-          <span className="block font-bold text-app-text">iKeePay</span>
-          <span className="mt-1 block text-sm leading-5 text-app-muted">Paiement hébergé existant.</span>
-        </button>
-        {pawapayAvailable && (
-          <button
-            type="button"
-            onClick={() => onProviderChange("PAWAPAY")}
-            className={`rounded-lg border p-4 text-left transition focus:outline-none focus:ring-4 focus:ring-primary-100 ${
-              provider === "PAWAPAY"
-                ? "border-primary-600 bg-primary-50 ring-1 ring-primary-200"
-                : "border-app-border bg-app-background/60 hover:border-primary-200"
-            }`}
-          >
-            <span className="block font-bold text-app-text">pawaPay</span>
-            <span className="mt-1 block text-sm leading-5 text-app-muted">Dépôt Mobile Money en RDC.</span>
-          </button>
-        )}
-        {optgatewayAvailable && (
-          <button
-            type="button"
-            onClick={() => onProviderChange("OPTGATEWAY")}
-            className={`rounded-lg border p-4 text-left transition focus:outline-none focus:ring-4 focus:ring-primary-100 ${
-              provider === "OPTGATEWAY"
-                ? "border-primary-600 bg-primary-50 ring-1 ring-primary-200"
-                : "border-app-border bg-app-background/60 hover:border-primary-200"
-            }`}
-          >
-            <span className="block font-bold text-app-text">OPTGateway</span>
-            <span className="mt-1 block text-sm leading-5 text-app-muted">Paiement hébergé sécurisé.</span>
-          </button>
-        )}
-      </div>
-
-      {provider === "PAWAPAY" && pawapayAvailable && (
-        <div className="mt-5 grid gap-4 rounded-lg border border-app-border bg-app-background/60 p-4 sm:grid-cols-2">
-          <label className="grid gap-1.5 text-sm font-medium text-app-text">
-            Pays
-            <input value="RDC (CD)" disabled className="h-11 rounded-md border border-app-border bg-app-surface px-3 text-app-muted" />
-          </label>
-          <label className="grid gap-1.5 text-sm font-medium text-app-text">
-            Opérateur
-            <select value={pawapayOperator} onChange={(event) => onOperatorChange(event.target.value)} className="h-11 rounded-md border border-app-border bg-app-surface px-3 text-app-text focus:outline-none focus:ring-4 focus:ring-primary-100">
-              <option value="">Sélectionnez un opérateur</option>
-              {PAWAPAY_OPERATORS.map((operator) => <option key={operator.value} value={operator.value}>{operator.label}</option>)}
-            </select>
-          </label>
-          <label className="grid gap-1.5 text-sm font-medium text-app-text sm:col-span-2">
-            Numéro Mobile Money
-            <input value={pawapayPhoneNumber} onChange={(event) => onPhoneNumberChange(event.target.value.replace(/[^\d+\s()-]/g, ""))} inputMode="tel" autoComplete="tel" placeholder="Ex. +243 812 345 678" className="h-11 rounded-md border border-app-border bg-app-surface px-3 text-app-text outline-none focus:ring-4 focus:ring-primary-100" />
-          </label>
-          <p className="text-sm leading-6 text-app-muted sm:col-span-2">Le montant et la disponibilité sont confirmés par le backend. Une validation peut être demandée sur votre téléphone.</p>
-        </div>
-      )}
+      <p className="text-sm font-semibold uppercase tracking-wide text-app-muted">Paiement sécurisé</p>
+      <p className="mt-2 text-sm leading-6 text-app-muted">
+        Réglez votre abonnement par Mobile Money, carte bancaire ou tout autre moyen disponible lors du paiement.
+      </p>
     </section>
   );
 }
@@ -1090,7 +953,7 @@ function buildPaymentButtonLabel(paymentState: PaymentState) {
     return "Paiement confirmé";
   }
 
-  return "Confirmer et continuer vers le paiement";
+  return "Payer mon abonnement";
 }
 
 function buildOrderSummary(plan: PharmacyPlan | null, commitment: CommitmentOption) {
