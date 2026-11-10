@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/ui/link-button";
+import { ToastMessage } from "@/components/ui/toast";
 import {
   createPharmacy,
   getCitiesOrProvinces,
@@ -26,6 +27,9 @@ type FormState = {
   neighborhood: string;
   invitedBy: string;
 };
+
+type FormField = keyof FormState;
+type FieldErrors = Partial<Record<FormField, string>>;
 
 const initialFormState: FormState = {
   name: "",
@@ -58,9 +62,147 @@ export default function CreatePharmacyPage() {
   const [isLoadingCities, setIsLoadingCities] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [touchedFields, setTouchedFields] = useState<Partial<Record<FormField, boolean>>>({});
+  const [toast, setToast] = useState<{ tone: "error"; message: string } | null>(null);
 
-  function updateField(field: keyof FormState, value: string) {
+  function updateField(field: FormField, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
+    setFieldErrors((current) => ({ ...current, [field]: validateField(field, value) }));
+  }
+
+  function validateField(field: FormField, value = form[field]) {
+    const trimmedValue = value.trim();
+
+    if (field === "name" && !trimmedValue) {
+      return "Le nom de la pharmacie est obligatoire.";
+    }
+    if (field === "devise" && !trimmedValue) {
+      return "Veuillez sélectionner une devise.";
+    }
+    if (field === "countryPhoneCode" && !trimmedValue) {
+      return "Veuillez sélectionner un pays.";
+    }
+    if (field === "cityOrProvinceId" && !trimmedValue) {
+      return "Veuillez sélectionner une ville ou une province.";
+    }
+    if (field === "street" && !trimmedValue) {
+      return "Veuillez renseigner une adresse.";
+    }
+    if (field === "email" && trimmedValue && !/^\S+@\S+\.\S+$/.test(trimmedValue)) {
+      return "Veuillez saisir une adresse e-mail valide.";
+    }
+    if (field === "invitedBy" && trimmedValue && !referralCodePattern.test(trimmedValue.toUpperCase())) {
+      return "Le code de parrainage doit respecter le format USXXXXXXXX (10 caractères).";
+    }
+
+    return "";
+  }
+
+  function validateForm() {
+    const nextErrors = (Object.keys(form) as FormField[]).reduce<FieldErrors>((errors, field) => {
+      const message = validateField(field);
+      if (message) {
+        errors[field] = message;
+      }
+      return errors;
+    }, {});
+
+    setFieldErrors(nextErrors);
+    setTouchedFields(
+      (Object.keys(form) as FormField[]).reduce(
+        (touched, field) => ({ ...touched, [field]: true }),
+        {},
+      ),
+    );
+    return nextErrors;
+  }
+
+  function focusFirstInvalidField(errors: FieldErrors) {
+    const firstInvalidField = [
+      "name",
+      "email",
+      "phoneNumber",
+      "devise",
+      "countryPhoneCode",
+      "cityOrProvinceId",
+      "street",
+      "neighborhood",
+      "invitedBy",
+    ].find((field) => errors[field as FormField]);
+
+    if (!firstInvalidField) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      const element = document.getElementById(firstInvalidField);
+      element?.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (element instanceof HTMLInputElement || element instanceof HTMLSelectElement) {
+        element.focus();
+      }
+    });
+  }
+
+  function handleBlur(field: FormField) {
+    setTouchedFields((current) => ({ ...current, [field]: true }));
+    setFieldErrors((current) => ({ ...current, [field]: validateField(field) }));
+  }
+
+  function showError(message: string) {
+    setToast({ tone: "error", message });
+  }
+
+  function applyBackendErrors(message: string) {
+    const nextErrors: FieldErrors = {};
+    const fieldMap: Record<string, FormField> = {
+      name: "name",
+      email: "email",
+      phone_number: "phoneNumber",
+      devise: "devise",
+      country: "countryPhoneCode",
+      city_or_province: "cityOrProvinceId",
+      street: "street",
+      invited_by: "invitedBy",
+      "adresse.country": "countryPhoneCode",
+      "adresse.city_or_province": "cityOrProvinceId",
+      "adresse.street": "street",
+    };
+
+    for (const line of message.split("\n")) {
+      const separatorIndex = line.indexOf(" : ");
+      if (separatorIndex === -1) {
+        continue;
+      }
+      const key = line.slice(0, separatorIndex);
+      const field = fieldMap[key];
+      if (field) {
+        nextErrors[field] = line.slice(separatorIndex + 3);
+      }
+    }
+
+    if (Object.keys(nextErrors).length) {
+      setFieldErrors((current) => ({ ...current, ...nextErrors }));
+      setTouchedFields((current) => ({
+        ...current,
+        ...Object.keys(nextErrors).reduce(
+          (fields, field) => ({ ...fields, [field]: true }),
+          {},
+        ),
+      }));
+      focusFirstInvalidField(nextErrors);
+    }
+  }
+
+  function getSafeSubmissionError(error: unknown) {
+    const message = error instanceof Error ? error.message.trim() : "";
+    const technicalMessage = /fetch failed|internal server error|traceback|exception|syntaxerror|database|sql/i.test(
+      message,
+    );
+
+    return message && !technicalMessage
+      ? message
+      : "Impossible de créer cette pharmacie. Veuillez réessayer dans quelques instants.";
   }
 
   useEffect(() => {
@@ -191,15 +333,18 @@ export default function CreatePharmacyPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setErrorMessage("");
+    setToast(null);
 
-    const invitedBy = form.invitedBy.trim().toUpperCase();
-    if (invitedBy && !referralCodePattern.test(invitedBy)) {
-      setErrorMessage(
-        "Le code de parrainage doit respecter le format USXXXXXXXX (10 caractères).",
-      );
+    const errors = validateForm();
+    if (Object.keys(errors).length) {
+      const message =
+        "Certains champs sont incomplets ou incorrects. Veuillez corriger les informations indiquées ci-dessous.";
+      showError(message);
+      focusFirstInvalidField(errors);
       return;
     }
 
+    const invitedBy = form.invitedBy.trim().toUpperCase();
     setIsSubmitting(true);
 
     try {
@@ -226,8 +371,9 @@ export default function CreatePharmacyPage() {
 
       window.location.href = "/app/pharmacies/" + pharmacy.id + "/dashboard";
     } catch (error) {
-      const message = error instanceof Error ? error.message : "";
-      setErrorMessage(message || "Impossible de créer cette pharmacie.");
+      const safeMessage = getSafeSubmissionError(error);
+      applyBackendErrors(safeMessage);
+      showError(safeMessage);
       setIsSubmitting(false);
     }
   }
@@ -255,9 +401,15 @@ export default function CreatePharmacyPage() {
       <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         <form
           onSubmit={handleSubmit}
+          noValidate
           className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]"
         >
           <div className="rounded-lg border border-app-border bg-app-card p-5 shadow-sm sm:p-6">
+            {toast && (
+              <ToastMessage tone={toast.tone} onClose={() => setToast(null)}>
+                {toast.message}
+              </ToastMessage>
+            )}
             {errorMessage && (
               <div
                 role="alert"
@@ -273,7 +425,9 @@ export default function CreatePharmacyPage() {
                 label="Nom de la pharmacie"
                 value={form.name}
                 onChange={(value) => updateField("name", value)}
+                onBlur={() => handleBlur("name")}
                 required
+                error={touchedFields.name ? fieldErrors.name : ""}
                 placeholder="Ex. Pharmacie Centrale"
               />
 
@@ -284,6 +438,8 @@ export default function CreatePharmacyPage() {
                   type="email"
                   value={form.email}
                   onChange={(value) => updateField("email", value)}
+                  onBlur={() => handleBlur("email")}
+                  error={touchedFields.email ? fieldErrors.email : ""}
                   placeholder="contact@pharmacie.cd"
                 />
                 <TextField
@@ -292,6 +448,8 @@ export default function CreatePharmacyPage() {
                   type="tel"
                   value={form.phoneNumber}
                   onChange={(value) => updateField("phoneNumber", value)}
+                  onBlur={() => handleBlur("phoneNumber")}
+                  error={touchedFields.phoneNumber ? fieldErrors.phoneNumber : ""}
                   placeholder="+243 ..."
                 />
               </div>
@@ -301,9 +459,11 @@ export default function CreatePharmacyPage() {
                 label="Devise"
                 value={form.devise}
                 onChange={(value) => updateField("devise", value)}
+                onBlur={() => handleBlur("devise")}
                 options={currencies}
                 required
                 disabled={isLoadingCurrencies}
+                error={touchedFields.devise ? fieldErrors.devise : ""}
               />
 
               <TextField
@@ -311,6 +471,8 @@ export default function CreatePharmacyPage() {
                 label="Code de parrainage (facultatif)"
                 value={form.invitedBy}
                 onChange={(value) => updateField("invitedBy", value.toUpperCase())}
+                onBlur={() => handleBlur("invitedBy")}
+                error={touchedFields.invitedBy ? fieldErrors.invitedBy : ""}
                 placeholder="Ex. USA7K9M2Q1"
                 maxLength={referralCodeLength}
                 hint="Référence publique de la personne qui vous a invité, au format USXXXXXXXX. Laissez vide si vous n'avez pas de parrain."
@@ -331,19 +493,23 @@ export default function CreatePharmacyPage() {
                           cityOrProvinceId: "",
                         }));
                       }}
+                      onBlur={() => handleBlur("countryPhoneCode")}
                       options={countries.map((country) => ({
                         label: country.name + " (" + country.phoneCode + ")",
                         value: country.phoneCode,
                       }))}
                       required
                       disabled={isLoadingCountries || !countries.length}
+                      error={touchedFields.countryPhoneCode ? fieldErrors.countryPhoneCode : ""}
                     />
                     <TextField
                       id="street"
                       label="Rue et numéro"
                       value={form.street}
                       onChange={(value) => updateField("street", value)}
+                      onBlur={() => handleBlur("street")}
                       required
+                      error={touchedFields.street ? fieldErrors.street : ""}
                       placeholder="Ex. Avenue du Commerce 12"
                     />
                   </div>
@@ -352,18 +518,22 @@ export default function CreatePharmacyPage() {
                     label="Ville, province ou région."
                     value={form.cityOrProvinceId}
                     onChange={(value) => updateField("cityOrProvinceId", value)}
+                    onBlur={() => handleBlur("cityOrProvinceId")}
                     options={citiesOrProvinces.map((cityOrProvince) => ({
                       label: cityOrProvince.name,
                       value: String(cityOrProvince.id),
                     }))}
                     required
                     disabled={isLoadingCities || !citiesOrProvinces.length}
+                    error={touchedFields.cityOrProvinceId ? fieldErrors.cityOrProvinceId : ""}
                   />
                   <TextField
                     id="neighborhood"
                     label="Quartier,commune,arrondissement, secteur, village ou repère local."
-                    value={form.neighborhood}
-                    onChange={(value) => updateField("neighborhood", value)}
+                  value={form.neighborhood}
+                  onChange={(value) => updateField("neighborhood", value)}
+                  onBlur={() => handleBlur("neighborhood")}
+                  error={touchedFields.neighborhood ? fieldErrors.neighborhood : ""}
                     placeholder="Ex. Gombe"
                   />
                 </div>
@@ -377,11 +547,7 @@ export default function CreatePharmacyPage() {
               <Button
                 type="submit"
                 disabled={
-                  isSubmitting ||
-                  !form.name.trim() ||
-                  !form.countryPhoneCode.trim() ||
-                  !form.cityOrProvinceId.trim() ||
-                  !form.street.trim()
+                  isSubmitting
                 }
               >
                 {isSubmitting ? "Création en cours..." : "Créer la pharmacie"}
@@ -407,22 +573,27 @@ function TextField({
   label,
   value,
   onChange,
+  onBlur,
   type = "text",
   required = false,
   placeholder,
   maxLength,
   hint,
+  error,
 }: {
   id: string;
   label: string;
   value: string;
   onChange: (value: string) => void;
+  onBlur?: () => void;
   type?: string;
   required?: boolean;
   placeholder?: string;
   maxLength?: number;
   hint?: string;
+  error?: string;
 }) {
+  const errorId = id + "-error";
   return (
     <label htmlFor={id} className="block">
       <span className="text-sm font-semibold text-app-text">
@@ -434,12 +605,24 @@ function TextField({
         type={type}
         value={value}
         onChange={(event) => onChange(event.target.value)}
+        onBlur={onBlur}
         required={required}
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? errorId : hint ? id + "-hint" : undefined}
         placeholder={placeholder}
         maxLength={maxLength}
-        className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 py-2 text-sm text-app-text outline-none transition placeholder:text-app-muted focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
+        className={`mt-2 min-h-11 w-full rounded-md border bg-app-surface px-3 py-2 text-sm text-app-text outline-none transition placeholder:text-app-muted focus:ring-4 focus:ring-primary-100 ${error ? "border-red-400 focus:border-red-500" : "border-app-border focus:border-primary-500"}`}
       />
-      {hint && <span className="mt-2 block text-xs leading-5 text-app-muted">{hint}</span>}
+      {error && (
+        <span id={errorId} className="mt-2 block text-xs font-semibold text-red-600">
+          {error}
+        </span>
+      )}
+      {hint && !error && (
+        <span id={id + "-hint"} className="mt-2 block text-xs leading-5 text-app-muted">
+          {hint}
+        </span>
+      )}
     </label>
   );
 }
@@ -449,18 +632,23 @@ function SelectField({
   label,
   value,
   onChange,
+  onBlur,
   options,
   required = false,
   disabled = false,
+  error,
 }: {
   id: string;
   label: string;
   value: string;
   onChange: (value: string) => void;
+  onBlur?: () => void;
   options: { label: string; value: string }[];
   required?: boolean;
   disabled?: boolean;
+  error?: string;
 }) {
+  const errorId = id + "-error";
   return (
     <label htmlFor={id} className="block">
       <span className="text-sm font-semibold text-app-text">
@@ -471,9 +659,12 @@ function SelectField({
         id={id}
         value={value}
         onChange={(event) => onChange(event.target.value)}
+        onBlur={onBlur}
         required={required}
         disabled={disabled}
-        className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 py-2 text-sm text-app-text outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100 disabled:cursor-not-allowed disabled:bg-app-border/30 disabled:text-app-muted"
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? errorId : undefined}
+        className={`mt-2 min-h-11 w-full rounded-md border bg-app-surface px-3 py-2 text-sm text-app-text outline-none transition focus:ring-4 disabled:cursor-not-allowed disabled:bg-app-border/30 disabled:text-app-muted ${error ? "border-red-400 focus:border-red-500" : "border-app-border focus:border-primary-500"}`}
       >
         {!options.length && (
           <option value="">
@@ -486,6 +677,11 @@ function SelectField({
           </option>
         ))}
       </select>
+      {error && (
+        <span id={errorId} className="mt-2 block text-xs font-semibold text-red-600">
+          {error}
+        </span>
+      )}
     </label>
   );
 }
