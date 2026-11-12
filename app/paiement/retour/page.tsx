@@ -8,11 +8,14 @@ import { PublicLayout } from "@/components/layout/public-layout";
 import {
   getPharmacySubscriptionPayment,
   getPharmacySubscriptionPayments,
+  getUserLicensePurchases,
   getUserPharmacies,
   type PharmacySummary,
   type PharmacySubscriptionPayment,
+  type UserLicensePurchase,
 } from "@/lib/api";
 import {
+  findLicensePurchaseByProviderReference,
   findPaymentByProviderReference,
   getSubscriptionReturnState,
   type SubscriptionReturnState,
@@ -29,6 +32,7 @@ export default function OptGatewayReturnPage() {
   const [pageState, setPageState] = useState<ReturnPageState>("loading");
   const [returnState, setReturnState] = useState<SubscriptionReturnState>("unknown");
   const [payment, setPayment] = useState<PharmacySubscriptionPayment | null>(null);
+  const [licensePurchase, setLicensePurchase] = useState<UserLicensePurchase | null>(null);
   const [pharmacy, setPharmacy] = useState<PharmacySummary | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -39,7 +43,11 @@ export default function OptGatewayReturnPage() {
       return true;
     }
 
-    const pharmacies = await getUserPharmacies();
+    const [pharmaciesResult, licensePurchasesResult] = await Promise.allSettled([
+      getUserPharmacies(),
+      getUserLicensePurchases(),
+    ]);
+    const pharmacies = pharmaciesResult.status === "fulfilled" ? pharmaciesResult.value : [];
     const candidates = await Promise.allSettled(
       pharmacies
         .filter((candidate) => Boolean(candidate.reference))
@@ -69,6 +77,23 @@ export default function OptGatewayReturnPage() {
       setReturnState(verifiedState);
       setPageState("ready");
       return verifiedState !== "pending";
+    }
+
+    if (licensePurchasesResult.status === "fulfilled") {
+      const matchedPurchase = findLicensePurchaseByProviderReference(
+        licensePurchasesResult.value,
+        sessionId,
+      );
+      if (matchedPurchase) {
+        setLicensePurchase(matchedPurchase);
+        setReturnState(getSubscriptionReturnState(matchedPurchase.status));
+        setPageState("ready");
+        return getSubscriptionReturnState(matchedPurchase.status) !== "pending";
+      }
+    }
+
+    if (pharmaciesResult.status === "rejected" && licensePurchasesResult.status === "rejected") {
+      throw pharmaciesResult.reason;
     }
 
     setPageState("ready");
@@ -119,6 +144,7 @@ export default function OptGatewayReturnPage() {
   const dashboardHref = pharmacy
     ? `/app/pharmacies/${encodeURIComponent(pharmacy.id)}/dashboard`
     : "";
+  const licenseHref = licensePurchase ? "/app/compte/licence" : "";
 
   return (
     <PublicLayout>
@@ -137,7 +163,9 @@ export default function OptGatewayReturnPage() {
             <>
               <h1 className="text-2xl font-bold text-app-text">Paiement confirmé</h1>
               <p className="mt-3 text-app-muted">
-                Votre paiement a été confirmé par Kisinet. L’abonnement sera visible dans la pharmacie.
+                {licensePurchase
+                  ? "Votre paiement de licence a été confirmé par Kisinet. La licence est maintenant active."
+                  : "Votre paiement a été confirmé par Kisinet. L’abonnement sera visible dans la pharmacie."}
               </p>
             </>
           ) : null}
@@ -175,6 +203,9 @@ export default function OptGatewayReturnPage() {
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             {dashboardHref && returnState === "success" ? (
               <LinkButton href={dashboardHref}>Retour à la pharmacie</LinkButton>
+            ) : null}
+            {licenseHref && returnState === "success" ? (
+              <LinkButton href={licenseHref}>Voir ma licence</LinkButton>
             ) : null}
             <LinkButton href="/tarifs" variant="secondary">Voir les tarifs</LinkButton>
           </div>

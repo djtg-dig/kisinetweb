@@ -1,4 +1,4 @@
-import type { PharmacySubscriptionPayment } from "@/lib/api";
+import type { PharmacySubscriptionPayment, UserLicensePurchase } from "@/lib/api";
 
 export type SubscriptionReturnState =
   | "success"
@@ -39,5 +39,19 @@ export function findPaymentByProviderReference(
 
   return payments.find(
     (payment) => payment.providerReference?.trim() === normalizedSessionId,
+  );
+}
+
+export function findLicensePurchaseByProviderReference(
+  purchases: UserLicensePurchase[],
+  sessionId: string,
+): UserLicensePurchase | undefined {
+  const normalizedSessionId = sessionId.trim();
+  if (!normalizedSessionId) {
+    return undefined;
+  }
+
+  return purchases.find(
+    (purchase) => purchase.providerReference.trim() === normalizedSessionId,
   );
 }

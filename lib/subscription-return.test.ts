@@ -4,6 +4,7 @@ import test from "node:test";
 import type { PharmacySubscriptionPayment } from "@/lib/api";
 import {
   findPaymentByProviderReference,
+  findLicensePurchaseByProviderReference,
   getSubscriptionReturnState,
 } from "@/lib/subscription-return";
 
@@ -36,4 +37,23 @@ test("matches the OPTGateway session only against provider_reference", () => {
 
   assert.equal(result?.reference, "PT-session");
   assert.equal(findPaymentByProviderReference([payment({ reference: "PT123" })], "PT123"), undefined);
+});
+
+test("matches a license purchase against the OPTGateway session", () => {
+  const result = findLicensePurchaseByProviderReference(
+    [{
+      reference: "LP123",
+      plan: { code: "illimite", name: "Illimitée", price: "10.00", currency: "USD", maxPharmacies: null, isUnlimited: true },
+      amount: "10.00",
+      currency: "USD",
+      providerCode: "OPTGATEWAY",
+      providerReference: "cs_license_123",
+      checkoutUrl: "",
+      status: "VALIDATED",
+      activatedAt: "2026-11-12T10:00:00Z",
+    }],
+    "cs_license_123",
+  );
+
+  assert.equal(result?.reference, "LP123");
 });
