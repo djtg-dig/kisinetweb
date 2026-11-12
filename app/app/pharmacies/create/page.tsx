@@ -7,12 +7,16 @@ import { LinkButton } from "@/components/ui/link-button";
 import { ToastMessage } from "@/components/ui/toast";
 import {
   createPharmacy,
+  createOPTGatewayUserLicensePurchase,
+  getSafeOPTGatewayCheckoutUrl,
+  getUserLicensePlans,
   getCitiesOrProvinces,
   getCountries,
   getCurrencies,
   type CityOrProvinceOption,
   type CountryOption,
   type CurrencyOption,
+  type UserLicensePlan,
 } from "@/lib/api";
 import { setActivePharmacyId } from "@/lib/auth";
 import { isPharmacyLicenseLimitError } from "@/lib/license-limit";
@@ -68,6 +72,10 @@ export default function CreatePharmacyPage() {
   const [touchedFields, setTouchedFields] = useState<Partial<Record<FormField, boolean>>>({});
   const [toast, setToast] = useState<{ tone: "error"; message: string } | null>(null);
   const [licenseModalMode, setLicenseModalMode] = useState<LicenseModalMode | null>(null);
+  const [licensePlans, setLicensePlans] = useState<UserLicensePlan[]>([]);
+  const [licensePlansLoading, setLicensePlansLoading] = useState(false);
+  const [licensePurchaseError, setLicensePurchaseError] = useState("");
+  const [licensePurchaseLoading, setLicensePurchaseLoading] = useState(false);
 
   function updateField(field: FormField, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -333,6 +341,17 @@ export default function CreatePharmacyPage() {
     };
   }, [form.countryPhoneCode]);
 
+  useEffect(() => {
+    if (licenseModalMode !== "limit" || licensePlans.length) {
+      return;
+    }
+    setLicensePlansLoading(true);
+    getUserLicensePlans()
+      .then((plans) => setLicensePlans(plans))
+      .catch((error) => setLicensePurchaseError(error instanceof Error ? error.message : "Impossible de charger les licences."))
+      .finally(() => setLicensePlansLoading(false));
+  }, [licenseModalMode, licensePlans.length]);
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setErrorMessage("");
@@ -578,7 +597,26 @@ export default function CreatePharmacyPage() {
       <LicenseModal
         mode={licenseModalMode}
         onClose={() => setLicenseModalMode(null)}
-        onPurchase={() => setLicenseModalMode("unavailable")}
+        plans={licensePlans}
+        plansLoading={licensePlansLoading}
+        purchaseError={licensePurchaseError}
+        purchaseLoading={licensePurchaseLoading}
+        onPurchase={async (planCode) => {
+          setLicensePurchaseLoading(true);
+          setLicensePurchaseError("");
+          try {
+            const purchase = await createOPTGatewayUserLicensePurchase(
+              planCode,
+              "license-" + crypto.randomUUID(),
+            );
+            window.location.assign(getSafeOPTGatewayCheckoutUrl(purchase.checkoutUrl));
+          } catch (error) {
+            setLicensePurchaseError(error instanceof Error ? error.message : "Impossible de démarrer le paiement.");
+          } finally {
+            setLicensePlansLoading(false);
+            setLicensePurchaseLoading(false);
+          }
+        }}
       />
     </MainLayout>
   );
@@ -588,10 +626,18 @@ function LicenseModal({
   mode,
   onClose,
   onPurchase,
+  plans,
+  plansLoading,
+  purchaseError,
+  purchaseLoading,
 }: {
   mode: LicenseModalMode | null;
   onClose: () => void;
-  onPurchase: () => void;
+  plans: UserLicensePlan[];
+  plansLoading: boolean;
+  purchaseError: string;
+  purchaseLoading: boolean;
+  onPurchase: (planCode: string) => Promise<void>;
 }) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
@@ -629,6 +675,7 @@ function LicenseModal({
   }
 
   const unavailable = mode === "unavailable";
+  const paidPlans = plans.filter((plan) => Number(plan.price) > 0);
   return (
     <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/45 p-4">
       <button
@@ -668,8 +715,19 @@ function LicenseModal({
               Votre licence actuelle ne permet pas de créer une pharmacie supplémentaire.
             </p>
             <p className="mt-3 text-sm leading-6 text-app-muted">
-              Pour créer plus d'une pharmacie, vous devez disposer d'une licence supplémentaire.
+              Choisissez une licence disponible. Le paiement est sécurisé par OPTGateway et utilise Mobile Money uniquement.
             </p>
+            <div className="mt-4 space-y-2">
+              {plansLoading && <p className="text-sm text-app-muted">Chargement des licences...</p>}
+              {!plansLoading && !paidPlans.length && <p className="text-sm text-app-muted">Aucune licence payante disponible.</p>}
+              {paidPlans.map((plan) => (
+                <button key={plan.code} type="button" disabled={purchaseLoading} onClick={() => onPurchase(plan.code)} className="flex w-full items-center justify-between rounded-md border border-app-border bg-app-surface px-4 py-3 text-left hover:border-primary-500 disabled:opacity-60">
+                  <span><strong className="block text-app-text">{plan.name}</strong><span className="text-sm text-app-muted">Pharmacies illimitées</span></span>
+                  <span className="font-semibold text-app-text">{plan.price} {plan.currency}</span>
+                </button>
+              ))}
+              {purchaseError && <p className="text-sm text-red-600">{purchaseError}</p>}
+            </div>
           </>
         )}
 
@@ -683,13 +741,13 @@ function LicenseModal({
               Plus tard
             </button>
           )}
-          <button
+          {unavailable && <button
             type="button"
-            onClick={unavailable ? onClose : onPurchase}
+            onClick={onClose}
             className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-700 focus:outline-none focus:ring-4 focus:ring-primary-100"
           >
-            {unavailable ? "Fermer" : "Acheter une licence"}
-          </button>
+            Fermer
+          </button>}
         </div>
       </div>
     </div>

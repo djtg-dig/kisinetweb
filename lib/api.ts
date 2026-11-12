@@ -1212,9 +1212,13 @@ export async function getUserLicensePurchases(): Promise<UserLicensePurchase[]> 
 
 export async function createOPTGatewayUserLicensePurchase(planCode: string, idempotencyKey: string): Promise<UserLicensePurchase> {
   const data = await postJson<UnknownRecord>("/api/paiements/user-license-purchases/", "Impossible d'initialiser l'achat de licence.", {
-    plan_code: planCode, country: "CD", provider_code: "OPTGATEWAY", idempotency_key: idempotencyKey,
+    plan_code: planCode, country: "CD", idempotency_key: idempotencyKey,
   });
-  return normalizeUserLicensePurchase(data);
+  const purchase = normalizeUserLicensePurchase(data);
+  if (!purchase.checkoutUrl) {
+    throw new Error("Le checkout OPTGateway n'a pas été fourni par le backend.");
+  }
+  return purchase;
 }
 
 /**
