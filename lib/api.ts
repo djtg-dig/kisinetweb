@@ -1186,10 +1186,21 @@ export function getSafeOPTGatewayCheckoutUrl(value: string): string {
 }
 
 export type UserLicensePlan = { code: string; name: string; price: string; currency: string; maxPharmacies: number | null; isUnlimited: boolean };
+export type UserLicense = { plan: UserLicensePlan; status: string; purchasedAt: string | null; ownedPharmaciesCount: number; canCreatePharmacy: boolean };
 export type UserLicensePurchase = { reference: string; plan: UserLicensePlan; amount: string; currency: string; providerCode: string; providerReference: string; checkoutUrl: string; status: string; activatedAt: string | null };
 
 function normalizeUserLicensePlan(item: UnknownRecord): UserLicensePlan {
   return { code: String(item.code || ""), name: String(item.name || ""), price: String(item.price || ""), currency: String(item.currency || ""), maxPharmacies: item.max_pharmacies == null ? null : Number(item.max_pharmacies), isUnlimited: Boolean(item.is_unlimited) };
+}
+
+function normalizeUserLicense(item: UnknownRecord): UserLicense {
+  return {
+    plan: normalizeUserLicensePlan(getRecord(item.plan) || {}),
+    status: String(item.status || ""),
+    purchasedAt: getText(item.purchased_at) || null,
+    ownedPharmaciesCount: Number(item.owned_pharmacies_count || 0),
+    canCreatePharmacy: Boolean(item.can_create_pharmacy),
+  };
 }
 
 function normalizeUserLicensePurchase(item: UnknownRecord): UserLicensePurchase {
@@ -1201,6 +1212,11 @@ export async function getUserLicensePlans(): Promise<UserLicensePlan[]> {
   const record = getRecord(data);
   const rows = Array.isArray(data) ? data : Array.isArray(record?.results) ? record.results : [];
   return rows.map(getRecord).filter((row): row is UnknownRecord => row !== null).map(normalizeUserLicensePlan);
+}
+
+export async function getMyUserLicense(): Promise<UserLicense> {
+  const data = await fetchApiJson<UnknownRecord>("/api/paiements/my-license/", "Impossible de vérifier votre licence.");
+  return normalizeUserLicense(data);
 }
 
 export async function getUserLicensePurchases(): Promise<UserLicensePurchase[]> {

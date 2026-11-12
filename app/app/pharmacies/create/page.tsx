@@ -4,11 +4,13 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/ui/link-button";
+import { LoadingBubble } from "@/components/ui/loading-bubble";
 import { ToastMessage } from "@/components/ui/toast";
 import {
   createPharmacy,
   createOPTGatewayUserLicensePurchase,
   getSafeOPTGatewayCheckoutUrl,
+  getMyUserLicense,
   getUserLicensePlans,
   getCitiesOrProvinces,
   getCountries,
@@ -36,6 +38,7 @@ type FormState = {
 type FormField = keyof FormState;
 type FieldErrors = Partial<Record<FormField, string>>;
 type LicenseModalMode = "limit" | "unavailable";
+type LicenseAccessState = "checking" | "allowed" | "limited" | "error";
 
 const initialFormState: FormState = {
   name: "",
@@ -72,6 +75,8 @@ export default function CreatePharmacyPage() {
   const [touchedFields, setTouchedFields] = useState<Partial<Record<FormField, boolean>>>({});
   const [toast, setToast] = useState<{ tone: "error"; message: string } | null>(null);
   const [licenseModalMode, setLicenseModalMode] = useState<LicenseModalMode | null>(null);
+  const [licenseAccessState, setLicenseAccessState] = useState<LicenseAccessState>("checking");
+  const [licenseAccessError, setLicenseAccessError] = useState("");
   const [licensePlans, setLicensePlans] = useState<UserLicensePlan[]>([]);
   const [licensePlansLoading, setLicensePlansLoading] = useState(false);
   const [licensePurchaseError, setLicensePurchaseError] = useState("");
@@ -219,6 +224,39 @@ export default function CreatePharmacyPage() {
   useEffect(() => {
     let isMounted = true;
 
+    async function verifyLicenseAccess() {
+      setLicenseAccessState("checking");
+      setLicenseAccessError("");
+      try {
+        const license = await getMyUserLicense();
+        if (!isMounted) {
+          return;
+        }
+        if (license.canCreatePharmacy) {
+          setLicenseModalMode(null);
+          setLicenseAccessState("allowed");
+        } else {
+          setLicenseModalMode("limit");
+          setLicenseAccessState("limited");
+        }
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+        setLicenseAccessState("error");
+        setLicenseAccessError(error instanceof Error ? error.message : "Impossible de vérifier votre licence.");
+      }
+    }
+
+    void verifyLicenseAccess();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
     async function loadReferenceData() {
       setIsLoadingCountries(true);
       setIsLoadingCurrencies(true);
@@ -352,6 +390,66 @@ export default function CreatePharmacyPage() {
       .finally(() => setLicensePlansLoading(false));
   }, [licenseModalMode, licensePlans.length]);
 
+  function retryLicenseAccess() {
+    setLicenseAccessState("checking");
+    setLicenseAccessError("");
+    window.location.reload();
+  }
+
+  if (licenseAccessState === "checking") {
+    return (
+      <MainLayout>
+        <main className="mx-auto max-w-3xl px-4 py-16 sm:px-6 lg:px-8">
+          <LoadingBubble label="Vérification de votre capacité de création" className="min-h-[220px]" />
+        </main>
+      </MainLayout>
+    );
+  }
+
+  if (licenseAccessState === "error") {
+    return (
+      <MainLayout>
+        <main className="mx-auto max-w-3xl px-4 py-16 sm:px-6 lg:px-8">
+          <section className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+            <h1 className="text-xl font-bold text-red-800">Vérification impossible</h1>
+            <p className="mt-3 text-sm text-red-700">{licenseAccessError}</p>
+            <Button type="button" className="mt-5" onClick={retryLicenseAccess}>Réessayer</Button>
+          </section>
+        </main>
+      </MainLayout>
+    );
+  }
+
+  if (licenseAccessState === "limited") {
+    return (
+      <MainLayout>
+        <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6 lg:px-8">
+          <LicenseModal
+            mode="limit"
+            inline
+            onClose={() => { window.location.href = "/app/select-pharmacy"; }}
+            plans={licensePlans}
+            plansLoading={licensePlansLoading}
+            purchaseError={licensePurchaseError}
+            purchaseLoading={licensePurchaseLoading}
+            onPurchase={async (planCode) => {
+              setLicensePurchaseLoading(true);
+              setLicensePurchaseError("");
+              try {
+                const purchase = await createOPTGatewayUserLicensePurchase(planCode, "license-" + crypto.randomUUID());
+                window.location.assign(getSafeOPTGatewayCheckoutUrl(purchase.checkoutUrl));
+              } catch (error) {
+                setLicensePurchaseError(error instanceof Error ? error.message : "Impossible de démarrer le paiement.");
+              } finally {
+                setLicensePurchaseLoading(false);
+              }
+            }}
+          />
+        </main>
+      </MainLayout>
+    );
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setErrorMessage("");
@@ -397,6 +495,7 @@ export default function CreatePharmacyPage() {
         setToast(null);
         setIsSubmitting(false);
         setLicenseModalMode("limit");
+        setLicenseAccessState("limited");
         return;
       }
 
@@ -624,6 +723,7 @@ export default function CreatePharmacyPage() {
 
 function LicenseModal({
   mode,
+  inline = false,
   onClose,
   onPurchase,
   plans,
@@ -632,6 +732,7 @@ function LicenseModal({
   purchaseLoading,
 }: {
   mode: LicenseModalMode | null;
+  inline?: boolean;
   onClose: () => void;
   plans: UserLicensePlan[];
   plansLoading: boolean;
@@ -677,18 +778,18 @@ function LicenseModal({
   const unavailable = mode === "unavailable";
   const paidPlans = plans.filter((plan) => Number(plan.price) > 0);
   return (
-    <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/45 p-4">
-      <button
+    <div className={inline ? "w-full" : "fixed inset-0 z-[1200] flex items-center justify-center bg-black/45 p-4"}>
+      {!inline && <button
         type="button"
         aria-label="Fermer la fenêtre"
         className="absolute inset-0 cursor-default"
         onClick={onClose}
-      />
+      />}
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="license-modal-title"
-        className="relative w-full max-w-md rounded-xl border border-app-border bg-app-card p-6 shadow-soft"
+        className={(inline ? "mx-auto " : "relative ") + "w-full max-w-md rounded-xl border border-app-border bg-app-card p-6 shadow-soft"}
       >
         <div className="flex items-start justify-between gap-4">
           <h2 id="license-modal-title" className="text-lg font-bold text-app-text">
