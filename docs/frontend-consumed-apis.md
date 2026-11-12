@@ -54,7 +54,9 @@ contexte pharmacie, même si le backend est indisponible.
 - **Service frontend** : `getAccountProfile()` dans `lib/api`
 - **Authentification** : requise avec `Authorization: Bearer <access_token>`.
 - **Réponse attendue (200)** : profil utilisateur avec `reference`, `email`,
-  `first_name`, `last_name`, `phone_number`, `date_joined` et `updated_at`.
+  `first_name`, `last_name`, `phone_number`, `date_joined`, `updated_at` et
+  `avatar_url`. `avatar_url` est une URL HTTPS Cloudinary synchronisée à la
+  connexion SSO ; une chaîne vide signifie qu'aucune photo n'est confirmée.
 - **Comportement frontend** : le menu `Compte > Mon profil` mène vers la page
   profil global de l'utilisateur. Cette page ne dépend pas d'une pharmacie active.
 

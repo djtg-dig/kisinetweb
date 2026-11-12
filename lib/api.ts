@@ -44,6 +44,7 @@ export type AccountProfile = {
   phoneNumber?: string;
   dateJoined?: string;
   updatedAt?: string;
+  avatarUrl?: string;
 };
 
 export type AccountSession = {
@@ -525,6 +526,7 @@ function normalizeAccountProfile(item: UnknownRecord): AccountProfile {
     phoneNumber: getText(item.phone_number),
     dateJoined: getText(item.date_joined),
     updatedAt: getText(item.updated_at),
+    avatarUrl: getText(item.avatar_url),
   };
 }
 

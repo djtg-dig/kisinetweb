@@ -216,9 +216,7 @@ function PersonalInfoSection({ profile }: { profile: AccountProfile }) {
 
       {/* Carte d'identité utilisateur */}
       <div className="mt-4 flex flex-col gap-4 border-b border-app-border pb-6 sm:flex-row sm:items-center">
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-md bg-primary-600 text-xl font-bold text-white">
-          {getInitials(profile)}
-        </div>
+        <ProfileAvatar profile={profile} />
         <div className="min-w-0">
           <p className="truncate text-2xl font-bold text-app-text">
             {fullName || "Utilisateur Kisinet"}
@@ -240,6 +238,14 @@ function PersonalInfoSection({ profile }: { profile: AccountProfile }) {
       </div>
     </section>
   );
+}
+
+function ProfileAvatar({ profile }: { profile: AccountProfile }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  if (profile.avatarUrl && !imageFailed) {
+    return <img alt="Photo de profil" className="h-16 w-16 shrink-0 rounded-full object-cover" onError={() => setImageFailed(true)} src={profile.avatarUrl} />;
+  }
+  return <div aria-label="Avatar par défaut" className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-primary-600 text-xl font-bold text-white">{getInitials(profile)}</div>;
 }
 
 // ──────────────────────────────────────────────────
