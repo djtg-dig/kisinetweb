@@ -4,9 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/ui/link-button";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
+import { ToastMessage } from "@/components/ui/toast";
+import { SubscriptionInactiveState } from "@/components/subscriptions/subscription-inactive-state";
 import {
   getPharmacyDetail,
   getPharmacyPermissions,
+  type PharmacyPermissions,
 } from "@/lib/api";
 import {
   getExpirationReport,
@@ -22,6 +25,12 @@ import {
   type SalesReport,
 } from "@/lib/api/reports";
 import { formatCurrency, formatDate } from "@/lib/dashboard";
+import {
+  canPayPharmacySubscription,
+  isKnownInactiveSubscription,
+  isSubscriptionInactiveError,
+  SUBSCRIPTION_PURCHASE_DENIED_MESSAGE,
+} from "@/lib/subscription-access";
 
 /**
  * Page des rapports pharmacie.
@@ -35,7 +44,7 @@ type ReportsPageProps = {
   params: Promise<{ pharmacyId: string }>;
 };
 
-type PageState = "loading" | "ready" | "forbidden" | "feature_unavailable" | "error";
+type PageState = "loading" | "ready" | "forbidden" | "feature_unavailable" | "subscription-inactive" | "error";
 type SectionState = "idle" | "loading" | "ready" | "empty" | "error";
 type ReportTab = "overview" | "sales" | "inventory" | "expirations";
 type PeriodFilters = { startDate: string; endDate: string };
@@ -62,6 +71,7 @@ export default function PharmacyReportsPage({ params }: ReportsPageProps) {
   const [pharmacyId, setPharmacyId] = useState("");
   const [pharmacyName, setPharmacyName] = useState("");
   const [currency, setCurrency] = useState("USD");
+  const [permissions, setPermissions] = useState<PharmacyPermissions>({});
   const [features, setFeatures] = useState<ReportFeatures>(emptyFeatures);
   const [pageState, setPageState] = useState<PageState>("loading");
   const [pageError, setPageError] = useState("");
@@ -80,6 +90,7 @@ export default function PharmacyReportsPage({ params }: ReportsPageProps) {
   const [sectionError, setSectionError] = useState("");
   const [contextReloadKey, setContextReloadKey] = useState(0);
   const [reloadKey, setReloadKey] = useState(0);
+  const [toast, setToast] = useState<{ tone: "error" | "warning"; text: string } | null>(null);
 
   useEffect(() => {
     let isCurrent = true;
@@ -108,6 +119,7 @@ export default function PharmacyReportsPage({ params }: ReportsPageProps) {
     async function loadReportsContext() {
       setPageState("loading");
       setPageError("");
+      let pharmacySubscription: unknown = null;
 
       try {
         // Contexte minimum : identité pharmacie, devise, permissions et features du plan.
@@ -119,10 +131,17 @@ export default function PharmacyReportsPage({ params }: ReportsPageProps) {
           return;
         }
 
+        pharmacySubscription = pharmacy.subscription;
+        setPermissions(userPermissions);
         const reportFeatures = getReportFeaturesFromPharmacy(pharmacy);
         setFeatures(reportFeatures);
         setPharmacyName(pharmacy.name || "Pharmacie active");
         setCurrency(pharmacy.devise || "USD");
+
+        if (isKnownInactiveSubscription(pharmacySubscription)) {
+          setPageState("subscription-inactive");
+          return;
+        }
 
         if (!reportFeatures.reports) {
           setPageState("feature_unavailable");
@@ -135,8 +154,12 @@ export default function PharmacyReportsPage({ params }: ReportsPageProps) {
         }
 
         setPageState("ready");
-      } catch {
+      } catch (error) {
         if (!isCurrent) {
+          return;
+        }
+        if (isSubscriptionInactiveError(error, pharmacySubscription)) {
+          setPageState("subscription-inactive");
           return;
         }
         setPageError("Impossible de préparer les rapports. Veuillez réessayer.");
@@ -208,8 +231,12 @@ export default function PharmacyReportsPage({ params }: ReportsPageProps) {
         if (!isCurrent) return;
         setExpirationReport(data);
         setSectionState(data.results.length ? "ready" : "empty");
-      } catch {
+      } catch (error) {
         if (!isCurrent) {
+          return;
+        }
+        if (isSubscriptionInactiveError(error, null)) {
+          setPageState("subscription-inactive");
           return;
         }
         setSectionError(getReportErrorMessage(activeTab));
@@ -269,6 +296,24 @@ export default function PharmacyReportsPage({ params }: ReportsPageProps) {
     );
   }
 
+  if (pageState === "subscription-inactive") {
+    return (
+      <ReportsShell
+        pharmacyName={pharmacyName}
+        content={
+          <>
+            <SubscriptionInactiveState
+              context="reports"
+              canPaySubscription={canPayPharmacySubscription(permissions)}
+              onPurchaseDenied={() => setToast({ tone: "warning", text: SUBSCRIPTION_PURCHASE_DENIED_MESSAGE })}
+            />
+            {toast && <ToastMessage tone={toast.tone} onClose={() => setToast(null)}>{toast.text}</ToastMessage>}
+          </>
+        }
+      />
+    );
+  }
+
   if (pageState === "error") {
     return (
       <ReportsShell
@@ -279,6 +324,7 @@ export default function PharmacyReportsPage({ params }: ReportsPageProps) {
   }
 
   return (
+    <>
     <ReportsShell
       pharmacyName={pharmacyName}
       content={
@@ -345,6 +391,7 @@ export default function PharmacyReportsPage({ params }: ReportsPageProps) {
         </>
       }
     />
+    </>
   );
 }
 

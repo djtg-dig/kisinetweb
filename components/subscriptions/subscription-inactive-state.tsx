@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 
-type SubscriptionContext = "invoices" | "products" | "stock" | "members";
+type SubscriptionContext = "invoices" | "products" | "stock" | "members" | "reports" | "sales";
 
 type SubscriptionInactiveStateProps = {
   context: SubscriptionContext;
@@ -32,6 +32,16 @@ const content: Record<SubscriptionContext, { subtitle: string; description: stri
     subtitle: "",
     description:
       "L'abonnement de cette pharmacie n'est pas actif. Un abonnement actif est nécessaire pour inviter de nouveaux collaborateurs.",
+  },
+  reports: {
+    subtitle: "Rapports indisponibles",
+    description:
+      "L'abonnement de cette pharmacie n'est plus actif. Renouvelez votre abonnement pour consulter les rapports et les statistiques de votre pharmacie.",
+  },
+  sales: {
+    subtitle: "Création de vente indisponible",
+    description:
+      "L'abonnement de cette pharmacie n'est plus actif. Un abonnement actif est nécessaire pour créer des ventes et générer des factures.",
   },
 };
 

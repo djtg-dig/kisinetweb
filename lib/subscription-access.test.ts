@@ -6,10 +6,17 @@ import { ApiError } from "./api/errors.ts";
 import {
   MEMBER_INVITATION_PERMISSION_MESSAGE,
   MEMBER_LIMIT_REACHED_MESSAGE,
+  SUBSCRIPTION_INACTIVE_CODE,
   canPayPharmacySubscription,
   getMemberInvitationErrorMessage,
   isSubscriptionInactiveError,
 } from "./subscription-access.ts";
+
+test("le code métier SUBSCRIPTION_INACTIVE est reconnu sans requalifier les autres erreurs", () => {
+  const error = new ApiError("Abonnement inactif.", SUBSCRIPTION_INACTIVE_CODE, 403);
+
+  assert.equal(isSubscriptionInactiveError(error, { is_active: true }), true);
+});
 
 test("un abonnement actif ne transforme pas un 403 de permission en erreur d'abonnement", () => {
   const error = new ApiError("Accès refusé.", undefined, 403);

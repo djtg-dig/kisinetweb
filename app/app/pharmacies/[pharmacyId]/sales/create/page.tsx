@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { LinkButton } from "@/components/ui/link-button";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
+import { SubscriptionInactiveState } from "@/components/subscriptions/subscription-inactive-state";
 import {
   analyzePrescription,
   clearSaleDraft,
@@ -21,16 +22,27 @@ import {
   type SaleProduct,
 } from "@/lib/api/sales";
 import { describeApiError } from "@/lib/api/errors";
-import { getAccountProfile } from "@/lib/api";
+import {
+  getAccountProfile,
+  getPharmacyDetail,
+  getPharmacyPermissions,
+  type PharmacyPermissions,
+} from "@/lib/api";
 import { getUserAiCredits } from "@/lib/api/billing";
 import { notifyAiCreditsUpdated } from "@/lib/ai-credits-events";
 import { getPharmacyDashboard } from "@/lib/dashboard-api";
+import {
+  canPayPharmacySubscription,
+  isKnownInactiveSubscription,
+  isSubscriptionInactiveError,
+  SUBSCRIPTION_PURCHASE_DENIED_MESSAGE,
+} from "@/lib/subscription-access";
 
 type CreateSalePageProps = {
   params: Promise<{ pharmacyId: string }>;
 };
 
-type PageState = "loading" | "ready" | "error";
+type PageState = "loading" | "ready" | "subscription-inactive" | "forbidden" | "error";
 
 type CustomerForm = {
   name: string;
@@ -58,9 +70,11 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
   const [pharmacyId, setPharmacyId] = useState("");
   const [pharmacyName, setPharmacyName] = useState("");
   const [currency, setCurrency] = useState("");
+  const [permissions, setPermissions] = useState<PharmacyPermissions>({});
   const [cashierName, setCashierName] = useState("Non renseigné");
   const [pageState, setPageState] = useState<PageState>("loading");
   const [pageError, setPageError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
   const [items, setItems] = useState<SaleDraftItem[]>([]);
   const [customer, setCustomer] = useState<CustomerForm>(defaultCustomer);
   const [discount, setDiscount] = useState<DiscountForm>(defaultDiscount);
@@ -100,9 +114,32 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
     async function loadPageContext() {
       setPageState("loading");
       setPageError("");
+      let pharmacySubscription: unknown = null;
 
       try {
-        const profile = await getAccountProfile();
+        const [profile, pharmacyPermissions, pharmacy] = await Promise.all([
+          getAccountProfile(),
+          getPharmacyPermissions(pharmacyId),
+          getPharmacyDetail(pharmacyId),
+        ]);
+        pharmacySubscription = pharmacy.subscription;
+        if (!isCurrent) {
+          return;
+        }
+        setPermissions(pharmacyPermissions);
+        setPharmacyName(pharmacy.name || "");
+        setCurrency(pharmacy.devise || "");
+
+        if (isKnownInactiveSubscription(pharmacySubscription)) {
+          setPageState("subscription-inactive");
+          return;
+        }
+
+        if (!pharmacyPermissions.sale_create) {
+          setPageState("forbidden");
+          return;
+        }
+
         const userReference = profile.reference || "";
         aiUserReferenceRef.current = userReference;
         const [dashboard, cashier, aiCredits] = await Promise.all([
@@ -129,6 +166,10 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
         if (!isCurrent) {
           return;
         }
+        if (isSubscriptionInactiveError(error, pharmacySubscription)) {
+          setPageState("subscription-inactive");
+          return;
+        }
         const message = error instanceof Error ? error.message : "";
         setPageError(message || "Impossible de préparer la page de vente.");
         setPageState("error");
@@ -140,7 +181,7 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
     return () => {
       isCurrent = false;
     };
-  }, [pharmacyId]);
+  }, [pharmacyId, reloadKey]);
 
   const subtotal = useMemo(
     () => items.reduce((total, item) => total + item.product.salePrice * item.quantity, 0),
@@ -371,6 +412,10 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
       clearSaleDraft(pharmacyId);
       setFeedback({ tone: "success", message: "Facture créée avec succès. Le paiement sera enregistré par le caissier." });
     } catch (error) {
+      if (isSubscriptionInactiveError(error, null)) {
+        setPageState("subscription-inactive");
+        return;
+      }
       setFeedback({
         tone: "error",
         message: describeApiError(error),
@@ -408,7 +453,46 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
         <section className="mt-6 rounded-lg border border-red-200 bg-red-50 p-5">
           <p className="font-semibold text-red-700">Impossible de charger la vente</p>
           <p className="mt-2 text-sm text-red-700">{pageError}</p>
+          <button
+            type="button"
+            onClick={() => setReloadKey((key) => key + 1)}
+            className="mt-4 inline-flex min-h-10 items-center rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-800"
+          >
+            Réessayer
+          </button>
         </section>
+      </main>
+    );
+  }
+
+  if (pageState === "forbidden") {
+    return (
+      <main className="mx-auto min-h-[calc(100vh-4rem)] max-w-7xl px-4 py-8 sm:px-6 lg:min-h-[calc(100vh-4.5rem)] lg:px-8">
+        <PageHeader pharmacyId={pharmacyId} pharmacyName={pharmacyName} dashboardHref={dashboardHref} salesHref={salesHref} />
+        <section className="mt-6 rounded-lg border border-red-200 bg-red-50 p-5">
+          <p className="font-semibold text-red-700">Création de vente indisponible</p>
+          <p className="mt-2 text-sm text-red-700">Vous n'avez pas la permission de créer des ventes pour cette pharmacie.</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (pageState === "subscription-inactive") {
+    return (
+      <main className="mx-auto min-h-[calc(100vh-4rem)] max-w-7xl px-4 py-8 sm:px-6 lg:min-h-[calc(100vh-4.5rem)] lg:px-8">
+        <PageHeader pharmacyId={pharmacyId} pharmacyName={pharmacyName} dashboardHref={dashboardHref} salesHref={salesHref} />
+        <div className="mt-6">
+          <SubscriptionInactiveState
+            context="sales"
+            canPaySubscription={canPayPharmacySubscription(permissions)}
+            onPurchaseDenied={() => setFeedback({ tone: "error", message: SUBSCRIPTION_PURCHASE_DENIED_MESSAGE })}
+          />
+        </div>
+        {feedback && (
+          <ToastMessage tone={feedback.tone} onClose={() => setFeedback(null)}>
+            {feedback.message}
+          </ToastMessage>
+        )}
       </main>
     );
   }
