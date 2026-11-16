@@ -1412,6 +1412,7 @@ Endpoints consommés:
 | --- | --- |
 | Plans pharmacie | `GET /api/paiements/pharmacy-plans/` |
 | Détail plan | `GET /api/paiements/pharmacy-plans/{name}/` |
+| État d'abonnement d'une pharmacie | `GET /api/paiements/pharmacy-subscriptions/status/?pharmacy_reference=PHXXXXXXXX` |
 | Initialiser checkout agrégateur | `POST /api/paiements/pharmacy-subscriptions/agregateur/checkout/` |
 | Détail reçu abonnement | `GET /api/paiements/subscription-payments/{payment_id}/?pharmacy_reference=PHXXXXXXXX` |
 
@@ -1433,6 +1434,27 @@ Flux agrégateur:
    attente de confirmation » sans inventer de succès ni d'échec.
 
 Statuts paiement consommés: `PENDING`, `VALIDATED`, `CANCELED`, `REFUNDED`.
+
+### État de l'abonnement dans les détails de la pharmacie
+
+La page `/app/pharmacies/[pharmacyId]/settings/details` appelle
+`getPharmacySubscriptionStatus(pharmacyId)` dans `lib/api.ts` après avoir
+chargé la pharmacie. Le `pharmacyId` dynamique de l'URL est envoyé comme
+paramètre query `pharmacy_reference`; aucun identifiant de pharmacie n'est
+codé en dur.
+
+L'endpoint exige un utilisateur authentifié qui est propriétaire de la
+pharmacie ou dispose de `subscription_pay`. Une erreur d'accès ou de réseau ne
+bloque pas les autres détails de la pharmacie : le bloc affiche un message
+indisponible.
+
+Le bloc affiche `plan_code`, `effective_status`, `starts_at`, `expires_at`,
+`duration_days`, `days_remaining` et `last_confirmed_payment`. Les statuts
+`TRIAL`, `ACTIVE`, `EXPIRED`, `PENDING` et `CANCELED` sont traduits en français.
+`last_confirmed_payment` est `null` lorsqu'aucun paiement d'abonnement n'a été
+confirmé; le frontend affiche alors « Aucun paiement effectué ». Les dates
+retournées au format `JJ-MM-AAAA HH:MM:SS` sont affichées en `JJ/MM/AAAA`; les
+jours restants sont affichés tels que fournis par le backend, sans recalcul.
 
 ### pawaPay Mobile Money (activation locale contrôlée)
 

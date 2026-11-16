@@ -5,6 +5,7 @@ import {
   getCitiesOrProvinces,
   getCountries,
   getPharmacyDetail,
+  getPharmacySubscriptionStatus,
   getPharmacyPermissions,
   getPharmacyLegalDocuments,
   createPharmacyLegalDocument,
@@ -16,11 +17,10 @@ import {
   type CountryOption,
   type PharmacyDetail,
   type PharmacyPermissions,
+  type PharmacySubscriptionStatus,
   type PharmacyLegalDocument,
   type PharmacyLegalDocumentType,
-  type UpdatePharmacyAddressInput,
   type UpdatePharmacyInput,
-  type CreatePharmacyLegalDocumentInput,
 } from "@/lib/api";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
 
@@ -42,6 +42,7 @@ type AddressFormState = {
 };
 
 type PageState = "loading" | "error" | "ready";
+type SubscriptionState = "loading" | "error" | "ready";
 
 // Section en cours d'edition : coordonnees, adresse, documents ou aucune.
 type EditingSection = "coordinates" | "address" | "legal-document" | null;
@@ -72,6 +73,8 @@ const documentTypeLabels: Record<PharmacyLegalDocumentType, string> = {
 export default function SettingsDetailsPage({ params }: SettingsDetailsPageProps) {
   const [pharmacyId, setPharmacyId] = useState("");
   const [pharmacy, setPharmacy] = useState<PharmacyDetail | null>(null);
+  const [subscription, setSubscription] = useState<PharmacySubscriptionStatus | null>(null);
+  const [subscriptionState, setSubscriptionState] = useState<SubscriptionState>("loading");
   const [permissions, setPermissions] = useState<PharmacyPermissions>({});
   const [state, setState] = useState<PageState>("loading");
   const [errorMessage, setErrorMessage] = useState("");
@@ -131,6 +134,8 @@ export default function SettingsDetailsPage({ params }: SettingsDetailsPageProps
 
     async function loadDetails() {
       setState("loading");
+      setSubscriptionState("loading");
+      setSubscription(null);
       setErrorMessage("");
       setSuccessMessage("");
 
@@ -139,6 +144,17 @@ export default function SettingsDetailsPage({ params }: SettingsDetailsPageProps
         const loadedPharmacy = await getPharmacyDetail(pharmacyId);
         setPharmacy(loadedPharmacy);
         setState("ready");
+
+        // L'accès aux détails de la pharmacie ne donne pas forcément le droit
+        // de consulter l'abonnement. Cette erreur ne doit donc pas bloquer la page.
+        try {
+          const currentSubscription = await getPharmacySubscriptionStatus(pharmacyId);
+          setSubscription(currentSubscription);
+          setSubscriptionState("ready");
+        } catch {
+          setSubscription(null);
+          setSubscriptionState("error");
+        }
 
         // Charge les permissions pour afficher (ou non) les boutons Modifier.
         try {
@@ -642,6 +658,78 @@ export default function SettingsDetailsPage({ params }: SettingsDetailsPageProps
               <Detail label="Créée le" value={pharmacy.createdAt} />
               <Detail label="Mise à jour le" value={pharmacy.updatedAt} />
             </div>
+          </article>
+
+          <article className="rounded-lg border border-app-border bg-app-card p-5">
+            <div>
+              <p className="text-sm font-semibold text-primary-700">Abonnement</p>
+              <h2 className="mt-1 text-lg font-bold text-app-text">
+                Abonnement de la pharmacie
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-app-muted">
+                Consultez la période en cours et le dernier paiement confirmé.
+              </p>
+            </div>
+
+            {subscriptionState === "loading" && (
+              <LoadingBubble label="Chargement de l'abonnement" className="min-h-[120px]" />
+            )}
+
+            {subscriptionState === "error" && (
+              <p className="mt-4 rounded-md border border-app-border bg-app-surface px-4 py-3 text-sm text-app-muted">
+                Les informations d&apos;abonnement sont temporairement indisponibles.
+              </p>
+            )}
+
+            {subscriptionState === "ready" && subscription && (
+              <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <Detail label="Forfait actuel" value={subscription.planCode || "Non disponible"} />
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-app-muted">Statut</p>
+                  <div className="mt-1">
+                    <SubscriptionStatusBadge status={subscription.effectiveStatus} />
+                  </div>
+                </div>
+                <Detail
+                  label="Date du dernier paiement"
+                  value={
+                    subscription.lastConfirmedPayment
+                      ? formatSubscriptionDate(subscription.lastConfirmedPayment.confirmedAt)
+                      : "Aucun paiement effectué"
+                  }
+                />
+                <Detail
+                  label="Dernier montant payé"
+                  value={
+                    subscription.lastConfirmedPayment
+                      ? [
+                          subscription.lastConfirmedPayment.amount,
+                          subscription.lastConfirmedPayment.currency,
+                        ]
+                          .filter(Boolean)
+                          .join(" ") || "Non disponible"
+                      : "Aucun paiement effectué"
+                  }
+                />
+                <Detail
+                  label="Début de l'abonnement"
+                  value={formatSubscriptionDate(subscription.startsAt)}
+                />
+                <Detail
+                  label="Date d'expiration"
+                  value={formatSubscriptionDate(subscription.expiresAt)}
+                />
+                <Detail
+                  label="Durée"
+                  value={
+                    subscription.durationDays === null
+                      ? "Non disponible"
+                      : formatDays(subscription.durationDays)
+                  }
+                />
+                <Detail label="Jours restants" value={formatDays(subscription.daysRemaining)} />
+              </div>
+            )}
           </article>
 
           <article className="rounded-lg border border-app-border bg-app-card p-5">
@@ -1223,6 +1311,34 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+function SubscriptionStatusBadge({ status }: { status: string }) {
+  const statusLabels: Record<string, string> = {
+    TRIAL: "Essai gratuit",
+    ACTIVE: "Actif",
+    EXPIRED: "Expiré",
+    PENDING: "En attente",
+    CANCELED: "Annulé",
+  };
+  const statusStyles: Record<string, string> = {
+    TRIAL: "bg-primary-50 text-primary-700 ring-primary-100",
+    ACTIVE: "bg-success-50 text-success-700 ring-success-100",
+    EXPIRED: "bg-red-50 text-red-700 ring-red-100",
+    PENDING: "bg-yellow-50 text-yellow-700 ring-yellow-100",
+    CANCELED: "bg-app-surface text-app-muted ring-app-border",
+  };
+  const normalizedStatus = status.toUpperCase();
+
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${
+        statusStyles[normalizedStatus] || "bg-app-surface text-app-muted ring-app-border"
+      }`}
+    >
+      {statusLabels[normalizedStatus] || status || "Non disponible"}
+    </span>
+  );
+}
+
 function formatDate(value?: string | null) {
   if (!value) {
     return "";
@@ -1236,4 +1352,23 @@ function formatDate(value?: string | null) {
   return new Intl.DateTimeFormat("fr-FR", {
     dateStyle: "medium",
   }).format(date);
+}
+
+function formatSubscriptionDate(value?: string | null) {
+  if (!value) {
+    return "Non disponible";
+  }
+
+  // Le backend retourne cette API au format JJ-MM-AAAA HH:MM:SS. Ce format
+  // n'est pas normalisé par `Date`, il est donc rendu directement en JJ/MM/AAAA.
+  const backendDate = /^(\d{2})-(\d{2})-(\d{4})/.exec(value);
+  if (backendDate) {
+    return `${backendDate[1]}/${backendDate[2]}/${backendDate[3]}`;
+  }
+
+  return formatDate(value) || "Non disponible";
+}
+
+function formatDays(days: number) {
+  return `${days} ${days === 1 ? "jour" : "jours"}`;
 }

@@ -1169,6 +1169,24 @@ export type PharmacySubscriptionPayment = {
   createdAt?: string;
 };
 
+export type PharmacySubscriptionStatus = {
+  pharmacyReference: string;
+  planCode: string;
+  planName: string;
+  status: string;
+  effectiveStatus: string;
+  durationMonths: number;
+  durationDays: number | null;
+  startsAt: string | null;
+  expiresAt: string | null;
+  daysRemaining: number;
+  lastConfirmedPayment: {
+    confirmedAt: string | null;
+    amount: string;
+    currency: string;
+  } | null;
+};
+
 export type AgregateurSubscriptionCheckout = {
   checkoutUrl: string;
   payment: PharmacySubscriptionPayment;
@@ -1266,6 +1284,33 @@ function normalizeSubscriptionPayment(item: UnknownRecord): PharmacySubscription
     orderId: String(item.order_id || ""),
     providerReference: getText(item.provider_reference),
     createdAt: getText(item.created_at),
+  };
+}
+
+function normalizePharmacySubscriptionStatus(item: UnknownRecord): PharmacySubscriptionStatus {
+  const lastPayment = getRecord(item.last_confirmed_payment);
+
+  return {
+    pharmacyReference: String(item.pharmacy_reference || ""),
+    planCode: String(item.plan_code || ""),
+    planName: String(item.plan_name || item.plan_code || ""),
+    status: String(item.status || ""),
+    effectiveStatus: String(item.effective_status || item.status || ""),
+    durationMonths: Number(item.duration_months || 0),
+    durationDays:
+      item.duration_days === null || item.duration_days === undefined
+        ? null
+        : Number(item.duration_days),
+    startsAt: getText(item.starts_at) ?? null,
+    expiresAt: getText(item.expires_at) ?? null,
+    daysRemaining: Math.max(0, Number(item.days_remaining || 0)),
+    lastConfirmedPayment: lastPayment
+      ? {
+          confirmedAt: getText(lastPayment.confirmed_at) ?? null,
+          amount: String(lastPayment.amount ?? ""),
+          currency: String(lastPayment.currency || ""),
+        }
+      : null,
   };
 }
 
@@ -1474,6 +1519,18 @@ export async function getPharmacySubscriptionPayments(
     .map(getRecord)
     .filter((row): row is UnknownRecord => row !== null)
     .map(normalizeSubscriptionPayment);
+}
+
+export async function getPharmacySubscriptionStatus(
+  pharmacyReference: string,
+): Promise<PharmacySubscriptionStatus> {
+  const params = new URLSearchParams({ pharmacy_reference: pharmacyReference });
+  const data = await fetchApiJson<UnknownRecord>(
+    "/api/paiements/pharmacy-subscriptions/status/?" + params.toString(),
+    "Impossible de charger les informations d'abonnement.",
+  );
+
+  return normalizePharmacySubscriptionStatus(data);
 }
 
 export async function getCitiesOrProvinces(country: string): Promise<CityOrProvinceOption[]> {
