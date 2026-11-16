@@ -7,6 +7,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { ToastMessage } from "@/components/ui/toast";
+import { SubscriptionInactiveState } from "@/components/subscriptions/subscription-inactive-state";
 import {
   getPharmacyDetail,
   getPharmacyProducts,
@@ -19,6 +20,12 @@ import {
   type ProductSummary,
 } from "@/lib/api";
 import {
+  canPayPharmacySubscription,
+  isKnownInactiveSubscription,
+  isSubscriptionInactiveError,
+  SUBSCRIPTION_PURCHASE_DENIED_MESSAGE,
+} from "@/lib/subscription-access";
+import {
   deleteProduct,
   downloadProductExport,
   type ProductExportFormat,
@@ -28,7 +35,7 @@ type ProductsPageProps = {
   params: Promise<{ pharmacyId: string }>;
 };
 
-type PageState = "loading" | "error" | "empty" | "ready";
+type PageState = "loading" | "subscription-inactive" | "error" | "empty" | "ready";
 type ToastFeedback = { tone: "success" | "error" | "warning"; text: string } | null;
 
 const defaultFilters: ProductFilters = {
@@ -150,13 +157,28 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
     async function loadProducts() {
       setState("loading");
       setErrorMessage("");
+      let pharmacySubscription: unknown = null;
 
       try {
-        const [page, options, pharmacyPermissions, pharmacy] = await Promise.all([
-          getPharmacyProducts(pharmacyId, filters),
-          getProductFilterOptions(pharmacyId),
+        const [pharmacyPermissions, pharmacy] = await Promise.all([
           getPharmacyPermissions(pharmacyId),
           getPharmacyDetail(pharmacyId),
+        ]);
+        if (!isCurrent) {
+          return;
+        }
+        pharmacySubscription = pharmacy.subscription;
+        setPermissions(pharmacyPermissions);
+        setPharmacyDevise(pharmacy.devise || "USD");
+
+        if (isKnownInactiveSubscription(pharmacySubscription)) {
+          setState("subscription-inactive");
+          return;
+        }
+
+        const [page, options] = await Promise.all([
+          getPharmacyProducts(pharmacyId, filters),
+          getProductFilterOptions(pharmacyId),
         ]);
         if (!isCurrent) {
           return;
@@ -166,11 +188,13 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
         setHasNextPage(Boolean(page.next));
         setHasPreviousPage(Boolean(page.previous));
         setFilterOptions(options);
-        setPermissions(pharmacyPermissions);
-        setPharmacyDevise(pharmacy.devise || "USD");
         setState(page.results.length ? "ready" : "empty");
       } catch (error) {
         if (!isCurrent) {
+          return;
+        }
+        if (isSubscriptionInactiveError(error, pharmacySubscription)) {
+          setState("subscription-inactive");
           return;
         }
         const message = error instanceof Error ? error.message : "";
@@ -246,7 +270,20 @@ export default function PharmacyProductsPage({ params }: ProductsPageProps) {
             <LoadingBubble label="Chargement des produits" className="min-h-[220px]" />
           </section>
         )}
-        {state === "error" && <ErrorState message={errorMessage} pharmacyId={pharmacyId} />}
+        {state === "subscription-inactive" && (
+          <SubscriptionInactiveState
+            context="products"
+            canPaySubscription={canPayPharmacySubscription(permissions)}
+            onPurchaseDenied={() => setToast({ tone: "warning", text: SUBSCRIPTION_PURCHASE_DENIED_MESSAGE })}
+          />
+        )}
+        {state === "error" && (
+          <ErrorState
+            message={errorMessage}
+            pharmacyId={pharmacyId}
+            onRetry={() => setReloadKey((key) => key + 1)}
+          />
+        )}
         {state === "empty" && (
           <EmptyState
             canCreate={Boolean(permissions.product_create)}
@@ -919,19 +956,28 @@ function EmptyState({
   );
 }
 
-function ErrorState({ message, pharmacyId }: { message: string; pharmacyId: string }) {
+function ErrorState({
+  message,
+  pharmacyId,
+  onRetry,
+}: {
+  message: string;
+  pharmacyId: string;
+  onRetry: () => void;
+}) {
   return (
     <div className="rounded-lg border border-red-200 bg-app-card p-6 shadow-sm">
       <p className="text-sm font-semibold text-red-600">Erreur</p>
       <h2 className="mt-2 text-2xl font-bold text-app-text">Produits indisponibles</h2>
       <p className="mt-3 whitespace-pre-line text-sm leading-6 text-app-muted">{message}</p>
-      <LinkButton
-        href={"/app/pharmacies/" + pharmacyId + "/dashboard"}
-        variant="secondary"
-        className="mt-5"
-      >
-        Retour au dashboard
-      </LinkButton>
+      <div className="mt-5 flex flex-wrap gap-3">
+        <Button type="button" variant="secondary" onClick={onRetry}>
+          Réessayer
+        </Button>
+        <LinkButton href={"/app/pharmacies/" + pharmacyId + "/dashboard"} variant="secondary">
+          Retour au dashboard
+        </LinkButton>
+      </div>
     </div>
   );
 }

@@ -25,6 +25,13 @@ import {
 import { SALES_CHOICES_STORAGE_KEY, type SalesChoiceOption } from "@/lib/api/sales-choices";
 import { describeApiError } from "@/lib/api/errors";
 import { InvoiceReceiptTicket, type PrintReceiptData } from "@/components/invoices/PrintableInvoiceReceipt";
+import { SubscriptionInactiveState } from "@/components/subscriptions/subscription-inactive-state";
+import {
+  canPayPharmacySubscription,
+  isKnownInactiveSubscription,
+  isSubscriptionInactiveError,
+  SUBSCRIPTION_PURCHASE_DENIED_MESSAGE,
+} from "@/lib/subscription-access";
 import "@/components/invoices/invoice-receipt.css";
 
 type InvoicesPageProps = {
@@ -32,7 +39,7 @@ type InvoicesPageProps = {
 };
 
 // Union de chaînes : elle limite les états possibles de la page à ces valeurs précises.
-type PageState = "loading" | "ready" | "empty" | "forbidden" | "error";
+type PageState = "loading" | "ready" | "empty" | "forbidden" | "subscription-inactive" | "error";
 type FeedbackMessage = { tone: "success" | "error"; text: string };
 
 const defaultFilters: InvoiceFilters = {
@@ -122,6 +129,7 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
     async function loadInvoicesPage() {
       setState("loading");
       setErrorMessage("");
+      let pharmacySubscription: unknown = null;
 
       try {
         // On charge d'abord le contexte et les droits pour éviter d'appeler les factures sans accès vente.
@@ -136,6 +144,12 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
         setPermissions(userPermissions);
         setPharmacyName(pharmacy.name || "");
         setCurrency(pharmacy.devise || "USD");
+        pharmacySubscription = pharmacy.subscription;
+
+        if (isKnownInactiveSubscription(pharmacySubscription)) {
+          setState("subscription-inactive");
+          return;
+        }
 
         if (!userPermissions.sale_view) {
           setState("forbidden");
@@ -160,8 +174,12 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
         setHasNextPage(Boolean(page.next));
         setHasPreviousPage(Boolean(page.previous));
         setState(page.results.length ? "ready" : "empty");
-      } catch {
+      } catch (error) {
         if (!isCurrent) {
+          return;
+        }
+        if (isSubscriptionInactiveError(error, pharmacySubscription)) {
+          setState("subscription-inactive");
           return;
         }
         setErrorMessage(
@@ -300,6 +318,13 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
         {/* Rendu conditionnel : chaque état affiche uniquement le bloc correspondant. */}
         {state === "loading" && <InvoicesSkeleton />}
         {state === "forbidden" && <ForbiddenState pharmacyId={pharmacyId} />}
+        {state === "subscription-inactive" && (
+          <SubscriptionInactiveState
+            context="invoices"
+            canPaySubscription={canPayPharmacySubscription(permissions)}
+            onPurchaseDenied={() => setFeedback({ tone: "error", text: SUBSCRIPTION_PURCHASE_DENIED_MESSAGE })}
+          />
+        )}
         {state === "error" && (
           <ErrorState
             message={errorMessage}

@@ -27,6 +27,16 @@ export class ApiError extends Error {
   }
 }
 
+/** Lit le code métier optionnel d'une réponse JSON du backend. */
+export function getApiErrorCode(data: unknown): string | undefined {
+  if (!data || typeof data !== "object") {
+    return undefined;
+  }
+
+  const code = (data as { code?: unknown }).code;
+  return typeof code === "string" && code.trim() ? code : undefined;
+}
+
 export const CREDIT_EXHAUSTED_MESSAGE =
   "Crédits insuffisants : les crédits inclus et les crédits achetés de cette pharmacie sont épuisés.";
 

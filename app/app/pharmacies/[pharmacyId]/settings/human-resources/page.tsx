@@ -3,6 +3,7 @@
 import { useEffect, useState, type ChangeEvent, type ReactNode } from "react";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ToastMessage } from "@/components/ui/toast";
 import { MemberInvitationDialog } from "@/components/pharmacies/member-invitation-dialog";
 import {
   assignPharmacyMemberPermissions,
@@ -11,6 +12,7 @@ import {
   revokePharmacyMemberInvitation,
   deletePharmacyMember,
   getPharmacyMembers,
+  getPharmacyDetail,
   getPharmacyPermissions,
   suspendPharmacyMember,
   updatePharmacyMember,
@@ -19,12 +21,14 @@ import {
   type PharmacyMemberInvitation,
   type PharmacyPermissions,
 } from "@/lib/api";
+import { SUBSCRIPTION_PURCHASE_DENIED_MESSAGE } from "@/lib/subscription-access";
 
 type HumanResourcesSettingsPageProps = {
   params: Promise<{ pharmacyId: string }>;
 };
 
 type PageState = "loading" | "error" | "empty" | "ready";
+type ToastFeedback = { tone: "warning"; text: string } | null;
 
 const roleLabels: Record<PharmacyMemberRole, string> = {
   OWNER: "Propriétaire",
@@ -101,6 +105,8 @@ export default function HumanResourcesSettingsPage({
   const [successMessage, setSuccessMessage] = useState("");
   const [permissionFeedback, setPermissionFeedback] = useState("");
   const [runningAction, setRunningAction] = useState("");
+  const [pharmacySubscription, setPharmacySubscription] = useState<unknown>(null);
+  const [toast, setToast] = useState<ToastFeedback>(null);
 
   useEffect(() => {
     async function readParams() {
@@ -121,7 +127,12 @@ export default function HumanResourcesSettingsPage({
       setErrorMessage("");
 
       try {
-        const currentPermissions = await getPharmacyPermissions(pharmacyId);
+        const [currentPermissions, pharmacy] = await Promise.all([
+          getPharmacyPermissions(pharmacyId),
+          // Le détail est indicatif pour le modal d'invitation : une erreur
+          // ponctuelle sur cette ressource ne doit pas rendre la page RH indisponible.
+          getPharmacyDetail(pharmacyId).catch(() => null),
+        ]);
         const canViewMembers = Boolean(currentPermissions.member_view);
         const canViewInvitations = Boolean(
           currentPermissions.member_view || currentPermissions.member_invite,
@@ -136,6 +147,7 @@ export default function HumanResourcesSettingsPage({
         setMembers(pageMembers);
         setInvitations(pageInvitations);
         setPermissions(currentPermissions);
+        setPharmacySubscription(pharmacy?.subscription ?? null);
         setPermissionModalMember(null);
         setDraftPermissions({});
         setState("ready");
@@ -344,6 +356,11 @@ export default function HumanResourcesSettingsPage({
       {successMessage && (
         <Message tone="success">{successMessage}</Message>
       )}
+      {toast && (
+        <ToastMessage tone={toast.tone} onClose={() => setToast(null)}>
+          {toast.text}
+        </ToastMessage>
+      )}
 
       {state === "loading" && (
         <section className="mt-6 rounded-lg border border-app-border bg-app-card p-8 shadow-sm">
@@ -386,7 +403,12 @@ export default function HumanResourcesSettingsPage({
       <MemberInvitationDialog
         open={isInvitationDialogOpen}
         pharmacyId={pharmacyId}
+        subscription={pharmacySubscription}
+        canPaySubscription={Boolean(permissions.subscription_pay)}
         onClose={() => setIsInvitationDialogOpen(false)}
+        onSubscriptionPurchaseDenied={() =>
+          setToast({ tone: "warning", text: SUBSCRIPTION_PURCHASE_DENIED_MESSAGE })
+        }
         onCreated={async () => {
           await refreshInvitations();
           setSuccessMessage("Invitation envoyée.");

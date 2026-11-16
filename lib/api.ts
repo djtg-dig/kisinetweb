@@ -6,6 +6,7 @@ import {
   isAuthorizationDeniedStatus,
   isSessionExpiredStatus,
 } from "@/lib/api-auth-utils";
+import { ApiError, getApiErrorCode } from "@/lib/api/errors";
 
 export type PharmacySummary = {
   id: string;
@@ -832,13 +833,13 @@ async function fetchApiJson<T>(path: string, fallbackMessage: string): Promise<T
       headers: {
         Accept: "application/json",
       },
-    });
+    }, { preserveErrorStatuses: [403] });
 
     const responseText = await response.text();
     const data = parseJsonResponse(responseText);
 
     if (!response.ok) {
-      throw new Error(getApiErrorMessage(data, fallbackMessage));
+      throw new ApiError(getApiErrorMessage(data, fallbackMessage), getApiErrorCode(data), response.status);
     }
 
     return data as T;
@@ -878,7 +879,7 @@ async function postApiJson<T>(path: string, fallbackMessage: string): Promise<T>
   const data = parseJsonResponse(responseText);
 
   if (!response.ok) {
-    throw new Error(getApiErrorMessage(data, fallbackMessage));
+    throw new ApiError(getApiErrorMessage(data, fallbackMessage), getApiErrorCode(data), response.status);
   }
 
   return data as T;
@@ -898,13 +899,13 @@ async function postJson<T>(
       "Content-Type": "application/json",
     },
     body: body === undefined ? undefined : JSON.stringify(body),
-  }, options);
+  }, { preserveErrorStatuses: [403, ...(options?.preserveErrorStatuses || [])] });
 
   const responseText = await response.text();
   const data = parseJsonResponse(responseText);
 
   if (!response.ok) {
-    throw new Error(getApiErrorMessage(data, fallbackMessage));
+    throw new ApiError(getApiErrorMessage(data, fallbackMessage), getApiErrorCode(data), response.status);
   }
 
   return data as T;
@@ -929,13 +930,13 @@ async function sendApiJson<T>(
     cache: "no-store",
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  }, { preserveErrorStatuses: [403] });
 
   const responseText = await response.text();
   const data = parseJsonResponse(responseText);
 
   if (!response.ok) {
-    throw new Error(getApiErrorMessage(data, fallbackMessage));
+    throw new ApiError(getApiErrorMessage(data, fallbackMessage), getApiErrorCode(data), response.status);
   }
 
   return data as T;

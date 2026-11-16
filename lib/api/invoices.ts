@@ -1,6 +1,6 @@
 import { apiBaseUrl } from "@/lib/carri-account";
 import { apiFetch } from "@/lib/api/request";
-import { ApiError } from "@/lib/api/errors";
+import { ApiError, getApiErrorCode } from "@/lib/api/errors";
 
 export type InvoicePaymentStatus =
   | "UNPAID"
@@ -308,7 +308,11 @@ async function fetchInvoicesJson<T>(path: string): Promise<T> {
   const data = parseJsonResponse(responseText);
 
   if (!response.ok) {
-    throw new Error(getApiErrorMessage(data, "Impossible de charger les factures."));
+    throw new ApiError(
+      getApiErrorMessage(data, "Impossible de charger les factures."),
+      getApiErrorCode(data),
+      response.status,
+    );
   }
 
   return data as T;

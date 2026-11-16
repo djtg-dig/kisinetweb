@@ -2,19 +2,27 @@
 
 import { useEffect, useState } from "react";
 import { Modal } from "@/components/ui/modal";
+import { SubscriptionInactiveState } from "@/components/subscriptions/subscription-inactive-state";
 import {
   createPharmacyMemberInvitation,
   searchPharmacyMemberCandidate,
   type MemberCandidate,
   type PharmacyMemberRole,
 } from "@/lib/api";
+import {
+  getMemberInvitationErrorMessage,
+  isSubscriptionInactiveError,
+} from "@/lib/subscription-access";
 
 type InvitationRole = Exclude<PharmacyMemberRole, "OWNER">;
 
 type MemberInvitationDialogProps = {
   open: boolean;
   pharmacyId: string;
+  subscription: unknown;
+  canPaySubscription: boolean;
   onClose: () => void;
+  onSubscriptionPurchaseDenied: () => void;
   onCreated: () => Promise<void> | void;
 };
 
@@ -27,7 +35,10 @@ const roleLabels: Record<InvitationRole, string> = {
 export function MemberInvitationDialog({
   open,
   pharmacyId,
+  subscription,
+  canPaySubscription,
   onClose,
+  onSubscriptionPurchaseDenied,
   onCreated,
 }: MemberInvitationDialogProps) {
   const [email, setEmail] = useState("");
@@ -36,6 +47,7 @@ export function MemberInvitationDialog({
   const [isSearching, setIsSearching] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [subscriptionBlocked, setSubscriptionBlocked] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -46,6 +58,7 @@ export function MemberInvitationDialog({
     setCandidate(null);
     setRole("EMPLOYEE");
     setErrorMessage("");
+    setSubscriptionBlocked(false);
   }, [open]);
 
   function updateEmail(value: string) {
@@ -98,7 +111,11 @@ export function MemberInvitationDialog({
       await onCreated();
       onClose();
     } catch (error) {
-      setErrorMessage(getInvitationCreationErrorMessage(error));
+      if (isSubscriptionInactiveError(error, subscription)) {
+        setSubscriptionBlocked(true);
+      } else {
+        setErrorMessage(getMemberInvitationErrorMessage(error));
+      }
     } finally {
       setIsSending(false);
     }
@@ -107,11 +124,20 @@ export function MemberInvitationDialog({
   return (
     <Modal
       open={open}
-      title="Inviter un membre"
+      title={subscriptionBlocked ? "Abonnement inactif" : "Inviter un membre"}
       onClose={onClose}
       saving={isSearching || isSending}
     >
       <div className="grid gap-5">
+        {subscriptionBlocked ? (
+          <SubscriptionInactiveState
+            context="members"
+            compact
+            canPaySubscription={canPaySubscription}
+            onPurchaseDenied={onSubscriptionPurchaseDenied}
+          />
+        ) : (
+          <>
         <div className="grid gap-2">
           <label htmlFor="member-invitation-email" className="text-sm font-semibold text-app-text">
             Adresse e-mail
@@ -176,29 +202,9 @@ export function MemberInvitationDialog({
             </button>
           </>
         )}
+          </>
+        )}
       </div>
     </Modal>
   );
-}
-
-function getInvitationCreationErrorMessage(error: unknown): string {
-  const message = error instanceof Error ? error.message : "";
-
-  if (/déjà membre actif|already_pharmacy_member/i.test(message)) {
-    return "Cette personne est déjà membre actif de cette pharmacie.";
-  }
-  if (/propriétaire ou vous-même/i.test(message)) {
-    return "Vous ne pouvez pas vous inviter vous-même ni inviter le propriétaire.";
-  }
-  if (/invitation en attente/i.test(message)) {
-    return "Une invitation est déjà en attente pour cette personne.";
-  }
-  if (/souscrire la pharmacie à un abonnement.*ajouter des membres/i.test(message)) {
-    return message;
-  }
-  if (/permission|autorisation/i.test(message)) {
-    return "Vous n’avez pas la permission d’envoyer cette invitation.";
-  }
-
-  return "Impossible d’envoyer cette invitation. Réessayez dans quelques instants.";
 }

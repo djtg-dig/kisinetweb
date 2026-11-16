@@ -1,6 +1,7 @@
 import { apiFetch } from "@/lib/api/request";
 import { apiBaseUrl } from "@/lib/carri-account";
 import { getApiErrorMessage, parseJsonResponse } from "@/lib/api";
+import { ApiError, getApiErrorCode } from "@/lib/api/errors";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -129,7 +130,7 @@ async function fetchStockApiJson<T>(
   const data = parseJsonResponse(responseText);
 
   if (!response.ok) {
-    throw new Error(getApiErrorMessage(data, fallbackMessage));
+    throw new ApiError(getApiErrorMessage(data, fallbackMessage), getApiErrorCode(data), response.status);
   }
 
   return data as T;

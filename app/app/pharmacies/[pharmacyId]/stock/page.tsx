@@ -4,7 +4,10 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/ui/link-button";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
+import { ToastMessage } from "@/components/ui/toast";
+import { SubscriptionInactiveState } from "@/components/subscriptions/subscription-inactive-state";
 import {
+  getPharmacyDetail,
   getPharmacyPermissions,
   getPharmacyProducts,
   type PharmacyPermissions,
@@ -17,12 +20,19 @@ import {
   type StockMovement,
   type StockMovementType,
 } from "@/lib/api/stock-movements";
+import {
+  canPayPharmacySubscription,
+  isKnownInactiveSubscription,
+  isSubscriptionInactiveError,
+  SUBSCRIPTION_PURCHASE_DENIED_MESSAGE,
+} from "@/lib/subscription-access";
 
 type StockPageProps = {
   params: Promise<{ pharmacyId: string }>;
 };
 
-type PageState = "loading" | "error" | "forbidden" | "empty" | "ready";
+type PageState = "loading" | "subscription-inactive" | "error" | "forbidden" | "empty" | "ready";
+type ToastFeedback = { tone: "warning"; text: string } | null;
 
 type MovementForm = {
   productReference: string;
@@ -63,6 +73,7 @@ export default function PharmacyStockPage({ params }: StockPageProps) {
   const [loadingDetailId, setLoadingDetailId] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
   const [isPending, startTransition] = useTransition();
+  const [toast, setToast] = useState<ToastFeedback>(null);
 
   useEffect(() => {
     let isCurrent = true;
@@ -98,13 +109,23 @@ export default function PharmacyStockPage({ params }: StockPageProps) {
         setSuccessMessage("");
       }
       setErrorMessage("");
+      let pharmacySubscription: unknown = null;
 
       try {
-        const pharmacyPermissions = await getPharmacyPermissions(pharmacyId);
+        const [pharmacyPermissions, pharmacy] = await Promise.all([
+          getPharmacyPermissions(pharmacyId),
+          getPharmacyDetail(pharmacyId),
+        ]);
         if (!isCurrent) {
           return;
         }
         setPermissions(pharmacyPermissions);
+        pharmacySubscription = pharmacy.subscription;
+
+        if (isKnownInactiveSubscription(pharmacySubscription)) {
+          setState("subscription-inactive");
+          return;
+        }
 
         if (!pharmacyPermissions.stock_view) {
           setState("forbidden");
@@ -129,7 +150,9 @@ export default function PharmacyStockPage({ params }: StockPageProps) {
         if (!isCurrent) {
           return;
         }
-        if (isFirstLoad) {
+        if (isSubscriptionInactiveError(error, pharmacySubscription)) {
+          setState("subscription-inactive");
+        } else if (isFirstLoad) {
           setErrorMessage(
             error instanceof Error ? error.message : "Impossible de charger le stock.",
           );
@@ -256,6 +279,11 @@ export default function PharmacyStockPage({ params }: StockPageProps) {
       {successMessage && (
         <Message tone="success" message={successMessage} />
       )}
+      {toast && (
+        <ToastMessage tone={toast.tone} onClose={() => setToast(null)}>
+          {toast.text}
+        </ToastMessage>
+      )}
 
       {state === "loading" && (
         <section className="mt-6 rounded-lg border border-app-border bg-app-card p-8 shadow-sm">
@@ -264,7 +292,19 @@ export default function PharmacyStockPage({ params }: StockPageProps) {
       )}
 
       {state === "forbidden" && <ForbiddenState pharmacyId={pharmacyId} />}
-      {state === "error" && <ErrorState pharmacyId={pharmacyId} />}
+      {state === "subscription-inactive" && (
+        <SubscriptionInactiveState
+          context="stock"
+          canPaySubscription={canPayPharmacySubscription(permissions)}
+          onPurchaseDenied={() => setToast({ tone: "warning", text: SUBSCRIPTION_PURCHASE_DENIED_MESSAGE })}
+        />
+      )}
+      {state === "error" && (
+        <ErrorState
+          pharmacyId={pharmacyId}
+          onRetry={() => setReloadKey((key) => key + 1)}
+        />
+      )}
 
       {(state === "ready" || state === "empty") && (
         <section className="mt-6 grid gap-6 xl:grid-cols-[380px_1fr] xl:items-start">
@@ -762,20 +802,21 @@ function ForbiddenState({ pharmacyId }: { pharmacyId: string }) {
   );
 }
 
-function ErrorState({ pharmacyId }: { pharmacyId: string }) {
+function ErrorState({ pharmacyId, onRetry }: { pharmacyId: string; onRetry: () => void }) {
   return (
     <section className="mt-6 rounded-lg border border-red-200 bg-red-50 p-6 text-center">
       <h2 className="text-lg font-bold text-red-700">Stock indisponible</h2>
       <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-red-700">
         Les mouvements de stock ne peuvent pas être chargés pour le moment.
       </p>
-      <LinkButton
-        href={"/app/pharmacies/" + pharmacyId + "/dashboard"}
-        variant="secondary"
-        className="mt-5"
-      >
-        Retour au tableau de bord
-      </LinkButton>
+      <div className="mt-5 flex flex-wrap justify-center gap-3">
+        <Button type="button" variant="secondary" onClick={onRetry}>
+          Réessayer
+        </Button>
+        <LinkButton href={"/app/pharmacies/" + pharmacyId + "/dashboard"} variant="secondary">
+          Retour au tableau de bord
+        </LinkButton>
+      </div>
     </section>
   );
 }
