@@ -1448,13 +1448,18 @@ pharmacie ou dispose de `subscription_pay`. Une erreur d'accès ou de réseau ne
 bloque pas les autres détails de la pharmacie : le bloc affiche un message
 indisponible.
 
-Le bloc affiche `plan_code`, `effective_status`, `starts_at`, `expires_at`,
-`duration_days`, `days_remaining` et `last_confirmed_payment`. Les statuts
-`TRIAL`, `ACTIVE`, `EXPIRED`, `PENDING` et `CANCELED` sont traduits en français.
-`last_confirmed_payment` est `null` lorsqu'aucun paiement d'abonnement n'a été
-confirmé; le frontend affiche alors « Aucun paiement effectué ». Les dates
-retournées au format `JJ-MM-AAAA HH:MM:SS` sont affichées en `JJ/MM/AAAA`; les
-jours restants sont affichés tels que fournis par le backend, sans recalcul.
+Le bloc affiche séparément `plan_code`, `period_type`, `effective_status`,
+`starts_at`, `expires_at`, `commercial_duration_days`, `duration_days`,
+`days_remaining` et `last_confirmed_payment`. `period_type` est traduit en
+« Essai gratuit », « Payant » ou « Accès gratuit » et ne doit jamais être
+confondu avec le statut. `commercial_duration_days` est absent pendant l'essai,
+alors que `duration_days` correspond à la période réellement accordée (y
+compris une prolongation). `last_confirmed_payment` est `null` sans transaction
+d'abonnement validée et horodatée : le frontend affiche alors « Aucun paiement
+effectué » pour la date comme pour le montant, sans utiliser le prix catalogue.
+Les dates retournées au format `JJ-MM-AAAA HH:MM:SS` sont affichées en
+`JJ/MM/AAAA`; les jours restants sont affichés tels que fournis par le backend,
+sans recalcul.
 
 ### pawaPay Mobile Money (activation locale contrôlée)
 

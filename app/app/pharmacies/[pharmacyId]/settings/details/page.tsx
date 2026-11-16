@@ -684,6 +684,7 @@ export default function SettingsDetailsPage({ params }: SettingsDetailsPageProps
             {subscriptionState === "ready" && subscription && (
               <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <Detail label="Forfait actuel" value={subscription.planCode || "Non disponible"} />
+                <Detail label="Type de période" value={formatSubscriptionPeriodType(subscription.periodType)} />
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wide text-app-muted">Statut</p>
                   <div className="mt-1">
@@ -693,7 +694,7 @@ export default function SettingsDetailsPage({ params }: SettingsDetailsPageProps
                 <Detail
                   label="Date du dernier paiement"
                   value={
-                    subscription.lastConfirmedPayment
+                    subscription.lastConfirmedPayment?.confirmedAt
                       ? formatSubscriptionDate(subscription.lastConfirmedPayment.confirmedAt)
                       : "Aucun paiement effectué"
                   }
@@ -701,7 +702,7 @@ export default function SettingsDetailsPage({ params }: SettingsDetailsPageProps
                 <Detail
                   label="Dernier montant payé"
                   value={
-                    subscription.lastConfirmedPayment
+                    subscription.lastConfirmedPayment?.confirmedAt
                       ? [
                           subscription.lastConfirmedPayment.amount,
                           subscription.lastConfirmedPayment.currency,
@@ -725,6 +726,14 @@ export default function SettingsDetailsPage({ params }: SettingsDetailsPageProps
                     subscription.durationDays === null
                       ? "Non disponible"
                       : formatDays(subscription.durationDays)
+                  }
+                />
+                <Detail
+                  label="Durée commerciale"
+                  value={
+                    subscription.commercialDurationDays === null
+                      ? "Non applicable pendant l'essai"
+                      : formatDays(subscription.commercialDurationDays)
                   }
                 />
                 <Detail label="Jours restants" value={formatDays(subscription.daysRemaining)} />
@@ -1367,6 +1376,19 @@ function formatSubscriptionDate(value?: string | null) {
   }
 
   return formatDate(value) || "Non disponible";
+}
+
+function formatSubscriptionPeriodType(value: PharmacySubscriptionStatus["periodType"]) {
+  switch (value) {
+    case "TRIAL":
+      return "Essai gratuit";
+    case "PAID":
+      return "Payant";
+    case "FREE_ACCESS":
+      return "Accès gratuit";
+    default:
+      return "Non disponible";
+  }
 }
 
 function formatDays(days: number) {

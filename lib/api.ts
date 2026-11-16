@@ -1175,7 +1175,10 @@ export type PharmacySubscriptionStatus = {
   planName: string;
   status: string;
   effectiveStatus: string;
+  periodType: "TRIAL" | "PAID" | "FREE_ACCESS" | "";
   durationMonths: number;
+  commercialDurationMonths: number | null;
+  commercialDurationDays: number | null;
   durationDays: number | null;
   startsAt: string | null;
   expiresAt: string | null;
@@ -1296,7 +1299,16 @@ function normalizePharmacySubscriptionStatus(item: UnknownRecord): PharmacySubsc
     planName: String(item.plan_name || item.plan_code || ""),
     status: String(item.status || ""),
     effectiveStatus: String(item.effective_status || item.status || ""),
+    periodType: String(item.period_type || "") as PharmacySubscriptionStatus["periodType"],
     durationMonths: Number(item.duration_months || 0),
+    commercialDurationMonths:
+      item.commercial_duration_months === null || item.commercial_duration_months === undefined
+        ? null
+        : Number(item.commercial_duration_months),
+    commercialDurationDays:
+      item.commercial_duration_days === null || item.commercial_duration_days === undefined
+        ? null
+        : Number(item.commercial_duration_days),
     durationDays:
       item.duration_days === null || item.duration_days === undefined
         ? null

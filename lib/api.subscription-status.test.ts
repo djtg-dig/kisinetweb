@@ -17,8 +17,11 @@ test("lit le statut d'abonnement de la pharmacie demandée", async () => {
       plan_code: "STANDARD",
       plan_name: "Standard",
       status: "ACTIVE",
-      effective_status: "TRIAL",
+      effective_status: "ACTIVE",
+      period_type: "PAID",
       duration_months: 1,
+      commercial_duration_months: 1,
+      commercial_duration_days: 30,
       duration_days: 30,
       starts_at: "10-11-2026 10:00:00",
       expires_at: "10-12-2026 10:00:00",
@@ -41,8 +44,11 @@ test("lit le statut d'abonnement de la pharmacie demandée", async () => {
     planCode: "STANDARD",
     planName: "Standard",
     status: "ACTIVE",
-    effectiveStatus: "TRIAL",
+    effectiveStatus: "ACTIVE",
+    periodType: "PAID",
     durationMonths: 1,
+    commercialDurationMonths: 1,
+    commercialDurationDays: 30,
     durationDays: 30,
     startsAt: "10-11-2026 10:00:00",
     expiresAt: "10-12-2026 10:00:00",
@@ -61,8 +67,11 @@ test("conserve l'absence de paiement confirmé", async () => {
     plan_code: "BASIC",
     plan_name: "Basic",
     status: "ACTIVE",
-    effective_status: "TRIAL",
+    effective_status: "ACTIVE",
+    period_type: "TRIAL",
     duration_months: 1,
+    commercial_duration_months: null,
+    commercial_duration_days: null,
     duration_days: 90,
     starts_at: "10-11-2026 10:00:00",
     expires_at: "08-02-2027 10:00:00",
@@ -73,5 +82,5 @@ test("conserve l'absence de paiement confirmé", async () => {
   const subscription = await getPharmacySubscriptionStatus("PH12345678");
 
   assert.equal(subscription.lastConfirmedPayment, null);
-  assert.equal(subscription.effectiveStatus, "TRIAL");
+  assert.equal(subscription.periodType, "TRIAL");
 });
