@@ -2,7 +2,7 @@ import { apiFetch } from "@/lib/api/request";
 import { dedupeRequest } from "@/lib/api-request-cache";
 import { apiBaseUrl } from "@/lib/carri-account";
 import {
-  formatDate,
+  getDashboardSubscriptionAlert,
   getDashboardShortcuts,
   type DashboardAlert,
   type PharmacyDashboardData,
@@ -178,13 +178,11 @@ function stockProductToAlert(product: ApiStockProduct, tone: DashboardAlert["ton
   };
 }
 
-function subscriptionToAlert(subscription: ApiSubscriptionAlert): DashboardAlert {
-  return {
-    id: "subscription",
-    title: "Abonnement",
-    description: subscription.message + " Date: " + formatDate(subscription.expires_at) + ".",
-    tone: "warning",
-  };
+function subscriptionToAlert(subscription: ApiSubscriptionAlert): DashboardAlert | null {
+  return getDashboardSubscriptionAlert({
+    status: subscription.status,
+    expiresAt: subscription.expires_at,
+  });
 }
 
 function invoiceToAlert(invoice: ApiPendingInvoice, currency: string): DashboardAlert {

@@ -156,7 +156,11 @@ export function PharmacyDashboard({ data, permissions, subscriptionLabel }: Phar
             {alerts.length ? (
               <div className="grid gap-3">
                 {alerts.map((alert) => (
-                  <AlertItem key={alert.id} alert={alert} />
+                  <AlertItem
+                    key={alert.id}
+                    alert={alert}
+                    canRenewSubscription={Boolean(permissions.subscription_pay)}
+                  />
                 ))}
               </div>
             ) : (
@@ -335,11 +339,22 @@ function StatCard({
   );
 }
 
-function AlertItem({ alert }: { alert: DashboardAlert }) {
+function AlertItem({
+  alert,
+  canRenewSubscription,
+}: {
+  alert: DashboardAlert;
+  canRenewSubscription: boolean;
+}) {
   return (
     <div className={`rounded-lg border p-4 ${getAlertClass(alert.tone)}`}>
       <p className="font-semibold">{alert.title}</p>
       <p className="mt-1 text-sm leading-6">{alert.description}</p>
+      {alert.action?.kind === "renew-subscription" && canRenewSubscription && (
+        <LinkButton href="/tarifs" className="mt-4">
+          {alert.action.label}
+        </LinkButton>
+      )}
     </div>
   );
 }

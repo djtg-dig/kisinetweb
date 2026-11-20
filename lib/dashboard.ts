@@ -14,6 +14,15 @@ export type DashboardAlert = {
   title: string;
   description: string;
   tone: "warning" | "error" | "info";
+  action?: {
+    kind: "renew-subscription";
+    label: string;
+  };
+};
+
+type DashboardSubscriptionAlertInput = {
+  status?: string | null;
+  expiresAt?: string | null;
 };
 
 export type SalesDay = {
@@ -112,6 +121,101 @@ export function formatDate(value?: string) {
 
   return date.toLocaleDateString("fr-FR", {
     day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+/**
+ * Transforme uniquement une alerte déjà décidée par le backend. Le backend
+ * conserve donc le seuil d'expiration ; le frontend ne recalcule pas cette règle.
+ */
+export function getDashboardSubscriptionAlert(
+  subscription: DashboardSubscriptionAlertInput | null,
+  now = new Date(),
+): DashboardAlert | null {
+  if (!subscription) {
+    return null;
+  }
+
+  const status = subscription.status?.trim().toUpperCase();
+  const expiry = getSubscriptionAlertDate(subscription.expiresAt);
+  const formattedExpiry = expiry ? formatSubscriptionAlertDate(expiry) : undefined;
+
+  if (status === "EXPIRED") {
+    return {
+      id: "subscription",
+      title: "Abonnement expiré",
+      description: formattedExpiry
+        ? "L'abonnement de cette pharmacie a expiré le " +
+          formattedExpiry +
+          ". Veuillez renouveler votre abonnement pour continuer à utiliser les fonctionnalités concernées."
+        : "L'abonnement de cette pharmacie a expiré. Veuillez renouveler votre abonnement pour continuer à utiliser les fonctionnalités concernées.",
+      tone: "error",
+      action: {
+        kind: "renew-subscription",
+        label: "Renouveler l'abonnement",
+      },
+    };
+  }
+
+  // Une date absente, invalide ou déjà passée ne doit jamais produire une
+  // promesse d'expiration future. Le statut effectif reste prioritaire.
+  if (!expiry || expiry.getTime() <= now.getTime()) {
+    return null;
+  }
+
+  if (status === "ACTIVE") {
+    return {
+      id: "subscription",
+      title: "Abonnement bientôt expiré",
+      description:
+        "Votre abonnement expirera le " +
+        formattedExpiry +
+        ". Pensez à le renouveler pour éviter une interruption du service.",
+      tone: "warning",
+    };
+  }
+
+  if (status === "TRIAL") {
+    return {
+      id: "subscription",
+      title: "Période d'essai bientôt terminée",
+      description:
+        "Votre période d'essai se terminera le " +
+        formattedExpiry +
+        ". Pensez à souscrire un abonnement pour éviter une interruption du service.",
+      tone: "warning",
+    };
+  }
+
+  return null;
+}
+
+function getSubscriptionAlertDate(value?: string | null): Date | null {
+  if (!value?.trim()) {
+    return null;
+  }
+
+  const dateOnly = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnly) {
+    const year = Number(dateOnly[1]);
+    const month = Number(dateOnly[2]);
+    const day = Number(dateOnly[3]);
+    const date = new Date(year, month - 1, day);
+
+    return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day
+      ? date
+      : null;
+  }
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatSubscriptionAlertDate(date: Date): string {
+  return date.toLocaleDateString("fr-FR", {
+    day: "numeric",
     month: "long",
     year: "numeric",
   });
