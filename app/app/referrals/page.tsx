@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { ApiAuthError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -8,35 +8,36 @@ import { LinkButton } from "@/components/ui/link-button";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
 import { WithdrawalDialog, withdrawalStatusLabel } from "@/components/referrals/WithdrawalDialog";
 import { carriAccountLoginUrl } from "@/lib/carri-account";
-import { formatAmount, formatPercent } from "@/lib/referrals/withdrawal-format";
+import { formatAmount } from "@/lib/referrals/withdrawal-format";
 import { maskPhoneNumber } from "@/lib/referrals/withdrawal-display";
 import { evaluateWalletWithdrawability } from "@/lib/referrals/withdrawability";
 import {
-  createReferralWithdrawal,
-  getReferralWithdrawal,
-  getReferralPayoutAccounts,
   getReferralCommissions,
   getReferralOverview,
   getReferralWithdrawals,
   getReferredPharmacies,
   type ReferralCommission,
-  type ReferralPayoutAccount,
   type ReferralWalletSummary,
   type ReferralWithdrawal,
   type ReferredPharmacy,
 } from "@/lib/api/referrals";
+import {
+  confirmReferralWithdrawalQuote,
+  getMobileMoneyProviders,
+  getUserPaymentAccounts,
+  type MobileMoneyProvider,
+  type UserPaymentAccount,
+} from "@/lib/api/user-payment-accounts";
 
 type PageState = "loading" | "anonymous" | "ready" | "error";
-const PAWAPAY_ENABLED = process.env.NEXT_PUBLIC_PAWAPAY_ENABLED === "true";
-const FINAL_WITHDRAWAL_STATUSES = new Set(["PAID", "FAILED", "REJECTED", "CANCELLED"]);
-
 async function fetchReferralDashboard() {
-  const [overview, commissionList, withdrawalList, referredList, payoutAccountList] = await Promise.all([
+  const [overview, commissionList, withdrawalList, referredList, paymentAccountList, providerList] = await Promise.all([
     getReferralOverview(),
     getReferralCommissions(),
     getReferralWithdrawals(),
     getReferredPharmacies(),
-    getReferralPayoutAccounts(),
+    getUserPaymentAccounts(),
+    getMobileMoneyProviders(),
   ]);
 
   return {
@@ -44,7 +45,8 @@ async function fetchReferralDashboard() {
     commissionList,
     withdrawalList,
     referredList,
-    payoutAccountList,
+    paymentAccountList,
+    providerList,
   };
 }
 
@@ -58,7 +60,8 @@ export default function ReferralsPage() {
   const [commissions, setCommissions] = useState<ReferralCommission[]>([]);
   const [withdrawals, setWithdrawals] = useState<ReferralWithdrawal[]>([]);
   const [pharmacies, setPharmacies] = useState<ReferredPharmacy[]>([]);
-  const [payoutAccounts, setPayoutAccounts] = useState<ReferralPayoutAccount[]>([]);
+  const [paymentAccounts, setPaymentAccounts] = useState<UserPaymentAccount[]>([]);
+  const [mobileMoneyProviders, setMobileMoneyProviders] = useState<MobileMoneyProvider[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isWithdrawalModalOpen, setIsWithdrawalModalOpen] = useState(false);
   // `lastWithdrawalRef` stocke la référence du dernier retrait créé
@@ -73,13 +76,15 @@ export default function ReferralsPage() {
     commissionList,
     withdrawalList,
     referredList,
-    payoutAccountList,
+    paymentAccountList,
+    providerList,
   }: Awaited<ReturnType<typeof fetchReferralDashboard>>) {
     setWallets(overview);
     setCommissions(commissionList);
     setWithdrawals(withdrawalList);
     setPharmacies(referredList);
-    setPayoutAccounts(payoutAccountList);
+    setPaymentAccounts(paymentAccountList);
+    setMobileMoneyProviders(providerList);
     setPageState("ready");
   }
 
@@ -149,51 +154,19 @@ export default function ReferralsPage() {
   );
   const canWithdraw = withdrawability.canWithdraw;
 
-  async function handleWithdrawalSubmit(payload: {
-    amount: string;
-    country: string;
-    phone_number: string;
-    operator: string;
-    providerCode: "IKEEPAY" | "PAWAPAY";
-  }) {
+  async function handleWithdrawalSubmit(payload: { quoteToken: string; userPaymentAccountId: number }) {
     setIsSubmitting(true);
     setMessage("");
     setMessageKind("info");
 
     try {
-      const created = await createReferralWithdrawal({
-        amount: payload.amount,
-        currency: activeWallet ? activeWallet.currency : "USD",
-        country: payload.country,
-        phone_number: payload.phone_number,
-        operator: payload.operator,
-        provider_code: payload.providerCode,
-      });
+      const created = await confirmReferralWithdrawalQuote(payload);
       setIsWithdrawalModalOpen(false);
       setLastWithdrawalRef(created.reference);
-      const resolved = await pollReferralWithdrawalStatus(created);
-      setLastWithdrawalStatus(resolved.status);
-      // On rafraîchit le dashboard pour récupérer le nouveau solde
-      // disponible (available_balance a été décrémenté de
-      // total_reserved_amount, pas de amount seul).
+      setLastWithdrawalStatus(created.status);
       applyReferralDashboard(await fetchReferralDashboard());
-      // On choisit le ton du message en fonction du statut retourné :
-      // REQUESTED / PROCESSING -> info, PAID -> success, FAILED -> error.
-      const kind: "info" | "success" | "error" =
-        resolved.status === "PAID"
-          ? "success"
-          : resolved.status === "FAILED" || resolved.status === "REJECTED"
-            ? "error"
-            : "info";
-      setMessageKind(kind);
-      const statusLabel = withdrawalStatusLabel(resolved.status);
-      setMessage(
-        resolved.status === "PROCESSING"
-          ? `Votre retrait a été transmis. Référence : ${created.reference} — Retrait en cours de traitement.`
-          : resolved.status === "REQUESTED"
-            ? `Votre retrait a été transmis. Référence : ${created.reference} — Préparation en cours.`
-            : `Votre retrait (${created.reference}) est : ${statusLabel}.`,
-      );
+      setMessageKind("success");
+      setMessage("Votre demande de retrait a été enregistrée. Le montant correspondant est réservé jusqu'à son traitement.");
     } catch (error) {
       setMessageKind("error");
       setMessage(
@@ -265,7 +238,7 @@ export default function ReferralsPage() {
                 )}
 
                 <p className="mt-4 text-sm leading-6 text-app-muted">
-                  Regroupez plusieurs commissions dans un seul retrait. Le payout est envoyé automatiquement au provider ; aucune approbation manuelle n'est nécessaire.
+                  Demandez le retrait de vos commissions vers votre compte Mobile Money. Votre demande sera traitée par Carri Business.
                 </p>
 
                 {message && (
@@ -338,7 +311,7 @@ export default function ReferralsPage() {
                   disabled={!canWithdraw}
                   className="mt-5 w-full"
                 >
-                  Retirer
+                  Demander un retrait
                 </Button>
               </section>
             </aside>
@@ -349,10 +322,11 @@ export default function ReferralsPage() {
           open={isWithdrawalModalOpen}
           onClose={() => setIsWithdrawalModalOpen(false)}
           wallet={activeWallet}
+          accounts={paymentAccounts}
+          providers={mobileMoneyProviders}
           isSubmitting={isSubmitting}
-          pawaPayEnabled={PAWAPAY_ENABLED}
           message={messageKind === "error" ? message : ""}
-          onSubmit={handleWithdrawalSubmit}
+          onConfirm={handleWithdrawalSubmit}
         />
 
         {/* Référence du dernier retrait créé (utile aux tests/debug). */}
@@ -369,21 +343,6 @@ export default function ReferralsPage() {
       </section>
     </MainLayout>
   );
-}
-
-async function pollReferralWithdrawalStatus(initial: ReferralWithdrawal): Promise<ReferralWithdrawal> {
-  let current = initial;
-  // Consultation bornée : elle ne crée jamais une seconde demande et laisse le
-  // backend réconcilier un éventuel timeout fournisseur.
-  for (let attempt = 0; attempt < 4 && !FINAL_WITHDRAWAL_STATUSES.has(current.status); attempt += 1) {
-    await new Promise<void>((resolve) => window.setTimeout(resolve, 2_000));
-    try {
-      current = await getReferralWithdrawal(initial.reference);
-    } catch {
-      return current;
-    }
-  }
-  return current;
 }
 
 function WalletOverview({ wallets }: { wallets: ReferralWalletSummary[] }) {
@@ -504,7 +463,9 @@ function WithdrawalRow({ withdrawal }: { withdrawal: ReferralWithdrawal }) {
     phone_number?: string;
     country?: string;
     operator?: string;
+    destination_masked?: string;
   };
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const feeAmount = withdrawal.fee_amount;
   const totalReserved = withdrawal.total_reserved_amount;
   const phoneLabel = snapshot.phone_number ? maskPhoneNumber(snapshot.phone_number) : "";
@@ -543,6 +504,20 @@ function WithdrawalRow({ withdrawal }: { withdrawal: ReferralWithdrawal }) {
               {totalReserved ? formatAmount(totalReserved, withdrawal.currency) : "—"}
             </dd>
           </div>
+        </dl>
+      )}
+      <Button type="button" variant="secondary" onClick={() => setDetailsOpen((open) => !open)} className="mt-3">
+        {detailsOpen ? "Masquer le détail" : "Voir le détail"}
+      </Button>
+      {detailsOpen && (
+        <dl className="mt-3 grid gap-3 rounded-md border border-app-border bg-app-surface p-3 text-sm sm:grid-cols-2">
+          <Metric label="Statut" value={withdrawalStatusLabel(withdrawal.status)} />
+          <Metric label="Compte destinataire" value={snapshot.destination_masked || phoneLabel || "Destination protégée"} />
+          <Metric label="Demandé le" value={withdrawal.requested_at || "—"} />
+          <Metric label="Traité le" value={withdrawal.processing_at || "—"} />
+          <Metric label="Payé le" value={withdrawal.paid_at || "—"} />
+          <Metric label="Référence du transfert" value={withdrawal.provider_reference || "—"} />
+          {withdrawal.rejection_reason && <Metric label="Motif du rejet" value={withdrawal.rejection_reason} />}
         </dl>
       )}
     </article>

@@ -13,11 +13,14 @@ import {
   type PharmacySummary,
 } from "@/lib/api";
 import {
-  createReferralPayoutAccount,
-  getReferralPayoutAccounts,
-  updateReferralPayoutAccount,
-  type ReferralPayoutAccount,
-} from "@/lib/api/referrals";
+  createUserPaymentAccount,
+  getMobileMoneyProviders,
+  getUserPaymentAccounts,
+  setDefaultUserPaymentAccount,
+  updateUserPaymentAccount,
+  type MobileMoneyProvider,
+  type UserPaymentAccount,
+} from "@/lib/api/user-payment-accounts";
 import {
   getActivePharmacyId,
   logout,
@@ -33,7 +36,8 @@ export default function AccountSettingsPage() {
   const [activePharmacy, setActivePharmacy] = useState<PharmacySummary | null>(null);
   const [pharmacyCount, setPharmacyCount] = useState(0);
   const [pharmacyLoadMessage, setPharmacyLoadMessage] = useState("");
-  const [payoutAccounts, setPayoutAccounts] = useState<ReferralPayoutAccount[]>([]);
+  const [paymentAccounts, setPaymentAccounts] = useState<UserPaymentAccount[]>([]);
+  const [mobileMoneyProviders, setMobileMoneyProviders] = useState<MobileMoneyProvider[]>([]);
   const { authenticated } = useSession();
 
   useEffect(() => {
@@ -48,12 +52,14 @@ export default function AccountSettingsPage() {
 
       try {
         await getAccountSession();
-        const [pharmacies, accounts] = await Promise.all([
+        const [pharmacies, accounts, providers] = await Promise.all([
           getUserPharmacies(),
-          getReferralPayoutAccounts(),
+          getUserPaymentAccounts(),
+          getMobileMoneyProviders(),
         ]);
         setPharmacyCount(pharmacies.length);
-        setPayoutAccounts(accounts);
+        setPaymentAccounts(accounts);
+        setMobileMoneyProviders(providers);
         setActivePharmacy(
           pharmacies.find((pharmacy) => pharmacy.id === storedPharmacyId) || null,
         );
@@ -133,10 +139,7 @@ export default function AccountSettingsPage() {
                 </div>
               </section>
 
-              <PayoutAccountPanel
-                accounts={payoutAccounts}
-                onAccountsChange={setPayoutAccounts}
-              />
+              <PayoutAccountPanel accounts={paymentAccounts} providers={mobileMoneyProviders} onAccountsChange={setPaymentAccounts} />
             </section>
 
             <aside className="space-y-6">
@@ -193,58 +196,71 @@ export default function AccountSettingsPage() {
 
 function PayoutAccountPanel({
   accounts,
+  providers,
   onAccountsChange,
 }: {
-  accounts: ReferralPayoutAccount[];
-  onAccountsChange: (accounts: ReferralPayoutAccount[]) => void;
+  accounts: UserPaymentAccount[];
+  providers: MobileMoneyProvider[];
+  onAccountsChange: (accounts: UserPaymentAccount[]) => void;
 }) {
-  const [currency, setCurrency] = useState(accounts[0]?.currency || "USD");
-  const [provider, setProvider] = useState(accounts[0]?.provider || "AGREGATEUR");
-  const [paymentMethod, setPaymentMethod] = useState(accounts[0]?.payment_method || "MOBILE_MONEY");
-  const [operator, setOperator] = useState(accounts[0]?.operator || "");
-  const [phoneNumber, setPhoneNumber] = useState(accounts[0]?.phone_number || "");
-  const [accountName, setAccountName] = useState(accounts[0]?.account_name || "");
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [providerId, setProviderId] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [accountName, setAccountName] = useState("");
+  const [isDefault, setIsDefault] = useState(false);
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    const account = accounts[0];
-    if (!account || phoneNumber || accountName || operator) {
-      return;
-    }
-    setCurrency(account.currency);
-    setProvider(account.provider);
-    setPaymentMethod(account.payment_method);
-    setOperator(account.operator);
-    setPhoneNumber(account.phone_number);
-    setAccountName(account.account_name);
-  }, [accounts, accountName, operator, phoneNumber]);
+    if (!providerId && providers[0]) setProviderId(String(providers[0].id));
+  }, [providerId, providers]);
+
+  function resetForm() {
+    setEditingId(null);
+    setPhoneNumber("");
+    setAccountName("");
+    setIsDefault(false);
+  }
+
+  function editAccount(account: UserPaymentAccount) {
+    setEditingId(account.id);
+    setProviderId(String(account.mobileMoneyProvider || providers[0]?.id || ""));
+    setPhoneNumber("");
+    setAccountName(account.accountName);
+    setIsDefault(account.isDefault);
+    setMessage("");
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage("");
+    const mobileMoneyProvider = Number(providerId);
+    if (!mobileMoneyProvider || (!editingId && !phoneNumber.trim())) {
+      setMessage("Sélectionnez un opérateur et renseignez le numéro Mobile Money.");
+      return;
+    }
     setIsSubmitting(true);
 
-    const payload = {
-      currency,
-      provider,
-      payment_method: paymentMethod,
-      operator,
-      phone_number: phoneNumber,
-      account_name: accountName,
-      is_active: true,
-    };
-
     try {
-      const existing = accounts.find((account) => account.currency === currency);
-      const saved = existing
-        ? await updateReferralPayoutAccount(existing.reference, payload)
-        : await createReferralPayoutAccount(payload);
-      const nextAccounts = existing
-        ? accounts.map((account) => (account.reference === saved.reference ? saved : account))
-        : [saved, ...accounts];
+      const saved = editingId
+        ? await updateUserPaymentAccount(editingId, {
+          mobileMoneyProvider,
+          ...(phoneNumber.trim() ? { accountIdentifier: phoneNumber.trim() } : {}),
+          accountName: accountName.trim(),
+          isDefault,
+        })
+        : await createUserPaymentAccount({
+          mobileMoneyProvider,
+          accountIdentifier: phoneNumber.trim(),
+          accountName: accountName.trim(),
+          isDefault,
+        });
+      const nextAccounts = editingId
+        ? accounts.map((account) => account.id === saved.id ? saved : saved.isDefault ? { ...account, isDefault: false } : account)
+        : [saved, ...accounts.map((account) => saved.isDefault ? { ...account, isDefault: false } : account)];
       onAccountsChange(nextAccounts);
       setMessage("Compte de retrait enregistré.");
+      resetForm();
     } catch (error) {
       setMessage(
         error instanceof Error ? error.message : "Impossible d'enregistrer le compte de retrait.",
@@ -257,81 +273,26 @@ function PayoutAccountPanel({
   return (
     <section className="rounded-lg border border-app-border bg-app-card p-6 shadow-sm">
       <p className="text-sm font-semibold text-primary-700">Retraits de commissions</p>
-      <h2 className="mt-2 text-xl font-bold text-app-text">Compte de réception</h2>
+      <h2 className="mt-2 text-xl font-bold text-app-text">Mes comptes de retrait</h2>
       <p className="mt-3 text-sm leading-6 text-app-muted">
-        Ce compte est utilisé pour recevoir les retraits groupés de vos commissions
-        de parrainage. Les demandes de retrait copieront ces informations au moment
-        de l'envoi.
+        Enregistrez les comptes Mobile Money qui pourront recevoir vos commissions.
+        Le pays et la devise sont confirmés lors de chaque demande de retrait.
       </p>
 
+      <div className="mt-5 space-y-3">
+        {accounts.length ? accounts.map((account) => {
+          const provider = providers.find((item) => item.id === account.mobileMoneyProvider);
+          return <article key={account.id} className="rounded-md border border-app-border bg-app-surface p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold text-app-text">{provider?.name || "Mobile Money"} · {account.accountIdentifierMasked}</p><p className="mt-1 text-sm text-app-muted">{account.accountName || "Bénéficiaire non renseigné"}{account.isDefault ? " · Compte par défaut" : ""}{!account.isActive ? " · Désactivé" : ""}</p></div><div className="flex flex-wrap gap-2"><Button type="button" variant="secondary" onClick={() => editAccount(account)}>Modifier</Button>{account.isActive && !account.isDefault && <Button type="button" variant="secondary" onClick={async () => { const saved = await setDefaultUserPaymentAccount(account.id); onAccountsChange(accounts.map((item) => item.id === saved.id ? saved : { ...item, isDefault: false })); }}>Par défaut</Button>}{account.isActive && <Button type="button" variant="secondary" onClick={async () => { const saved = await updateUserPaymentAccount(account.id, { isActive: false }); onAccountsChange(accounts.map((item) => item.id === saved.id ? saved : item)); }}>Désactiver</Button>}</div></div></article>;
+        }) : <p className="rounded-md border border-app-border bg-app-surface p-4 text-sm text-app-muted">Aucun compte Mobile Money enregistré.</p>}
+      </div>
+
       <form onSubmit={handleSubmit} className="mt-5 grid gap-4 sm:grid-cols-2">
-
-        <label className="block text-sm font-semibold text-app-text">
-          Systeme de paiement
-          <select
-            value={paymentMethod}
-            onChange={(event) => setPaymentMethod(event.target.value)}
-            className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
-          >
-            <option value="MOBILE_MONEY">Mobile Money</option>
-            <option value="BANK_TRANSFER">Virement bancaire</option>
-          </select>
-        </label>
-
-          <label className="block text-sm font-semibold text-app-text">
-          Prestataire
-          <select
-            value={provider}
-            onChange={(event) => setProvider(event.target.value)}
-            className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
-          >
-            <option value="AGREGATEUR">M-pesa</option>
-            <option value="AGREGATEUR">Orange money</option>
-            <option value="MOBILE_MONEY">....</option>
-            <option value="OTHER">Autre</option>
-          </select>
-        </label>
-
-        <label className="block text-sm font-semibold text-app-text">
-          Numero du Compte
-          <input
-            value={operator}
-            onChange={(event) => setOperator(event.target.value)}
-            placeholder="MPESA"
-            className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
-          />
-        </label>
-
-        <label className="block text-sm font-semibold text-app-text">
-          Téléphone
-          <input
-            value={phoneNumber}
-            onChange={(event) => setPhoneNumber(event.target.value)}
-            placeholder="+243XXXXXXXXX"
-            className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
-          />
-        </label>
-
-        <label className="block text-sm font-semibold text-app-text">
-          Nom du bénéficiaire
-          <input
-            value={accountName}
-            onChange={(event) => setAccountName(event.target.value)}
-            className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
-          />
-        </label>
-
-        {message && (
-          <p className="rounded-md border border-app-border bg-app-surface px-4 py-3 text-sm text-app-muted sm:col-span-2">
-            {message}
-          </p>
-        )}
-
-        <div className="sm:col-span-2">
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Enregistrement..." : "Enregistrer le compte"}
-          </Button>
-        </div>
+        <label className="block text-sm font-semibold text-app-text">Opérateur Mobile Money<select value={providerId} onChange={(event) => setProviderId(event.target.value)} required className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"><option value="">Sélectionner un opérateur</option>{providers.map((provider) => <option key={provider.id} value={provider.id}>{provider.name}</option>)}</select></label>
+        <label className="block text-sm font-semibold text-app-text">Numéro Mobile Money<input value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} placeholder={editingId ? "Laisser vide pour conserver le numéro" : "+243XXXXXXXXX"} required={!editingId} className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100" /></label>
+        <label className="block text-sm font-semibold text-app-text">Nom du bénéficiaire (facultatif)<input value={accountName} onChange={(event) => setAccountName(event.target.value)} className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100" /></label>
+        <label className="flex min-h-11 items-center gap-3 self-end text-sm font-semibold text-app-text"><input type="checkbox" checked={isDefault} onChange={(event) => setIsDefault(event.target.checked)} className="h-4 w-4 accent-primary-600" /> Définir comme compte par défaut</label>
+        {message && <p role="status" className="rounded-md border border-app-border bg-app-surface px-4 py-3 text-sm text-app-muted sm:col-span-2">{message}</p>}
+        <div className="flex flex-col gap-3 sm:col-span-2 sm:flex-row"><Button type="submit" disabled={isSubmitting || !providers.length}>{isSubmitting ? "Enregistrement..." : editingId ? "Mettre à jour le compte" : "Ajouter un compte Mobile Money"}</Button>{editingId && <Button type="button" variant="secondary" onClick={resetForm}>Annuler</Button>}</div>
       </form>
     </section>
   );

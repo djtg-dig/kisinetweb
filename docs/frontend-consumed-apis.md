@@ -1574,97 +1574,76 @@ Endpoints consommés:
 | Transactions devise | `GET /api/paiements/referral-wallets/{currency}/transactions/` |
 | Commissions | `GET /api/paiements/referral-commissions/` |
 | Commissions par devise | `GET /api/paiements/referral-commissions/?currency=USD` |
-| Comptes de retrait | `GET /api/paiements/referral-payout-accounts/` |
-| Créer compte retrait | `POST /api/paiements/referral-payout-accounts/` |
-| Modifier compte retrait | `PATCH /api/paiements/referral-payout-accounts/{reference}/` |
+| Opérateurs Mobile Money | `GET /api/payment/mobile-money/providers/` |
+| Comptes de retrait Mobile Money | `GET /api/user-payment-accounts/` |
+| Créer un compte de retrait | `POST /api/user-payment-accounts/` |
+| Modifier ou désactiver un compte | `PATCH /api/user-payment-accounts/{id}/` |
+| Définir le compte par défaut | `POST /api/user-payment-accounts/{id}/set-default/` |
 | Retraits | `GET /api/paiements/referral-withdrawals/` |
-| Création retrait | `POST /api/paiements/referral-withdrawals/` |
+| Devis de retrait | `POST /api/paiements/referral-withdrawals/quote/` |
+| Confirmation de la demande | `POST /api/paiements/referral-withdrawals/confirm-quote/` |
 | Détail retrait | `GET /api/paiements/referral-withdrawals/{reference}/` |
 
-Payload envoyé depuis `/app/settings` pour configurer le compte de réception:
+La page `/app/settings` utilise les comptes de paiement de l'utilisateur,
+partagés avec les autres usages Mobile Money : aucun second système de comptes
+ou de coordonnées de retrait n'est créé. Le contrat de compte ne porte ni pays
+ni devise ; ces deux valeurs sont choisies pour établir le devis de retrait.
+
+Payload envoyé depuis `/app/settings` pour créer un compte Mobile Money :
 
 ```json
 {
-  "currency": "USD",
-  "provider": "AGREGATEUR",
-  "payment_method": "MOBILE_MONEY",
-  "operator": "MPESA",
-  "phone_number": "+243XXXXXXXXX",
+  "mobile_money_provider": 12,
+  "account_identifier": "+243XXXXXXXXX",
   "account_name": "Nom du bénéficiaire",
-  "metadata": {}
+  "is_default": true
 }
 ```
 
-Payload envoyé depuis `/app/referrals` pour un retrait.
+Le retrait suit deux étapes sans appel à un agrégateur : le frontend demande un
+devis, affiche ses frais et son montant net, puis confirme ce devis signé. Le
+backend réserve alors le montant débité et Carri Business traite la demande.
 
-> **Retrait libre** : les retraits sont initiés librement par
-> l'utilisateur. Après validation automatique (solde, frais, minimum,
-> maximum, destination), Kisinet réserve les fonds et soumet
-> immédiatement le payout au fournisseur sélectionné. iKeePay reste le choix
-> par défaut ; pawaPay n'est proposé que lorsque
-> `NEXT_PUBLIC_PAWAPAY_ENABLED=true`. **Aucune approbation
-> administrative n'est requise.** Le statut normal observé après un
-> POST réussi est `PROCESSING` (En cours).
-
-Deux modes acceptés par le backend (le frontend doit en choisir un seul) :
-
-**Mode destination directe** (sans compte sauvegardé) :
+Payload de devis :
 
 ```json
 {
-  "amount": "5.00",
+  "amount": "20.00",
   "currency": "USD",
   "country": "CD",
-  "phone_number": "+243 999 123 456",
-  "operator": "AIRTEL_COD",
-  "provider_code": "PAWAPAY"
+  "payment_method": "MOBILE_MONEY",
+  "user_payment_account_id": 42
 }
 ```
 
-Après la création, l'interface consulte au plus quatre fois (toutes les deux
-secondes) `GET /api/paiements/referral-withdrawals/{reference}/`. Un timeout ou
-une erreur de consultation conserve le dernier statut serveur et n'envoie jamais
-un second `POST`; la réconciliation reste entièrement côté backend.
+La réponse de devis contient `quote_token`, `total_debited`, `fee_amount`,
+`net_payout`, les limites applicables et une durée de validité. Les montants
+du devis backend font foi ; aucun frais n'est envoyé par le frontend.
 
-**Mode compte sauvegardé** (réutilise un `ReferralPayoutAccount`) :
+Payload de confirmation :
 
 ```json
 {
-  "amount": "5.00",
-  "currency": "USD",
-  "payout_account_reference": "PAXXXXXXXX"
+  "quote_token": "<jeton signé temporaire>",
+  "user_payment_account_id": 42
 }
 ```
 
-Le frontend NE DOIT PAS envoyer `fee_rate`, `fee_amount` ou
-`total_reserved_amount` : ces valeurs sont recalculées par le backend
-depuis `BusinessConfig.referral_withdrawal_fee_rate`.
-
-Après création, le backend peut renvoyer `status` ∈ {`REQUESTED`,
-`PROCESSING`, `FAILED`} selon la réponse iKeePay. Le statut final
-`PAID` est confirmé par le webhook iKeePay et visible via le détail
-du retrait. La page `/app/referrals` affiche le libellé français
-correspondant :
+Le détail d'une demande est consulté dans l'historique. La page affiche les
+statuts traduits suivants :
 
 | Statut backend | Libellé UI | Signification |
 | -------------- | ---------- | ------------- |
-| `REQUESTED` | Préparation | État technique transitoire (très bref). Pas une attente d'approbation. |
-| `PROCESSING` | En cours | Payout soumis à iKeePay, confirmation finale en attente. |
-| `PAID` | Payé | Paiement confirmé par iKeePay. |
-| `FAILED` | Échec | iKeePay a refusé ou confirmé un échec ; wallet restitué. |
+| `REQUESTED` | En attente | Demande enregistrée, montant réservé. |
+| `PROCESSING` | En cours de traitement | Demande prise en charge par Carri Business. |
+| `PAID` | Payé | Transfert confirmé. |
+| `REJECTED` ou `FAILED` | Rejeté | Demande refusée ou non aboutie ; le backend gère la restitution. |
 | `CANCELLED` | Annulé | Annulation. |
-| `REJECTED` | Rejeté | Statut legacy, conservé pour rétrocompatibilité. |
 
-L'UI masque partiellement le numéro de téléphone dans l'historique
-pour respecter la confidentialité. Le bouton principal est
-« Retirer » (jamais « Demander », « Soumettre » ou « Envoyer la
-demande »). Le message de succès est :
-
-```text
-Votre retrait a été transmis.
-```
-
-et non « Votre demande a été envoyée ».
+Le bouton principal est « Demander un retrait ». Après confirmation, le message
+est « Votre demande de retrait a été enregistrée. Le montant correspondant est
+réservé jusqu'à son traitement. » ; aucun paiement n'est présenté comme effectué
+à ce stade.
 
 La page affiche également, pour chaque devise du wallet, les champs
 de configuration renvoyés par `GET /api/paiements/referral-wallets/{currency}/summary/` :

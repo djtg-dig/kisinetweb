@@ -1,35 +1,26 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { LinkButton } from "@/components/ui/link-button";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { WITHDRAWAL_COUNTRIES } from "@/lib/referrals/countries";
-import { WITHDRAWAL_OPERATORS } from "@/lib/referrals/mobile-operators";
-import {
-  formatAmount,
-  formatPercent,
-  isCountryCodeValid,
-  isOperatorCodeValid,
-  isPhoneNumberFormatValid,
-  previewFeeAndTotal,
-} from "@/lib/referrals/withdrawal-format";
+import { formatAmount } from "@/lib/referrals/withdrawal-format";
 import type { ReferralWalletSummary } from "@/lib/api/referrals";
+import {
+  getReferralWithdrawalQuote,
+  type MobileMoneyProvider,
+  type ReferralWithdrawalQuote,
+  type UserPaymentAccount,
+} from "@/lib/api/user-payment-accounts";
 
-// Mapping local des statuts iKeePay vers libellés utilisateur français.
-// Ces libellés sont présentationnels : la source de vérité reste le code
-// retourné par le backend (REQUESTED, PROCESSING, PAID, FAILED, ...).
-//
-// REQUESTED est conservé comme état technique transitoire (créé
-// localement mais pas encore soumis au provider). C'est très bref
-// dans le flux normal, l'utilisateur final voit principalement
-// PROCESSING (En cours) après un POST réussi.
 export const REFERRAL_WITHDRAWAL_STATUS_LABELS: Record<string, string> = {
-  REQUESTED: "Préparation",
-  PROCESSING: "En cours",
+  REQUESTED: "En attente",
+  PROCESSING: "En cours de traitement",
   PAID: "Payé",
-  FAILED: "Échec",
-  CANCELLED: "Annulé",
   REJECTED: "Rejeté",
+  FAILED: "Rejeté",
+  CANCELLED: "Annulé",
 };
 
 export function withdrawalStatusLabel(status: string): string {
@@ -39,287 +30,156 @@ export function withdrawalStatusLabel(status: string): string {
 type WithdrawalDialogProps = {
   open: boolean;
   onClose: () => void;
-  // Wallet actif sur lequel le retrait sera prélevé.
   wallet: ReferralWalletSummary | null;
-  // Soumission déclenchée par le parent : le parent gère l'appel API et
-  // l'état isSubmitting. On ne dédouble pas la logique.
-  onSubmit: (payload: {
-    amount: string;
-    country: string;
-    phone_number: string;
-    operator: string;
-    providerCode: "IKEEPAY" | "PAWAPAY";
-  }) => void;
+  accounts: UserPaymentAccount[];
+  providers: MobileMoneyProvider[];
+  onConfirm: (input: { quoteToken: string; userPaymentAccountId: number }) => void;
   isSubmitting: boolean;
-  pawaPayEnabled: boolean;
-  // Message d'erreur/succès à afficher dans la modal (déjà humanisé
-  // par le parent).
   message?: string;
 };
 
-// Modal de retrait en mode "destination directe".
-// Le frontend collecte UNIQUEMENT les informations de destination et le
-// montant ; le backend recalcule fee_rate/fee_amount/total_reserved_amount
-// à partir du BusinessConfig snapshoté.
 export function WithdrawalDialog({
   open,
   onClose,
   wallet,
-  onSubmit,
+  accounts,
+  providers,
+  onConfirm,
   isSubmitting,
-  pawaPayEnabled,
   message,
 }: WithdrawalDialogProps) {
+  const activeAccounts = useMemo(
+    () => accounts.filter((account) => account.isActive && account.mobileMoneyProvider !== null),
+    [accounts],
+  );
   const [amount, setAmount] = useState("");
-  const [country, setCountry] = useState<string>("CD");
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [operator, setOperator] = useState<string>(WITHDRAWAL_OPERATORS[0]?.code || "");
-  const [providerCode, setProviderCode] = useState<"IKEEPAY" | "PAWAPAY">("IKEEPAY");
+  const [country, setCountry] = useState("CD");
+  const [accountId, setAccountId] = useState<number | null>(null);
+  const [quote, setQuote] = useState<ReferralWithdrawalQuote | null>(null);
+  const [quoteError, setQuoteError] = useState("");
+  const [isQuoting, setIsQuoting] = useState(false);
   const [touched, setTouched] = useState(false);
 
-  // Réinitialise le formulaire à l'ouverture. Indispensable pour éviter
-  // qu'une saisie précédente reste affichée après une annulation ou
-  // une soumission réussie.
   useEffect(() => {
-    if (open) {
-      setAmount("");
-      setCountry("CD");
-      setPhoneNumber("");
-      setOperator(WITHDRAWAL_OPERATORS[0]?.code || "");
-      setProviderCode("IKEEPAY");
-      setTouched(false);
-    }
-  }, [open]);
+    if (!open) return;
+    const defaultAccount = activeAccounts.find((account) => account.isDefault) || activeAccounts[0];
+    setAmount("");
+    setCountry("CD");
+    setAccountId(defaultAccount?.id || null);
+    setQuote(null);
+    setQuoteError("");
+    setTouched(false);
+  }, [open, activeAccounts]);
 
+  if (!wallet) return null;
+
+  const currentWallet = wallet;
   const amountNumber = Number(amount);
-  const minAmount = wallet ? Number(wallet.minimum_withdrawal_amount) : 0;
-  const maxAmount = wallet ? Number(wallet.max_withdrawable_amount) : 0;
-  const available = wallet ? Number(wallet.available_balance) : 0;
+  const minAmount = Number(currentWallet.minimum_withdrawal_amount);
+  const maxAmount = Number(currentWallet.max_withdrawable_amount);
+  const selectedAccount = activeAccounts.find((account) => account.id === accountId) || null;
+  const amountValid = Number.isFinite(amountNumber) && amountNumber >= minAmount && amountNumber <= maxAmount;
+  const canRequestQuote = amountValid && selectedAccount !== null && !isQuoting;
 
-  // Aperçu local non-comptable. Le backend reste la source de vérité.
-  const preview = useMemo(
-    () => (wallet ? previewFeeAndTotal(amount, wallet.withdrawal_fee_rate) : null),
-    [amount, wallet],
-  );
-
-  // Blocages UX : on n'autorise pas la saisie de valeurs manifestement
-  // hors intervalle. Le backend revérifie et refusera au dernier mot.
-  const amountTooLow = Number.isFinite(amountNumber) && amountNumber > 0 && amountNumber < minAmount;
-  const amountTooHigh = Number.isFinite(amountNumber) && amountNumber > 0 && amountNumber > maxAmount;
-  const amountInvalid = amount !== "" && (!Number.isFinite(amountNumber) || amountNumber <= 0);
-
-  const phoneValid = isPhoneNumberFormatValid(phoneNumber);
-  const countryValid = isCountryCodeValid(country);
-  const operatorValid = isOperatorCodeValid(operator);
-
-  // L'utilisateur peut soumettre si tous les champs UX sont valides.
-  // Le wallet doit autoriser un retrait (solde >= minimum_required_balance).
-  const canSubmit =
-    !!wallet &&
-    Number.isFinite(amountNumber) &&
-    amountNumber >= minAmount &&
-    amountNumber <= maxAmount &&
-    phoneValid &&
-    countryValid &&
-    operatorValid;
-
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleQuote(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setTouched(true);
-    if (!canSubmit) {
-      return;
+    if (!canRequestQuote || !selectedAccount) return;
+
+    setIsQuoting(true);
+    setQuoteError("");
+    try {
+      setQuote(await getReferralWithdrawalQuote({
+        amount: amountNumber.toFixed(2),
+        currency: currentWallet.currency,
+        country,
+        userPaymentAccountId: selectedAccount.id,
+      }));
+    } catch (error) {
+      setQuoteError(error instanceof Error ? error.message : "Impossible de préparer votre demande.");
+    } finally {
+      setIsQuoting(false);
     }
-    onSubmit({
-      amount: amountNumber.toFixed(2),
-      country: country.trim().toUpperCase(),
-      phone_number: phoneNumber.trim(),
-      operator: operator.trim().toUpperCase(),
-      providerCode,
-    });
   }
 
-  if (!wallet) {
-    // Si aucun wallet actif (devise inconnue, wallet inexistant), la
-    // modal reste vide ; le bouton "Retirer" n'est de toute
-    // façon pas ouvert dans cet état par le parent.
-    return null;
-  }
-
-  const canWithdraw = available >= Number(wallet.minimum_required_balance);
+  const provider = providers.find((item) => item.id === selectedAccount?.mobileMoneyProvider);
 
   return (
-    <Modal
-      open={open}
-      title="Confirmer le retrait"
-      onClose={onClose}
-      saving={isSubmitting}
-    >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {!canWithdraw && (
-          <p className="rounded-md border border-app-border bg-app-surface px-3 py-2 text-sm text-app-muted">
-            Votre solde est insuffisant pour effectuer un retrait.
-          </p>
-        )}
-
-        <section className="rounded-md border border-app-border bg-app-surface p-3 text-sm">
-          <dl className="grid grid-cols-2 gap-2 text-app-text">
-            <div>
-              <dt className="text-xs font-semibold uppercase text-app-muted">Disponible</dt>
-              <dd className="font-bold">{formatAmount(available, wallet.currency)}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase text-app-muted">Frais de retrait</dt>
-              <dd className="font-bold">{formatPercent(wallet.withdrawal_fee_rate)}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase text-app-muted">Retrait minimum</dt>
-              <dd className="font-bold">{formatAmount(wallet.minimum_withdrawal_amount, wallet.currency)}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase text-app-muted">Retrait maximum</dt>
-              <dd className="font-bold">{formatAmount(wallet.max_withdrawable_amount, wallet.currency)}</dd>
-            </div>
-          </dl>
+    <Modal open={open} title={quote ? "Confirmer ma demande" : "Demander un retrait"} onClose={onClose} saving={isSubmitting || isQuoting}>
+      {quote ? (
+        <section className="space-y-5">
+          <p className="text-sm leading-6 text-app-muted">Votre demande sera transmise à Carri Business pour traitement. Vous serez informé lorsque le transfert sera effectué.</p>
+          <WithdrawalSummary quote={quote} currency={wallet.currency} account={selectedAccount} provider={provider} />
+          {message && <Alert message={message} />}
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+            <Button type="button" variant="secondary" onClick={() => setQuote(null)} disabled={isSubmitting}>Modifier</Button>
+            <Button type="button" disabled={isSubmitting || !selectedAccount} onClick={() => selectedAccount && onConfirm({ quoteToken: quote.quoteToken, userPaymentAccountId: selectedAccount.id })}>
+              {isSubmitting ? "Enregistrement..." : "Confirmer ma demande"}
+            </Button>
+          </div>
         </section>
-
-        <label className="block text-sm font-semibold text-app-text">
-          Montant à recevoir ({wallet.currency})
-          <input
-            value={amount}
-            onChange={(event) => setAmount(event.target.value)}
-            onBlur={() => setTouched(true)}
-            inputMode="decimal"
-            required
-            min={minAmount}
-            max={maxAmount}
-            step="0.01"
-            placeholder={minAmount.toFixed(2)}
-            className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-card px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
-          />
-          <p className="mt-1 text-xs text-app-muted">
-            Minimum : {formatAmount(minAmount, wallet.currency)} — Maximum :{" "}
-            {formatAmount(maxAmount, wallet.currency)}
-          </p>
-          {touched && amountInvalid && (
-            <p className="mt-1 text-xs text-red-700">Montant invalide.</p>
-          )}
-          {touched && amountTooLow && (
-            <p className="mt-1 text-xs text-red-700">
-              Le montant minimum de retrait est de {formatAmount(minAmount, wallet.currency)}.
-            </p>
-          )}
-          {touched && amountTooHigh && (
-            <p className="mt-1 text-xs text-red-700">
-              Le montant maximum actuellement retirable est de {formatAmount(maxAmount, wallet.currency)}.
-            </p>
-          )}
-        </label>
-
-        <label className="block text-sm font-semibold text-app-text">
-          Pays
-          <select
-            value={country}
-            onChange={(event) => setCountry(event.target.value)}
-            className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-card px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
-          >
-            {WITHDRAWAL_COUNTRIES.map((option) => (
-              <option key={option.iso2} value={option.iso2}>
-                {option.iso2} — {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="block text-sm font-semibold text-app-text">
-          Numéro Mobile Money
-          <input
-            value={phoneNumber}
-            onChange={(event) => setPhoneNumber(event.target.value)}
-            onBlur={() => setTouched(true)}
-            inputMode="tel"
-            required
-            placeholder="+243 999 123 456"
-            className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-card px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
-          />
-          {touched && !phoneValid && (
-            <p className="mt-1 text-xs text-red-700">
-              Vérifiez le numéro de téléphone (au moins 6 chiffres).
-            </p>
-          )}
-        </label>
-
-        <label className="block text-sm font-semibold text-app-text">
-          Opérateur
-          <select
-            value={operator}
-            onChange={(event) => setOperator(event.target.value)}
-            className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-card px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
-          >
-            {WITHDRAWAL_OPERATORS.map((option) => (
-              <option key={option.code} value={option.code}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        {pawaPayEnabled && (
-          <label className="block text-sm font-semibold text-app-text">
-            Service de paiement
-            <select
-              value={providerCode}
-              onChange={(event) => setProviderCode(event.target.value as "IKEEPAY" | "PAWAPAY")}
-              className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-card px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100"
-            >
-              <option value="IKEEPAY">iKeePay</option>
-              <option value="PAWAPAY">pawaPay</option>
-            </select>
-          </label>
-        )}
-
-        {providerCode === "PAWAPAY" && (
-          <p className="rounded-md border border-app-border bg-app-surface px-3 py-2 text-sm text-app-muted">
-            Confirmez le retrait sur votre téléphone. Les fonds restent réservés jusqu’à la confirmation du backend.
-          </p>
-        )}
-
-        {/* Aperçu local non-comptable : seules les valeurs du backend
-            après soumission font foi. */}
-        {preview && Number.isFinite(amountNumber) && amountNumber > 0 && (
-          <section className="rounded-md border border-app-border bg-app-surface p-3 text-sm text-app-muted">
-            <p>Aperçu (indicatif, le backend reste la source de vérité)</p>
-            <dl className="mt-2 grid grid-cols-3 gap-2">
-              <div>
-                <dt className="text-xs font-semibold uppercase">À recevoir</dt>
-                <dd className="font-bold text-app-text">{formatAmount(amountNumber, wallet.currency)}</dd>
-              </div>
-              <div>
-                <dt className="text-xs font-semibold uppercase">Frais estimés</dt>
-                <dd className="font-bold text-app-text">{formatAmount(preview.fee, wallet.currency)}</dd>
-              </div>
-              <div>
-                <dt className="text-xs font-semibold uppercase">Total utilisé sur votre solde</dt>
-                <dd className="font-bold text-app-text">{formatAmount(preview.total, wallet.currency)}</dd>
-              </div>
+      ) : (
+        <form onSubmit={handleQuote} className="space-y-4">
+          <section className="rounded-md border border-app-border bg-app-surface p-3 text-sm">
+            <dl className="grid grid-cols-2 gap-3 text-app-text">
+              <SummaryItem label="Solde disponible" value={formatAmount(wallet.available_balance, wallet.currency)} />
+              <SummaryItem label="Limite minimale" value={formatAmount(wallet.minimum_withdrawal_amount, wallet.currency)} />
+              <SummaryItem label="Limite maximale" value={formatAmount(wallet.max_withdrawable_amount, wallet.currency)} />
+              <SummaryItem label="Frais" value="Déduits du montant demandé" />
             </dl>
           </section>
-        )}
 
-        {message && (
-          <p className="rounded-md border border-app-border bg-app-surface px-3 py-2 text-sm text-app-muted">
-            {message}
-          </p>
-        )}
+          {!activeAccounts.length ? (
+            <section className="rounded-md border border-primary-200 bg-primary-50 p-4 text-sm leading-6 text-app-text">
+              <p className="font-semibold">Aucun compte Mobile Money actif</p>
+              <p className="mt-1 text-app-muted">Enregistrez un compte avant de demander le retrait de vos commissions.</p>
+              <LinkButton href="/app/settings" className="mt-3" variant="secondary">Gérer mes comptes de retrait</LinkButton>
+            </section>
+          ) : (
+            <>
+              <label className="block text-sm font-semibold text-app-text">
+                Montant à retirer ({wallet.currency})
+                <input value={amount} onChange={(event) => setAmount(event.target.value)} onBlur={() => setTouched(true)} inputMode="decimal" required min={minAmount} max={maxAmount} step="0.01" placeholder={minAmount.toFixed(2)} className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-card px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100" />
+                {touched && !amountValid && <p className="mt-1 text-xs text-red-700">Respectez les limites de retrait affichées.</p>}
+              </label>
+              <label className="block text-sm font-semibold text-app-text">
+                Pays de réception
+                <select value={country} onChange={(event) => setCountry(event.target.value)} className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-card px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100">
+                  {WITHDRAWAL_COUNTRIES.map((option) => <option key={option.iso2} value={option.iso2}>{option.iso2} — {option.label}</option>)}
+                </select>
+              </label>
+              <label className="block text-sm font-semibold text-app-text">
+                Compte Mobile Money
+                <select value={accountId ?? ""} onChange={(event) => setAccountId(Number(event.target.value))} className="mt-2 min-h-11 w-full rounded-md border border-app-border bg-app-card px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-100">
+                  {activeAccounts.map((account) => {
+                    const accountProvider = providers.find((item) => item.id === account.mobileMoneyProvider);
+                    return <option key={account.id} value={account.id}>{accountProvider?.name || "Mobile Money"} — {account.accountIdentifierMasked}{account.isDefault ? " (par défaut)" : ""}</option>;
+                  })}
+                </select>
+              </label>
+              <LinkButton href="/app/settings" variant="secondary" className="w-full sm:w-auto">Gérer mes comptes de retrait</LinkButton>
+            </>
+          )}
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Annuler
-          </Button>
-          <Button type="submit" disabled={!canSubmit || isSubmitting || !canWithdraw}>
-            {isSubmitting ? "Envoi en cours..." : "Confirmer le retrait"}
-          </Button>
-        </div>
-      </form>
+          {quoteError && <Alert message={quoteError} />}
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+            <Button type="button" variant="secondary" onClick={onClose}>Annuler</Button>
+            <Button type="submit" disabled={!canRequestQuote || isSubmitting}>{isQuoting ? "Calcul des frais..." : "Voir le récapitulatif"}</Button>
+          </div>
+        </form>
+      )}
     </Modal>
   );
+}
+
+function WithdrawalSummary({ quote, currency, account, provider }: { quote: ReferralWithdrawalQuote; currency: string; account: UserPaymentAccount | null; provider?: MobileMoneyProvider }) {
+  return <section className="rounded-md border border-app-border bg-app-surface p-4 text-sm"><dl className="grid gap-3 sm:grid-cols-2"><SummaryItem label="Montant débité" value={formatAmount(quote.totalDebited, currency)} /><SummaryItem label="Frais" value={formatAmount(quote.feeAmount, currency)} /><SummaryItem label="Montant net à recevoir" value={formatAmount(quote.netPayout, currency)} /><SummaryItem label="Devise" value={currency} /><SummaryItem label="Opérateur" value={provider?.name || "Mobile Money"} /><SummaryItem label="Numéro Mobile Money" value={account?.accountIdentifierMasked || "—"} /></dl><p className="mt-4 text-xs leading-5 text-app-muted">Les frais sont déduits du montant demandé. Ce récapitulatif provient du devis du backend.</p></section>;
+}
+
+function SummaryItem({ label, value }: { label: string; value: string }) {
+  return <div><dt className="text-xs font-semibold uppercase text-app-muted">{label}</dt><dd className="mt-1 font-semibold text-app-text">{value}</dd></div>;
+}
+
+function Alert({ message }: { message: string }) {
+  return <p role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm leading-6 text-red-700 dark:border-red-900/70 dark:bg-red-950/30 dark:text-red-300">{message}</p>;
 }
