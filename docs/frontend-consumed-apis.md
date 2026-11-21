@@ -306,9 +306,10 @@ la liste paginée et `GET /api/admin/referral-withdrawals/summary/` pour les
 indicateurs par devise. Elle permet à un administrateur `is_staff` de passer une
 demande en traitement, de confirmer un paiement manuel avec une référence de
 transfert obligatoire, ou de la rejeter avec un motif obligatoire. Lors de la
-confirmation, elle envoie uniquement `transfer_date`, `payment_method` et
-`administrative_note` dans `provider_metadata`; aucun transfert automatique ni
-secret de paiement n'est manipulé par le frontend.
+confirmation, `transfer_date`, `payment_method` et `administrative_note` sont
+des métadonnées facultatives envoyées dans `provider_metadata` seulement si
+elles sont renseignées; aucun transfert automatique ni secret de paiement n'est
+manipulé par le frontend.
 
 ## Pharmacies
 

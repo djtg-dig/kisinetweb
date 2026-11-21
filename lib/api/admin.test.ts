@@ -72,3 +72,18 @@ test("confirme un retrait manuel avec les seules métadonnées administratives",
     },
   });
 });
+
+test("ne déclenche aucun transfert et peut confirmer sans métadonnées facultatives", async () => {
+  installCsrfCookie();
+  let sent: Record<string, unknown> | undefined;
+  setApiFetchImpl(async (_input, init) => {
+    sent = JSON.parse(String(init?.body)) as Record<string, unknown>;
+    return Response.json({ reference: "WD124", status: "PAID" });
+  });
+
+  await transitionAdminReferralWithdrawal("WD124", "paid", {
+    provider_reference: "MOMO-124",
+  });
+
+  assert.deepEqual(sent, { provider_reference: "MOMO-124" });
+});
