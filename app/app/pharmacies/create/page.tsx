@@ -777,6 +777,8 @@ function LicenseModal({
 
   const unavailable = mode === "unavailable";
   const paidPlans = plans.filter((plan) => Number(plan.price) > 0);
+  const paymentProviderUnavailable = isPaymentProviderUnavailable(purchaseError);
+  const purchaseUnavailable = purchaseLoading || paymentProviderUnavailable;
   return (
     <div className={inline ? "w-full" : "fixed inset-0 z-[1200] flex items-center justify-center bg-black/45 p-4"}>
       {!inline && <button
@@ -818,16 +820,66 @@ function LicenseModal({
             <p className="mt-3 text-sm leading-6 text-app-muted">
               Choisissez une licence disponible. Le paiement est sécurisé par OPTGateway et utilise Mobile Money uniquement.
             </p>
-            <div className="mt-4 space-y-2">
+            <div className="mt-5 space-y-3">
               {plansLoading && <p className="text-sm text-app-muted">Chargement des licences...</p>}
               {!plansLoading && !paidPlans.length && <p className="text-sm text-app-muted">Aucune licence payante disponible.</p>}
+              {purchaseError && (
+                <div
+                  role="alert"
+                  aria-live="assertive"
+                  className="flex gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm leading-6 text-red-700 dark:border-red-900/70 dark:bg-red-950/30 dark:text-red-300"
+                >
+                  <svg aria-hidden="true" viewBox="0 0 24 24" className="mt-0.5 h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 3h.01M10.3 3.3 2.5 17a2 2 0 0 0 1.74 3h15.52A2 2 0 0 0 21.5 17L13.7 3.3a2 2 0 0 0-3.4 0Z" />
+                  </svg>
+                  <div>
+                    <p className="font-semibold">Impossible de poursuivre le paiement</p>
+                    <p>{purchaseError}</p>
+                    {!paymentProviderUnavailable && <p className="mt-1">Vous pouvez réessayer en sélectionnant une licence.</p>}
+                  </div>
+                </div>
+              )}
               {paidPlans.map((plan) => (
-                <button key={plan.code} type="button" disabled={purchaseLoading} onClick={() => onPurchase(plan.code)} className="flex w-full items-center justify-between rounded-md border border-app-border bg-app-surface px-4 py-3 text-left hover:border-primary-500 disabled:opacity-60">
-                  <span><strong className="block text-app-text">{plan.name}</strong><span className="text-sm text-app-muted">Pharmacies illimitées</span></span>
-                  <span className="font-semibold text-app-text">{plan.price} {plan.currency}</span>
+                <button
+                  key={plan.code}
+                  type="button"
+                  disabled={purchaseUnavailable}
+                  onClick={() => onPurchase(plan.code)}
+                  className="group w-full rounded-xl border border-app-border bg-app-surface p-4 text-left shadow-sm transition duration-200 hover:border-primary-500 hover:bg-primary-50 focus:outline-none focus:ring-4 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-primary-100"
+                >
+                  <span className="flex items-start gap-3">
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary-100 text-primary-700 dark:bg-primary-200 dark:text-primary-800">
+                      <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M7 3h10a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" />
+                        <path strokeLinecap="round" d="M8.5 9.5h7M8.5 14.5h7" />
+                      </svg>
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <strong className="block text-base text-app-text">{plan.name}</strong>
+                      <span className="mt-1 block text-sm text-app-muted">{getLicensePlanDescription(plan)}</span>
+                    </span>
+                    <span className="shrink-0 text-right">
+                      <span className="block text-lg font-bold text-primary-700 dark:text-primary-700">{formatLicensePrice(plan.price, plan.currency)}</span>
+                      <span className="mt-1 block text-xs text-app-muted">Paiement unique</span>
+                    </span>
+                  </span>
+                  <span className="mt-4 flex min-h-11 items-center justify-center gap-2 rounded-md bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white transition group-hover:bg-primary-700 group-focus-visible:bg-primary-700 group-disabled:bg-primary-600">
+                    {purchaseLoading ? (
+                      <>
+                        <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                        Initialisation du paiement...
+                      </>
+                    ) : paymentProviderUnavailable ? (
+                      "Paiement temporairement indisponible"
+                    ) : (
+                      <>
+                        Acheter cette licence
+                        <span aria-hidden="true">→</span>
+                      </>
+                    )}
+                  </span>
                 </button>
               ))}
-              {purchaseError && <p className="text-sm text-red-600">{purchaseError}</p>}
             </div>
           </>
         )}
@@ -853,6 +905,33 @@ function LicenseModal({
       </div>
     </div>
   );
+}
+
+function getLicensePlanDescription(plan: UserLicensePlan) {
+  if (plan.isUnlimited || plan.maxPharmacies === null) {
+    return "Pharmacies illimitées";
+  }
+
+  return plan.maxPharmacies === 1
+    ? "1 pharmacie"
+    : `${plan.maxPharmacies} pharmacies`;
+}
+
+function formatLicensePrice(price: string, currency: string) {
+  const amount = Number(price);
+
+  if (!Number.isFinite(amount)) {
+    return [price, currency].filter(Boolean).join(" ");
+  }
+
+  return new Intl.NumberFormat("fr-FR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount) + (currency ? ` ${currency}` : "");
+}
+
+function isPaymentProviderUnavailable(message: string) {
+  return /(fournisseur|optgateway|paiement).*(indisponible|unavailable)|(indisponible|unavailable).*(fournisseur|optgateway|paiement)/i.test(message);
 }
 
 function TextField({
