@@ -4,7 +4,9 @@ import assert from "node:assert/strict";
 import {
   confirmReferralWithdrawalQuote,
   getReferralWithdrawalQuote,
+  getUserPaymentAccounts,
 } from "./user-payment-accounts";
+import { ApiAuthError } from "@/lib/api";
 import { setApiFetchImpl } from "./request";
 
 const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
@@ -53,4 +55,33 @@ test("confirme le devis sans envoyer de frais calculés par le frontend", async 
 
   assert.deepEqual(withdrawal, { reference: "WD12345678", status: "REQUESTED" });
   assert.deepEqual(sent, { quote_token: "signed-quote", user_payment_account_id: 42 });
+});
+
+test("préserve le compte actif par défaut retourné par l'API", async () => {
+  setApiFetchImpl(async () => Response.json([
+    {
+      id: 42,
+      mobile_money_provider: 4,
+      bank_provider: null,
+      account_identifier_masked: "******1234",
+      account_name: "Amina",
+      is_default: true,
+      is_verified: false,
+      is_active: true,
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-01T00:00:00Z",
+    },
+  ]));
+
+  const accounts = await getUserPaymentAccounts();
+
+  assert.deepEqual(accounts.map((account) => ({ id: account.id, isDefault: account.isDefault, isActive: account.isActive })), [
+    { id: 42, isDefault: true, isActive: true },
+  ]);
+});
+
+test("signale une session expirée sans la confondre avec une liste vide", async () => {
+  setApiFetchImpl(async () => Response.json({ detail: "Non authentifié" }, { status: 401 }));
+
+  await assert.rejects(getUserPaymentAccounts(), ApiAuthError);
 });

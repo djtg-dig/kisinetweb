@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 export type SessionState = {
   authenticated: boolean;
   loading: boolean;
+  error: boolean;
   user: unknown | null;
   refreshSession: () => Promise<void>;
 };
@@ -24,11 +25,14 @@ async function fetchSession(): Promise<{ authenticated: boolean; user: unknown }
       cache: "no-store",
       credentials: "include",
     });
+    if (!response.ok) {
+      throw new Error("Impossible de vérifier la session.");
+    }
     const data = await response.json();
     cachedSession = { data, timestamp: Date.now() };
     return data;
-  } catch {
-    return { authenticated: false, user: null };
+  } catch (error) {
+    throw error;
   }
 }
 
@@ -54,16 +58,23 @@ export function useSession(): SessionState {
     authenticated: boolean;
     user: unknown | null;
     loading: boolean;
+    error: boolean;
   }>({
     authenticated: false,
     user: null,
     loading: true,
+    error: false,
   });
 
   const loadSession = useCallback(async () => {
     setState((prev) => ({ ...prev, loading: true }));
-    const [sessionData] = await Promise.all([fetchSession(), ensureCsrfToken()]);
-    setState({ authenticated: sessionData.authenticated, user: sessionData.user, loading: false });
+    try {
+      const [sessionData] = await Promise.all([fetchSession(), ensureCsrfToken()]);
+      setState({ authenticated: sessionData.authenticated, user: sessionData.user, loading: false, error: false });
+    } catch {
+      // Une indisponibilité réseau ou serveur ne signifie pas une déconnexion.
+      setState({ authenticated: false, user: null, loading: false, error: true });
+    }
   }, []);
 
   useEffect(() => {

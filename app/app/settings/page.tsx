@@ -28,7 +28,7 @@ import {
 import { carriAccountLoginUrl } from "@/lib/carri-account";
 import { useSession } from "@/lib/hooks/use-session";
 
-type PageState = "loading" | "anonymous" | "ready";
+type PageState = "loading" | "anonymous" | "error" | "ready";
 
 export default function AccountSettingsPage() {
   const [state, setState] = useState<PageState>("loading");
@@ -38,10 +38,25 @@ export default function AccountSettingsPage() {
   const [pharmacyLoadMessage, setPharmacyLoadMessage] = useState("");
   const [paymentAccounts, setPaymentAccounts] = useState<UserPaymentAccount[]>([]);
   const [mobileMoneyProviders, setMobileMoneyProviders] = useState<MobileMoneyProvider[]>([]);
-  const { authenticated } = useSession();
+  const {
+    authenticated,
+    error: sessionError,
+    loading: sessionLoading,
+    refreshSession,
+  } = useSession();
 
   useEffect(() => {
     async function loadSettingsContext() {
+      if (sessionLoading) {
+        setState("loading");
+        return;
+      }
+
+      if (sessionError) {
+        setState("error");
+        return;
+      }
+
       if (!authenticated) {
         setState("anonymous");
         return;
@@ -63,6 +78,7 @@ export default function AccountSettingsPage() {
         setActivePharmacy(
           pharmacies.find((pharmacy) => pharmacy.id === storedPharmacyId) || null,
         );
+        setState("ready");
       } catch (error) {
         if (error instanceof ApiAuthError) {
           setState("anonymous");
@@ -72,13 +88,12 @@ export default function AccountSettingsPage() {
         setPharmacyLoadMessage(
           "Les informations de pharmacie ne sont pas disponibles pour le moment.",
         );
-      } finally {
         setState("ready");
       }
     }
 
     loadSettingsContext();
-  }, []);
+  }, [authenticated, sessionError, sessionLoading]);
 
   const activePharmacySettingsHref = useMemo(() => {
     if (!activePharmacyId) {
@@ -111,6 +126,18 @@ export default function AccountSettingsPage() {
         )}
 
         {state === "anonymous" && <AnonymousState />}
+
+        {state === "error" && (
+          <section className="max-w-2xl rounded-lg border border-app-border bg-app-card p-6 shadow-sm">
+            <p className="text-sm font-semibold text-red-700">Paramètres indisponibles</p>
+            <p className="mt-2 text-sm leading-6 text-app-muted">
+              Impossible de vérifier votre session pour le moment. Votre connexion n&apos;a pas été supprimée.
+            </p>
+            <Button onClick={() => void refreshSession()} className="mt-5">
+              Réessayer
+            </Button>
+          </section>
+        )}
 
         {state === "ready" && (
           <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
@@ -271,7 +298,7 @@ function PayoutAccountPanel({
   }
 
   return (
-    <section className="rounded-lg border border-app-border bg-app-card p-6 shadow-sm">
+    <section id="withdrawal-accounts" className="scroll-mt-6 rounded-lg border border-app-border bg-app-card p-6 shadow-sm">
       <p className="text-sm font-semibold text-primary-700">Retraits de commissions</p>
       <h2 className="mt-2 text-xl font-bold text-app-text">Mes comptes de retrait</h2>
       <p className="mt-3 text-sm leading-6 text-app-muted">

@@ -24,9 +24,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ authenticated: true, user: data.user });
     }
 
-    if (response.status === 401 && refreshToken) {
+    if (response.status === 401) {
+      if (!refreshToken) {
+        const logoutResponse = NextResponse.json({ authenticated: false, user: null });
+        clearAuthCookies(logoutResponse);
+        return logoutResponse;
+      }
+
       const refreshed = await tryRefreshTokens(refreshToken);
-      if (refreshed) {
+      if (refreshed.kind === "refreshed") {
         const retryResponse = await signedBackendFetch({
           path: "/api/accounts/session/",
           method: "GET",
@@ -40,23 +46,35 @@ export async function GET(request: NextRequest) {
           setAuthCookies(response, refreshed.newAccessToken, refreshed.newRefreshToken);
           return response;
         }
+
+        if (retryResponse.status === 401) {
+          const logoutResponse = NextResponse.json({ authenticated: false, user: null });
+          clearAuthCookies(logoutResponse);
+          return logoutResponse;
+        }
+
+        return sessionUnavailableResponse();
       }
 
-      const logoutResponse = NextResponse.json({ authenticated: false, user: null });
-      clearAuthCookies(logoutResponse);
-      return logoutResponse;
+      if (refreshed.kind === "invalid") {
+        const logoutResponse = NextResponse.json({ authenticated: false, user: null });
+        clearAuthCookies(logoutResponse);
+        return logoutResponse;
+      }
+
+      return sessionUnavailableResponse();
     }
 
-    return NextResponse.json({ authenticated: false, user: null });
+    return sessionUnavailableResponse();
   } catch {
-    return NextResponse.json({ authenticated: false, user: null });
+    return sessionUnavailableResponse();
   }
 }
 
-type RefreshResult = {
-  newAccessToken: string;
-  newRefreshToken: string;
-} | null;
+type RefreshResult =
+  | { kind: "refreshed"; newAccessToken: string; newRefreshToken: string }
+  | { kind: "invalid" }
+  | { kind: "unavailable" };
 
 async function tryRefreshTokens(refreshToken: string): Promise<RefreshResult> {
   try {
@@ -68,17 +86,25 @@ async function tryRefreshTokens(refreshToken: string): Promise<RefreshResult> {
     });
 
     if (!response.ok) {
-      return null;
+      return response.status >= 500 ? { kind: "unavailable" } : { kind: "invalid" };
     }
 
     const data = await response.json();
     return {
+      kind: "refreshed",
       newAccessToken: data.access,
       newRefreshToken: data.refresh || refreshToken,
     };
   } catch {
-    return null;
+    return { kind: "unavailable" };
   }
+}
+
+function sessionUnavailableResponse() {
+  return NextResponse.json(
+    { authenticated: false, user: null, error: "session_unavailable" },
+    { status: 503 },
+  );
 }
 
 function setAuthCookies(

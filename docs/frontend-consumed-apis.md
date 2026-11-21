@@ -31,10 +31,17 @@ Gestion des erreurs d'authentification utilisateur :
 
 - `401 Unauthorized` signifie session invalide ou expirée : le frontend tente
   `POST /api/accounts/token/refresh/`, rejoue la requête si le refresh réussit,
-  et ferme la session locale si le refresh échoue ;
+  et ferme la session locale seulement si le refresh confirme une session
+  invalide ;
 - `403 Forbidden` signifie utilisateur authentifié mais non autorisé : le
   frontend affiche une erreur d'autorisation et ne tente pas de reconnexion
   automatique.
+
+La Route Handler locale `GET /api/auth/session` ne renvoie `authenticated: false`
+que lorsqu'aucun cookie n'est présent ou lorsque le refresh confirme une session
+invalide. Une indisponibilité réseau ou serveur renvoie `503` avec
+`error: "session_unavailable"`, sans supprimer les cookies ; l'interface garde
+alors un état d'erreur distinct plutôt que de demander une nouvelle connexion.
 
 La déconnexion utilisateur est best-effort côté serveur : le frontend tente
 `POST /api/accounts/logout/` avec `Authorization: Bearer <access_token>` et le

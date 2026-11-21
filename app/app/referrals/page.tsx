@@ -30,14 +30,13 @@ import {
 } from "@/lib/api/user-payment-accounts";
 
 type PageState = "loading" | "anonymous" | "ready" | "error";
+type PaymentAccountsState = "loading" | "ready" | "error";
 async function fetchReferralDashboard() {
-  const [overview, commissionList, withdrawalList, referredList, paymentAccountList, providerList] = await Promise.all([
+  const [overview, commissionList, withdrawalList, referredList] = await Promise.all([
     getReferralOverview(),
     getReferralCommissions(),
     getReferralWithdrawals(),
     getReferredPharmacies(),
-    getUserPaymentAccounts(),
-    getMobileMoneyProviders(),
   ]);
 
   return {
@@ -45,8 +44,6 @@ async function fetchReferralDashboard() {
     commissionList,
     withdrawalList,
     referredList,
-    paymentAccountList,
-    providerList,
   };
 }
 
@@ -62,6 +59,8 @@ export default function ReferralsPage() {
   const [pharmacies, setPharmacies] = useState<ReferredPharmacy[]>([]);
   const [paymentAccounts, setPaymentAccounts] = useState<UserPaymentAccount[]>([]);
   const [mobileMoneyProviders, setMobileMoneyProviders] = useState<MobileMoneyProvider[]>([]);
+  const [paymentAccountsState, setPaymentAccountsState] = useState<PaymentAccountsState>("loading");
+  const [paymentAccountsError, setPaymentAccountsError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isWithdrawalModalOpen, setIsWithdrawalModalOpen] = useState(false);
   // `lastWithdrawalRef` stocke la référence du dernier retrait créé
@@ -76,16 +75,33 @@ export default function ReferralsPage() {
     commissionList,
     withdrawalList,
     referredList,
-    paymentAccountList,
-    providerList,
   }: Awaited<ReturnType<typeof fetchReferralDashboard>>) {
     setWallets(overview);
     setCommissions(commissionList);
     setWithdrawals(withdrawalList);
     setPharmacies(referredList);
-    setPaymentAccounts(paymentAccountList);
-    setMobileMoneyProviders(providerList);
     setPageState("ready");
+  }
+
+  async function reloadPaymentAccounts() {
+    setPaymentAccountsState("loading");
+    setPaymentAccountsError("");
+    try {
+      const [accounts, providers] = await Promise.all([
+        getUserPaymentAccounts(),
+        getMobileMoneyProviders(),
+      ]);
+      setPaymentAccounts(accounts);
+      setMobileMoneyProviders(providers);
+      setPaymentAccountsState("ready");
+    } catch (error) {
+      setPaymentAccountsState("error");
+      setPaymentAccountsError(
+        error instanceof Error
+          ? error.message
+          : "Impossible de charger les comptes Mobile Money.",
+      );
+    }
   }
 
   async function reloadReferralDashboard() {
@@ -94,6 +110,7 @@ export default function ReferralsPage() {
 
     try {
       applyReferralDashboard(await fetchReferralDashboard());
+      void reloadPaymentAccounts();
     } catch (error) {
       if (error instanceof ApiAuthError) {
         setPageState("anonymous");
@@ -112,9 +129,9 @@ export default function ReferralsPage() {
     async function load() {
       try {
         const data = await fetchReferralDashboard();
-        if (isMounted) {
-          applyReferralDashboard(data);
-        }
+        if (!isMounted) return;
+        applyReferralDashboard(data);
+        void reloadPaymentAccounts();
       } catch (error) {
         if (!isMounted) {
           return;
@@ -165,6 +182,7 @@ export default function ReferralsPage() {
       setLastWithdrawalRef(created.reference);
       setLastWithdrawalStatus(created.status);
       applyReferralDashboard(await fetchReferralDashboard());
+      await reloadPaymentAccounts();
       setMessageKind("success");
       setMessage("Votre demande de retrait a été enregistrée. Le montant correspondant est réservé jusqu'à son traitement.");
     } catch (error) {
@@ -306,6 +324,9 @@ export default function ReferralsPage() {
                     setMessageKind("info");
                     setLastWithdrawalRef(null);
                     setLastWithdrawalStatus(null);
+                    // Le retour depuis les paramètres peut restaurer cette page
+                    // depuis le cache du routeur : on relit donc les comptes.
+                    void reloadPaymentAccounts();
                     setIsWithdrawalModalOpen(true);
                   }}
                   disabled={!canWithdraw}
@@ -324,6 +345,9 @@ export default function ReferralsPage() {
           wallet={activeWallet}
           accounts={paymentAccounts}
           providers={mobileMoneyProviders}
+          accountsState={paymentAccountsState}
+          accountsError={paymentAccountsError}
+          onRetryAccounts={() => void reloadPaymentAccounts()}
           isSubmitting={isSubmitting}
           message={messageKind === "error" ? message : ""}
           onConfirm={handleWithdrawalSubmit}

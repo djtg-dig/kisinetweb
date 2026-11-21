@@ -33,6 +33,9 @@ type WithdrawalDialogProps = {
   wallet: ReferralWalletSummary | null;
   accounts: UserPaymentAccount[];
   providers: MobileMoneyProvider[];
+  accountsState: "loading" | "ready" | "error";
+  accountsError: string;
+  onRetryAccounts: () => void;
   onConfirm: (input: { quoteToken: string; userPaymentAccountId: number }) => void;
   isSubmitting: boolean;
   message?: string;
@@ -44,6 +47,9 @@ export function WithdrawalDialog({
   wallet,
   accounts,
   providers,
+  accountsState,
+  accountsError,
+  onRetryAccounts,
   onConfirm,
   isSubmitting,
   message,
@@ -78,8 +84,14 @@ export function WithdrawalDialog({
   const minAmount = Number(currentWallet.minimum_withdrawal_amount);
   const maxAmount = Number(currentWallet.max_withdrawable_amount);
   const selectedAccount = activeAccounts.find((account) => account.id === accountId) || null;
-  const amountValid = Number.isFinite(amountNumber) && amountNumber >= minAmount && amountNumber <= maxAmount;
-  const canRequestQuote = amountValid && selectedAccount !== null && !isQuoting;
+  const amountValid = isWithdrawalAmountValid(amountNumber, minAmount, maxAmount);
+  const canRequestQuote = accountsState === "ready" && amountValid && selectedAccount !== null && !isQuoting;
+  const quoteBlockReason = getQuoteBlockReason({
+    accountsState,
+    hasActiveAccount: selectedAccount !== null,
+    amountValid,
+    isQuoting,
+  });
 
   async function handleQuote(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -129,11 +141,21 @@ export function WithdrawalDialog({
             </dl>
           </section>
 
-          {!activeAccounts.length ? (
+          {accountsState === "loading" ? (
+            <section className="rounded-md border border-app-border bg-app-surface p-4 text-sm text-app-muted" aria-live="polite">
+              Chargement de vos comptes Mobile Money…
+            </section>
+          ) : accountsState === "error" ? (
+            <section className="rounded-md border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-700 dark:border-red-900/70 dark:bg-red-950/30 dark:text-red-300" role="alert">
+              <p className="font-semibold">Comptes Mobile Money indisponibles</p>
+              <p className="mt-1">{accountsError || "Impossible de charger vos comptes de retrait."}</p>
+              <Button type="button" variant="secondary" onClick={onRetryAccounts} className="mt-3">Réessayer</Button>
+            </section>
+          ) : !activeAccounts.length ? (
             <section className="rounded-md border border-primary-200 bg-primary-50 p-4 text-sm leading-6 text-app-text">
               <p className="font-semibold">Aucun compte Mobile Money actif</p>
               <p className="mt-1 text-app-muted">Enregistrez un compte avant de demander le retrait de vos commissions.</p>
-              <LinkButton href="/app/settings" className="mt-3" variant="secondary">Gérer mes comptes de retrait</LinkButton>
+              <LinkButton href="/app/settings#withdrawal-accounts" className="mt-3" variant="secondary">Gérer mes comptes de retrait</LinkButton>
             </section>
           ) : (
             <>
@@ -157,19 +179,43 @@ export function WithdrawalDialog({
                   })}
                 </select>
               </label>
-              <LinkButton href="/app/settings" variant="secondary" className="w-full sm:w-auto">Gérer mes comptes de retrait</LinkButton>
+              <LinkButton href="/app/settings#withdrawal-accounts" variant="secondary" className="w-full sm:w-auto">Gérer mes comptes de retrait</LinkButton>
             </>
           )}
 
           {quoteError && <Alert message={quoteError} />}
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
             <Button type="button" variant="secondary" onClick={onClose}>Annuler</Button>
-            <Button type="submit" disabled={!canRequestQuote || isSubmitting}>{isQuoting ? "Calcul des frais..." : "Voir le récapitulatif"}</Button>
+            <Button type="submit" disabled={!canRequestQuote || isSubmitting} aria-describedby={quoteBlockReason ? "withdrawal-quote-block-reason" : undefined}>{isQuoting ? "Calcul des frais..." : "Voir le récapitulatif"}</Button>
           </div>
+          {quoteBlockReason && <p id="withdrawal-quote-block-reason" className="text-sm text-app-muted">{quoteBlockReason}</p>}
         </form>
       )}
     </Modal>
   );
+}
+
+export function getQuoteBlockReason({
+  accountsState,
+  hasActiveAccount,
+  amountValid,
+  isQuoting,
+}: {
+  accountsState: "loading" | "ready" | "error";
+  hasActiveAccount: boolean;
+  amountValid: boolean;
+  isQuoting: boolean;
+}): string | null {
+  if (accountsState === "loading") return "Vos comptes Mobile Money sont en cours de chargement.";
+  if (accountsState === "error") return "Les comptes Mobile Money doivent être chargés avant de demander un devis.";
+  if (!hasActiveAccount) return "Ajoutez ou activez un compte Mobile Money avant de demander un devis.";
+  if (!amountValid) return "Saisissez un montant compris entre les limites de retrait affichées.";
+  if (isQuoting) return "Le devis est en cours de préparation.";
+  return null;
+}
+
+export function isWithdrawalAmountValid(amount: number, minimum: number, maximum: number): boolean {
+  return Number.isFinite(amount) && amount >= minimum && amount <= maximum;
 }
 
 function WithdrawalSummary({ quote, currency, account, provider }: { quote: ReferralWithdrawalQuote; currency: string; account: UserPaymentAccount | null; provider?: MobileMoneyProvider }) {
