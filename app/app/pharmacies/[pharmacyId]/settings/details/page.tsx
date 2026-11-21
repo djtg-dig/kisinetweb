@@ -2,9 +2,12 @@
 
 import { useEffect, useState, type ChangeEvent } from "react";
 import {
+  canUpdatePharmacyGeneralSettings,
+  canViewPharmacyGeneralSettings,
   getCitiesOrProvinces,
   getCountries,
   getPharmacyDetail,
+  getPharmacyGeneralSettings,
   getPharmacySubscriptionStatus,
   getPharmacyPermissions,
   getPharmacyLegalDocuments,
@@ -13,9 +16,11 @@ import {
   deletePharmacyLegalDocument,
   getPharmacyLegalDocumentDownloadUrl,
   updatePharmacy,
+  updatePharmacyGeneralSettings,
   type CityOrProvinceOption,
   type CountryOption,
   type PharmacyDetail,
+  type PharmacyGeneralSettings,
   type PharmacyPermissions,
   type PharmacySubscriptionStatus,
   type PharmacyLegalDocument,
@@ -83,6 +88,8 @@ export default function SettingsDetailsPage({ params }: SettingsDetailsPageProps
   const [coordinatesForm, setCoordinatesForm] = useState<UpdatePharmacyInput>({});
   const [addressForm, setAddressForm] = useState<AddressFormState>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [generalSettings, setGeneralSettings] = useState<PharmacyGeneralSettings | null>(null);
+  const [generalSettingsState, setGeneralSettingsState] = useState<"loading" | "ready" | "forbidden" | "error">("loading");
   // Listes geographiques pour les menus deroulants et l'affichage des noms.
   const [countries, setCountries] = useState<CountryOption[]>([]);
   const [cities, setCities] = useState<CityOrProvinceOption[]>([]);
@@ -136,6 +143,8 @@ export default function SettingsDetailsPage({ params }: SettingsDetailsPageProps
       setState("loading");
       setSubscriptionState("loading");
       setSubscription(null);
+      setGeneralSettings(null);
+      setGeneralSettingsState("loading");
       setErrorMessage("");
       setSuccessMessage("");
 
@@ -160,9 +169,22 @@ export default function SettingsDetailsPage({ params }: SettingsDetailsPageProps
         try {
           const currentPermissions = await getPharmacyPermissions(pharmacyId);
           setPermissions(currentPermissions);
+
+          if (canViewPharmacyGeneralSettings(currentPermissions)) {
+            try {
+              const currentGeneralSettings = await getPharmacyGeneralSettings(pharmacyId);
+              setGeneralSettings(currentGeneralSettings);
+              setGeneralSettingsState("ready");
+            } catch {
+              setGeneralSettingsState("error");
+            }
+          } else {
+            setGeneralSettingsState("forbidden");
+          }
         } catch {
           // Sans permission active, on considère simplement l'édition désactivée.
           setPermissions({});
+          setGeneralSettingsState("forbidden");
         }
 
         // Charge les documents juridiques si l'utilisateur a la permission de les voir.
@@ -481,6 +503,32 @@ export default function SettingsDetailsPage({ params }: SettingsDetailsPageProps
     }
   }
 
+  async function savePublicVisibility() {
+    if (!pharmacyId || !generalSettings || !canUpdatePharmacyGeneralSettings(permissions) || isSaving) {
+      return;
+    }
+
+    setIsSaving(true);
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    try {
+      const updatedSettings = await updatePharmacyGeneralSettings(pharmacyId, {
+        isPublic: generalSettings.isPublic,
+      });
+      setGeneralSettings(updatedSettings);
+      setSuccessMessage("La visibilité dans l'annuaire public a été mise à jour.");
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Impossible de modifier la visibilité dans l'annuaire public.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   async function saveLegalDocument() {
     if (!pharmacyId) {
       return;
@@ -589,6 +637,8 @@ export default function SettingsDetailsPage({ params }: SettingsDetailsPageProps
   const canEdit = Boolean(permissions.pharmacy_update) && !pharmacy?.isArchivedAt;
   const canManageLegalDocuments =
     Boolean(permissions.pharmacy_legal_document_manage) && !pharmacy?.isArchivedAt;
+  const canEditPublicVisibility =
+    canUpdatePharmacyGeneralSettings(permissions) && !pharmacy?.isArchivedAt;
 
   // Noms lisibles pour l'affichage en lecture seule.
   const countryName =
@@ -658,6 +708,68 @@ export default function SettingsDetailsPage({ params }: SettingsDetailsPageProps
               <Detail label="Créée le" value={pharmacy.createdAt} />
               <Detail label="Mise à jour le" value={pharmacy.updatedAt} />
             </div>
+          </article>
+
+          <article className="rounded-lg border border-app-border bg-app-card p-5">
+            <p className="text-sm font-semibold text-primary-700">Annuaire public</p>
+            <h2 className="mt-1 text-lg font-bold text-app-text">Visibilité publique</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-app-muted">
+              Autorisez l&apos;apparition de cette pharmacie dans l&apos;annuaire public Kisinet et sur sa fiche publique indexable.
+            </p>
+
+            {generalSettingsState === "loading" && (
+              <p className="mt-4 text-sm text-app-muted">Chargement de la visibilité…</p>
+            )}
+
+            {generalSettingsState === "forbidden" && (
+              <p className="mt-4 text-sm text-app-muted">
+                Vous n&apos;avez pas la permission de consulter les paramètres de visibilité.
+              </p>
+            )}
+
+            {generalSettingsState === "error" && (
+              <p className="mt-4 text-sm text-app-muted">
+                Impossible de charger les paramètres de visibilité.
+              </p>
+            )}
+
+            {generalSettingsState === "ready" && generalSettings && (
+              <>
+                <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-md border border-app-border bg-app-surface px-4 py-3 transition hover:border-primary-300 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-70">
+                  <input
+                    type="checkbox"
+                    checked={generalSettings.isPublic}
+                    onChange={(event) =>
+                      setGeneralSettings((current) =>
+                        current ? { ...current, isPublic: event.target.checked } : current,
+                      )
+                    }
+                    disabled={!canEditPublicVisibility || isSaving}
+                    className="mt-1 h-4 w-4 accent-primary-600"
+                  />
+                  <span>
+                    <span className="block text-sm font-semibold text-app-text">
+                      Visible dans l&apos;annuaire public
+                    </span>
+                    <span className="mt-1 block text-sm leading-6 text-app-muted">
+                      Les pharmacies non publiées ne sont pas affichées dans l&apos;annuaire public.
+                    </span>
+                  </span>
+                </label>
+                {canEditPublicVisibility && (
+                  <div className="mt-5 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={savePublicVisibility}
+                      disabled={isSaving}
+                      className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-700 focus:outline-none focus:ring-4 focus:ring-primary-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isSaving ? "Enregistrement..." : "Enregistrer la visibilité"}
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
           </article>
 
           <article className="rounded-lg border border-app-border bg-app-card p-5">

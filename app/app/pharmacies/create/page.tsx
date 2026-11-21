@@ -15,6 +15,7 @@ import {
   getCitiesOrProvinces,
   getCountries,
   getCurrencies,
+  updatePharmacyGeneralSettings,
   type CityOrProvinceOption,
   type CountryOption,
   type CurrencyOption,
@@ -70,6 +71,8 @@ export default function CreatePharmacyPage() {
   const [isLoadingCurrencies, setIsLoadingCurrencies] = useState(true);
   const [isLoadingCities, setIsLoadingCities] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPublic, setIsPublic] = useState(false);
+  const [createdPharmacyId, setCreatedPharmacyId] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [touchedFields, setTouchedFields] = useState<Partial<Record<FormField, boolean>>>({});
@@ -481,6 +484,23 @@ export default function CreatePharmacyPage() {
       });
 
       setActivePharmacyId(pharmacy.id);
+
+      // `is_public` n'est pas accepté par l'API de création. Le backend crée
+      // volontairement une pharmacie privée, puis cette préférence est mise à
+      // jour par son endpoint dédié si l'utilisateur a donné son accord.
+      if (isPublic) {
+        try {
+          await updatePharmacyGeneralSettings(pharmacy.id, { isPublic: true });
+        } catch {
+          setCreatedPharmacyId(pharmacy.id);
+          setErrorMessage(
+            "La pharmacie a été créée, mais sa visibilité dans l'annuaire n'a pas pu être enregistrée. Vous pouvez la modifier depuis ses détails.",
+          );
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       const params = new URLSearchParams(window.location.search);
       const returnTo = params.get("return_to");
 
@@ -606,6 +626,27 @@ export default function CreatePharmacyPage() {
                 hint="Référence publique de la personne qui vous a invité, au format USXXXXXXXX. Laissez vide si vous n'avez pas de parrain."
               />
 
+              <div className="rounded-md border border-app-border bg-app-surface px-4 py-3">
+                <label className="flex cursor-pointer items-start gap-3">
+                  <input
+                    id="isPublic"
+                    type="checkbox"
+                    checked={isPublic}
+                    onChange={(event) => setIsPublic(event.target.checked)}
+                    disabled={isSubmitting || Boolean(createdPharmacyId)}
+                    className="mt-1 h-4 w-4 accent-primary-600"
+                  />
+                  <span>
+                    <span className="block text-sm font-semibold text-app-text">
+                      Visible dans l&apos;annuaire public
+                    </span>
+                    <span className="mt-1 block text-sm leading-6 text-app-muted">
+                      Autorisez l&apos;apparition de cette pharmacie dans l&apos;annuaire public Kisinet et sur sa fiche publique indexable.
+                    </span>
+                  </span>
+                </label>
+              </div>
+
               <div className="border-t border-app-border pt-5">
                 <h2 className="text-lg font-bold text-app-text">Adresse</h2>
                 <div className="mt-4 grid gap-5">
@@ -674,13 +715,25 @@ export default function CreatePharmacyPage() {
               </LinkButton>
               <Button
                 type="submit"
-                disabled={
-                  isSubmitting
-                }
+                disabled={isSubmitting || Boolean(createdPharmacyId)}
               >
-                {isSubmitting ? "Création en cours..." : "Créer la pharmacie"}
+                {isSubmitting
+                  ? "Création en cours..."
+                  : createdPharmacyId
+                    ? "Pharmacie créée"
+                    : "Créer la pharmacie"}
               </Button>
             </div>
+            {createdPharmacyId && (
+              <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                <a
+                  href={"/app/pharmacies/" + createdPharmacyId + "/settings/details"}
+                  className="font-semibold underline underline-offset-2 focus:outline-none focus:ring-4 focus:ring-primary-100"
+                >
+                  Gérer la visibilité de la pharmacie
+                </a>
+              </div>
+            )}
           </div>
 
           <aside className="rounded-lg border border-app-border bg-app-surface p-5">

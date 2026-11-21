@@ -442,6 +442,11 @@ Accept: application/json
 - **Après succès** : la pharmacie créée devient la pharmacie active, puis le
   frontend redirige vers son tableau de bord ou vers le `return_to` de
   souscription (`/tarifs/...`) lorsqu'il est présent.
+- **Visibilité publique** : `is_public` ne fait pas partie de ce payload. Une
+  nouvelle pharmacie est privée par défaut. Lorsque l'utilisateur coche
+  « Visible dans l'annuaire public », le frontend appelle ensuite
+  `PATCH /api/pharmacies/{pharmacy_id}/general-settings/` avec
+  `{ "is_public": true }`, après la création réussie.
 
 #### Payload envoyé (JSON)
 
@@ -1216,7 +1221,8 @@ Content-Type: application/json
   la largeur du papier thermique POS et la visibilité dans l'annuaire public.
 - **Méthode HTTP** : `GET`
 - **URL** : `/api/pharmacies/{pharmacy_id}/general-settings/`
-- **Page frontend** : `/app/pharmacies/[pharmacyId]/settings/general`
+- **Pages frontend** : `/app/pharmacies/[pharmacyId]/settings/general` et
+  `/app/pharmacies/[pharmacyId]/settings/details`
 - **Service frontend** : `getPharmacyGeneralSettings(pharmacyId)` dans `lib/api`
 - **Authentification** : requise avec `Authorization: Bearer <access_token>`.
 - **Permission backend** : propriétaire, admin interne, `general_settings_view`
@@ -1234,7 +1240,9 @@ Content-Type: application/json
 - **Objectif** : modifier les préférences générales d'une pharmacie.
 - **Méthode HTTP** : `PATCH`
 - **URL** : `/api/pharmacies/{pharmacy_id}/general-settings/`
-- **Page frontend** : `/app/pharmacies/[pharmacyId]/settings/general`
+- **Pages frontend** : `/app/pharmacies/[pharmacyId]/settings/general`,
+  `/app/pharmacies/[pharmacyId]/settings/details` et, après création avec
+  publication demandée, `/app/pharmacies/create`
 - **Service frontend** : `updatePharmacyGeneralSettings(pharmacyId, input)` dans
   `lib/api`
 - **Authentification** : requise avec `Authorization: Bearer <access_token>`.
