@@ -116,6 +116,7 @@ Endpoints consommés:
 | Liste pharmacies admin | `GET /api/admin/pharmacies/?search=...&devise=...&country=...&city_or_province=...&neighborhood=...&archived=...&has_email=...&has_phone=...&page=...` | Oui, admin `is_staff` |
 | Liste abonnements admin | `GET /api/admin/subscriptions/?search=...&reference=...&plan_code=...&status=...&page=...` | Oui, admin `is_staff` |
 | Liste retraits parrainage admin | `GET /api/admin/referral-withdrawals/?search=...&status=...&currency=...&page=...` | Oui, admin `is_staff` |
+| Indicateurs retraits parrainage admin | `GET /api/admin/referral-withdrawals/summary/` | Oui, admin `is_staff` |
 | Liste fournisseurs paiement admin | `GET /api/admin/payment-providers/` | Oui, admin `is_staff` |
 | Création fournisseur paiement admin | `POST /api/admin/payment-providers/` | Oui, admin `is_staff` |
 | Détail fournisseur paiement admin | `GET /api/admin/payment-providers/{id}/` | Oui, admin `is_staff` |
@@ -301,9 +302,13 @@ affichées dans un toast automatique sans jamais afficher de donnée technique b
 
 
 La page `/admin/payments` consomme `GET /api/admin/referral-withdrawals/` pour
-traiter manuellement les demandes de retrait de commission: passage en
-traitement, paiement manuel avec référence, rejet ou échec. Aucune API de retrait
-agrégateur n'est appelée pour le moment.
+la liste paginée et `GET /api/admin/referral-withdrawals/summary/` pour les
+indicateurs par devise. Elle permet à un administrateur `is_staff` de passer une
+demande en traitement, de confirmer un paiement manuel avec une référence de
+transfert obligatoire, ou de la rejeter avec un motif obligatoire. Lors de la
+confirmation, elle envoie uniquement `transfer_date`, `payment_method` et
+`administrative_note` dans `provider_metadata`; aucun transfert automatique ni
+secret de paiement n'est manipulé par le frontend.
 
 ## Pharmacies
 

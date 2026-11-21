@@ -211,7 +211,16 @@ export type AdminReferralWithdrawal = {
   reference: string;
   requester_email: string;
   requester_reference: string;
+  processed_by_email: string | null;
+  processed_by_reference: string | null;
+  transfer_date: string;
+  transfer_payment_method: string;
+  administrative_note: string;
   amount: string;
+  fee_rate: string;
+  fee_amount: string;
+  total_reserved_amount: string;
+  net_payout_amount: string | null;
   currency: string;
   payout_account_reference: string;
   payment_method: string;
@@ -229,6 +238,19 @@ export type AdminReferralWithdrawalsPage = {
   next: string | null;
   previous: string | null;
   results: AdminReferralWithdrawal[];
+};
+
+export type AdminReferralWithdrawalTotal = {
+  currency: string;
+  amount: string;
+};
+
+export type AdminReferralWithdrawalSummary = {
+  requested_count: number;
+  processing_count: number;
+  rejected_count: number;
+  pending_totals: AdminReferralWithdrawalTotal[];
+  paid_totals: AdminReferralWithdrawalTotal[];
 };
 
 export type AdminPaymentProvider = {
@@ -844,9 +866,15 @@ export async function getAdminReferralWithdrawals({
   );
 }
 
+export async function getAdminReferralWithdrawalSummary(): Promise<AdminReferralWithdrawalSummary> {
+  return fetchAdminJson<AdminReferralWithdrawalSummary>(
+    "/api/admin/referral-withdrawals/summary/",
+  );
+}
+
 export async function transitionAdminReferralWithdrawal(
   reference: string,
-  action: "processing" | "paid" | "reject" | "failed",
+  action: "processing" | "paid" | "reject",
   payload: {
     provider_reference?: string;
     reason?: string;
