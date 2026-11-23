@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/ui/link-button";
 import {
@@ -17,6 +18,7 @@ import {
   getInvoiceMetadata,
   getPharmacyInvoices,
   type Invoice,
+  type InvoiceDetail,
   type InvoiceFilters,
   type InvoiceStatusOption,
   type InvoicePaymentStatus,
@@ -24,6 +26,10 @@ import {
 } from "@/lib/api/invoices";
 import { SALES_CHOICES_STORAGE_KEY, type SalesChoiceOption } from "@/lib/api/sales-choices";
 import { describeApiError } from "@/lib/api/errors";
+import {
+  canAccessInvoiceCollection,
+  INVOICE_COLLECTION_QUERY_PARAM,
+} from "@/lib/invoice-payment-access";
 import { InvoiceReceiptTicket, type PrintReceiptData } from "@/components/invoices/PrintableInvoiceReceipt";
 import { SubscriptionInactiveState } from "@/components/subscriptions/subscription-inactive-state";
 import {
@@ -79,6 +85,8 @@ const defaultPaymentMethodOptions: SalesChoiceOption[] = [
 ];
 
 export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   // `useState<Type>()` indique à TypeScript la forme exacte de la donnée stockée.
   const [pharmacyId, setPharmacyId] = useState("");
   const [pharmacyName, setPharmacyName] = useState("");
@@ -100,6 +108,7 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
   const [reloadKey, setReloadKey] = useState(0);
   const [printingInvoiceReference, setPrintingInvoiceReference] = useState("");
   const [printReceiptData, setPrintReceiptData] = useState<PrintReceiptData | null>(null);
+  const handledCollectionReferenceRef = useRef("");
 
   useEffect(() => {
     let isCurrent = true;
@@ -195,6 +204,73 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
       isCurrent = false;
     };
   }, [pharmacyId, filters, reloadKey]);
+
+  const requestedCollectionReference = searchParams.get(INVOICE_COLLECTION_QUERY_PARAM)?.trim() || "";
+  const invoicesPath = "/app/pharmacies/" + encodeURIComponent(pharmacyId) + "/invoices";
+
+  useEffect(() => {
+    if (!requestedCollectionReference) {
+      handledCollectionReferenceRef.current = "";
+      return;
+    }
+
+    if (!pharmacyId || state === "loading" || handledCollectionReferenceRef.current === requestedCollectionReference) {
+      return;
+    }
+
+    if (state !== "ready" && state !== "empty") {
+      return;
+    }
+
+    handledCollectionReferenceRef.current = requestedCollectionReference;
+    router.replace(invoicesPath);
+
+    if (!canAccessInvoiceCollection(permissions)) {
+      setFeedback({
+        tone: "error",
+        text: "Vous n'avez pas la permission d'encaisser les factures de cette pharmacie.",
+      });
+      return;
+    }
+
+    let isCurrent = true;
+
+    async function openRequestedCollection() {
+      try {
+        const invoice = await getInvoiceDetail(pharmacyId, requestedCollectionReference);
+        if (!isCurrent) {
+          return;
+        }
+
+        if (!canCollectInvoicePayment(invoice, true)) {
+          setFeedback({
+            tone: "error",
+            text: "Cette facture ne peut pas être encaissée.",
+          });
+          return;
+        }
+
+        setPaymentInvoice(invoice);
+      } catch (error) {
+        if (!isCurrent) {
+          return;
+        }
+
+        setFeedback({
+          tone: "error",
+          text: error instanceof Error
+            ? cleanUserErrorMessage(describeApiError(error))
+            : "Impossible d'ouvrir l'encaissement de cette facture.",
+        });
+      }
+    }
+
+    void openRequestedCollection();
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [invoicesPath, permissions, pharmacyId, requestedCollectionReference, router, state]);
 
   const currentPage = Number(filters.page || 1);
   const pageCount = Math.max(1, Math.ceil(totalInvoices / 10));
@@ -368,7 +444,9 @@ export default function PharmacyInvoicesPage({ params }: InvoicesPageProps) {
           pharmacyId={pharmacyId}
           currency={currency}
           printingInvoiceReference={printingInvoiceReference}
+          canOpenCashRegister={canAccessInvoiceCollection(permissions)}
           onClose={() => setSelectedInvoice(null)}
+          onCollect={setPaymentInvoice}
           onPrint={printInvoice}
         />
       )}
@@ -787,13 +865,7 @@ function InvoiceActions({
   onCollect: (invoice: Invoice) => void;
   onPrint: (invoice: Invoice) => void;
 }) {
-  const canCollectPayment =
-    canOpenCashRegister &&
-    invoice.remainingAmount > 0 &&
-    invoice.paymentStatus !== "PAID" &&
-    invoice.paymentStatus !== "OVERPAID" &&
-    invoice.paymentStatus !== "CANCELED" &&
-    invoice.paymentStatus !== "DRAFT";
+  const canCollectPayment = canCollectInvoicePayment(invoice, canOpenCashRegister);
   const canShowCancelPlaceholder =
     canCancel && invoice.paymentStatus !== "PAID" && invoice.paymentStatus !== "CANCELED";
 
@@ -848,75 +920,145 @@ function InvoiceDetailDialog({
   pharmacyId,
   currency,
   printingInvoiceReference,
+  canOpenCashRegister,
   onClose,
+  onCollect,
   onPrint,
 }: {
   invoice: Invoice;
   pharmacyId: string;
   currency: string;
   printingInvoiceReference: string;
+  canOpenCashRegister: boolean;
   onClose: () => void;
+  onCollect: (invoice: Invoice) => void;
   onPrint: (invoice: Invoice) => void;
 }) {
+  const [items, setItems] = useState<InvoiceDetail["items"] | null>(null);
+  const [itemsError, setItemsError] = useState("");
   const invoiceProductsPath =
     "/app/pharmacies/" +
     encodeURIComponent(pharmacyId) +
     "/invoices/" +
     encodeURIComponent(invoice.reference) +
     "/products";
+  const canCollectPayment = canCollectInvoicePayment(invoice, canOpenCashRegister);
+
+  useEffect(() => {
+    let isCurrent = true;
+    setItems(null);
+    setItemsError("");
+
+    async function loadInvoiceItems() {
+      try {
+        const detail = await getInvoiceDetail(pharmacyId, invoice.reference);
+        if (isCurrent) {
+          setItems(detail.items);
+        }
+      } catch {
+        if (isCurrent) {
+          setItemsError("Impossible de charger les produits de cette facture.");
+        }
+      }
+    }
+
+    void loadInvoiceItems();
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [invoice.reference, pharmacyId]);
 
   return (
-    <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[1100] flex items-start justify-center overflow-y-auto p-3 sm:items-center sm:p-4">
       <button
         type="button"
         className="absolute inset-0 bg-black/40"
         aria-label="Fermer le détail"
         onClick={onClose}
       />
-      <section className="relative w-full max-w-2xl rounded-lg border border-app-border bg-app-card p-6 shadow-soft">
-        <div className="flex items-start justify-between gap-4">
-          <div>
+      <section className="relative my-auto flex max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-app-border bg-app-card shadow-soft sm:max-h-[calc(100dvh-2rem)]">
+        <header className="flex shrink-0 items-start justify-between gap-3 border-b border-app-border px-4 py-3 sm:px-5">
+          <div className="min-w-0">
             <p className="text-sm font-semibold text-primary-700">{invoice.reference}</p>
-            <h2 className="mt-2 text-xl font-bold text-app-text">Détail de la facture</h2>
+            <h2 className="mt-1 text-lg font-bold text-app-text sm:text-xl">Détail de la facture</h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md border border-app-border bg-app-surface px-3 py-1.5 text-sm font-semibold text-app-text hover:bg-primary-50"
+            className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-md border border-app-border bg-app-surface px-3 py-1.5 text-sm font-semibold text-app-text hover:bg-primary-50"
           >
             Fermer
           </button>
+        </header>
+
+        <div className="min-h-0 overflow-y-auto px-4 py-3 sm:px-5">
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Detail label="Client" value={invoice.customerName} />
+            <Detail label="Téléphone" value={invoice.customerPhone} />
+            <Detail label="Date" value={formatDateTime(invoice.createdAt)} />
+            <Detail label="Créée par" value={invoice.createdBy} />
+            <Detail label="Sous-total" value={formatCurrency(invoice.subtotalAmount, currency)} />
+            <Detail label="Réduction" value={formatCurrency(invoice.discountAmount, currency)} />
+            <Detail label="Total" value={formatCurrency(invoice.totalAmount, currency)} />
+            <Detail label="Payé" value={formatCurrency(invoice.paidAmount, currency)} />
+            <Detail label="Reste" value={formatCurrency(invoice.remainingAmount, currency)} />
+            <Detail label="Statut" value={getInvoicePaymentStatusLabel(invoice.paymentStatus)} />
+          </div>
+
+          <section className="mt-4 border-t border-app-border pt-3">
+            <h3 className="text-sm font-bold text-app-text">Produits facturés</h3>
+            {items === null && !itemsError && (
+              <p className="mt-2 text-sm text-app-muted">Chargement des produits…</p>
+            )}
+            {itemsError && <p className="mt-2 text-sm font-semibold text-red-600">{itemsError}</p>}
+            {items !== null && !items.length && (
+              <p className="mt-2 text-sm text-app-muted">Aucun produit n'est associé à cette facture.</p>
+            )}
+            {items && items.length > 0 && (
+              <div className="mt-2 grid gap-2">
+                {items.map((item) => (
+                  <div key={item.product} className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-3 rounded-md border border-app-border bg-app-surface px-3 py-2 text-sm">
+                    <div className="min-w-0">
+                      <p className="break-words font-semibold text-app-text">{item.productName}</p>
+                      <p className="mt-0.5 text-xs text-app-muted">{item.quantity} × {formatCurrency(item.unitPrice, currency)}</p>
+                    </div>
+                    <p className="self-center whitespace-nowrap font-bold text-app-text">{formatCurrency(item.totalPrice, currency)}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
         </div>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          <Detail label="Client" value={invoice.customerName} />
-          <Detail label="Téléphone" value={invoice.customerPhone} />
-          <Detail label="Date" value={formatDateTime(invoice.createdAt)} />
-          <Detail label="Créée par" value={invoice.createdBy} />
-          <Detail label="Sous-total" value={formatCurrency(invoice.subtotalAmount, currency)} />
-          <Detail label="Réduction" value={formatCurrency(invoice.discountAmount, currency)} />
-          <Detail label="Total" value={formatCurrency(invoice.totalAmount, currency)} />
-          <Detail label="Payé" value={formatCurrency(invoice.paidAmount, currency)} />
-          <Detail label="Reste" value={formatCurrency(invoice.remainingAmount, currency)} />
-          <Detail label="Statut" value={getInvoicePaymentStatusLabel(invoice.paymentStatus)} />
-        </div>
-
-        {/* Action de consultation : elle ouvre la page complète des lignes de cette facture. */}
-        <div className="mt-6 flex flex-col gap-3 border-t border-app-border pt-5 sm:flex-row sm:justify-end">
-          <LinkButton href={invoiceProductsPath} onClick={onClose}>
+        <footer className="grid shrink-0 gap-2 border-t border-app-border px-4 py-3 sm:flex sm:flex-row sm:justify-end sm:px-5">
+          <LinkButton href={invoiceProductsPath} onClick={onClose} className="w-full sm:w-auto">
             Voir les produits
           </LinkButton>
+          {canCollectPayment && (
+            <Button
+              type="button"
+              onClick={() => {
+                onClose();
+                onCollect(invoice);
+              }}
+              className="w-full sm:w-auto"
+            >
+              Encaisser
+            </Button>
+          )}
           {isInvoicePrintable(invoice) && (
             <Button
               type="button"
               variant="secondary"
               onClick={() => onPrint(invoice)}
               disabled={printingInvoiceReference === invoice.reference}
+              className="w-full sm:w-auto"
             >
               {printingInvoiceReference === invoice.reference ? "Préparation..." : "🖨 Imprimer"}
             </Button>
           )}
-        </div>
+        </footer>
       </section>
     </div>
   );
@@ -924,6 +1066,17 @@ function InvoiceDetailDialog({
 
 function isInvoicePrintable(invoice: Invoice) {
   return invoice.paymentStatus === "PAID" || invoice.paymentStatus === "OVERPAID";
+}
+
+function canCollectInvoicePayment(invoice: Invoice, canOpenCashRegister: boolean) {
+  return (
+    canOpenCashRegister &&
+    invoice.remainingAmount > 0 &&
+    invoice.paymentStatus !== "PAID" &&
+    invoice.paymentStatus !== "OVERPAID" &&
+    invoice.paymentStatus !== "CANCELED" &&
+    invoice.paymentStatus !== "DRAFT"
+  );
 }
 
 function InvoicePaymentDialog({
@@ -1013,7 +1166,7 @@ function InvoicePaymentDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[1100] flex items-start justify-center overflow-y-auto p-3 sm:items-center sm:p-4">
       <button
         type="button"
         className="absolute inset-0 bg-black/40"
@@ -1023,13 +1176,13 @@ function InvoicePaymentDialog({
       />
       <form
         onSubmit={submitPayment}
-        className="relative w-full max-w-lg rounded-lg border border-app-border bg-app-card p-6 shadow-soft"
+        className="relative my-auto flex max-h-[calc(100dvh-1.5rem)] w-full max-w-lg flex-col overflow-hidden rounded-lg border border-app-border bg-app-card shadow-soft sm:max-h-[calc(100dvh-2rem)]"
       >
-        <div className="flex items-start justify-between gap-4">
-          <div>
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-app-border px-4 py-3 sm:px-5">
+          <div className="min-w-0">
             <p className="text-sm font-semibold text-primary-700">{invoice.reference}</p>
-            <h2 className="mt-2 text-xl font-bold text-app-text">Encaisser la facture</h2>
-            <p className="mt-2 text-sm leading-6 text-app-muted">
+            <h2 className="mt-1 text-lg font-bold text-app-text sm:text-xl">Encaisser la facture</h2>
+            <p className="mt-1 text-sm leading-6 text-app-muted">
               Reste à payer : {formatCurrency(invoice.remainingAmount, currency)}
             </p>
           </div>
@@ -1037,45 +1190,47 @@ function InvoicePaymentDialog({
             type="button"
             onClick={onClose}
             disabled={submitting}
-            className="rounded-md border border-app-border bg-app-surface px-3 py-1.5 text-sm font-semibold text-app-text hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-md border border-app-border bg-app-surface px-3 py-1.5 text-sm font-semibold text-app-text hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
             Fermer
           </button>
         </div>
 
-        <div className="mt-5 grid gap-4">
-          <ReadOnlyPaymentValue
-            label="Montant à encaisser"
-            value={formatCurrency(remainingAmount, currency)}
-          />
-          <FilterInput
-            label="Montant reçu"
-            type="number"
-            step="0.01"
-            value={amountReceived}
-            onChange={setAmountReceived}
-          />
-          <FilterSelect
-            label="Mode de paiement"
-            value={paymentMethod}
-            options={paymentMethods}
-            onChange={setPaymentMethod}
-          />
-          <FilterInput
-            label="Référence transactionnelle"
-            value={transactionReference}
-            placeholder="Optionnel"
-            onChange={setTransactionReference}
-          />
+        <div className="min-h-0 overflow-y-auto px-4 py-3 sm:px-5">
+          <div className="grid gap-3">
+            <ReadOnlyPaymentValue
+              label="Montant à encaisser"
+              value={formatCurrency(remainingAmount, currency)}
+            />
+            <FilterInput
+              label="Montant reçu"
+              type="number"
+              step="0.01"
+              value={amountReceived}
+              onChange={setAmountReceived}
+            />
+            <FilterSelect
+              label="Mode de paiement"
+              value={paymentMethod}
+              options={paymentMethods}
+              onChange={setPaymentMethod}
+            />
+            <FilterInput
+              label="Référence transactionnelle"
+              value={transactionReference}
+              placeholder="Optionnel"
+              onChange={setTransactionReference}
+            />
+          </div>
+
+          {errorMessage && (
+            <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
+              {errorMessage}
+            </p>
+          )}
         </div>
 
-        {errorMessage && (
-          <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-            {errorMessage}
-          </p>
-        )}
-
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+        <div className="grid shrink-0 gap-2 border-t border-app-border px-4 py-3 sm:flex sm:flex-row sm:justify-end sm:px-5">
           <Button type="button" variant="secondary" onClick={onClose} disabled={submitting}>
             Annuler
           </Button>
@@ -1306,9 +1461,9 @@ function Info({
 
 function Detail({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-app-border bg-app-surface p-4">
+    <div className="min-w-0 rounded-md border border-app-border bg-app-surface p-3">
       <p className="text-xs font-semibold text-app-muted">{label}</p>
-      <p className="mt-1 font-semibold text-app-text">{value}</p>
+      <p className="mt-1 break-words font-semibold text-app-text">{value}</p>
     </div>
   );
 }

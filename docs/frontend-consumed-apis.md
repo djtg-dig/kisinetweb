@@ -967,9 +967,12 @@ Content-Type: application/json
   utiliser sa devise (`pharmacy.devise`) dans les montants de la vente.
 - **Contexte caissier utilisé** : `GET /api/accounts/me/`
   via `getCurrentCashierName()` pour afficher le nom ou l'email du caissier.
-- **Validation vente** : aucun endpoint backend réel n'est encore consommé. Le helper
-  `createSale(payload)` existe côté frontend, mais il renvoie le message :
-  `La validation backend de la vente sera ajoutée ultérieurement.`
+- **Validation vente** : `createSale(payload)` envoie `POST /api/sales/` et utilise
+  la référence de facture retournée. Si l'utilisateur possède simultanément
+  `sale_view` et `sale_payment_create`, une proposition d'encaissement est affichée
+  pendant 10 secondes. Le choix « Encaisser maintenant » ouvre la page Factures avec
+  cette référence ; aucun paiement n'est envoyé sans validation du formulaire
+  d'encaissement.
 - **Brouillon temporaire** : dès qu'au moins un produit est présent dans le
   brouillon, les produits, les informations client et la réduction sont sauvegardés
   automatiquement dans `localStorage`, avec une clé par pharmacie. Le brouillon est
@@ -1071,8 +1074,9 @@ Content-Type: application/json
 - **Méthode HTTP** : `GET`
 - **URL** : `/api/sales/{invoice_reference}/?pharmacy_reference={pharmacy_id}`
 - **Pages frontend** :
-  `/app/pharmacies/[pharmacyId]/invoices/[invoiceReference]/products` et la
-  modale d'impression de `/app/pharmacies/[pharmacyId]/invoices`.
+  `/app/pharmacies/[pharmacyId]/invoices/[invoiceReference]/products`, la modale
+  de détails et la modale d'impression de
+  `/app/pharmacies/[pharmacyId]/invoices`.
 - **Service frontend** : `getInvoiceDetail(pharmacyId, invoiceReference)` dans
   `lib/api/invoices.ts`.
 - **Authentification et accès** : requis. La page Factures exige `sale_view`
@@ -1080,6 +1084,11 @@ Content-Type: application/json
   réelle et de l'appartenance de la facture à la pharmacie.
 - **Réponse utilisée** : la facture, ses montants, son statut de paiement et les
   lignes de produits (`items`). Aucun champ n'est modifié par ce parcours.
+- **Ouverture d'encaissement après création** : la page Factures accepte le paramètre
+  frontend `?collect={invoice_reference}`. Elle relit alors le détail avec cet
+  endpoint, vérifie à nouveau `sale_view` et `sale_payment_create`, puis ouvre le
+  modal d'encaissement existant pour cette seule facture. En cas de permission ou de
+  statut invalide, aucun `POST /api/sale-payments/` n'est déclenché.
 
 ### POST /api/sale-payments/
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { LinkButton } from "@/components/ui/link-button";
 import { LoadingBubble } from "@/components/ui/loading-bubble";
@@ -32,6 +33,10 @@ import { getUserAiCredits } from "@/lib/api/billing";
 import { notifyAiCreditsUpdated } from "@/lib/ai-credits-events";
 import { getPharmacyDashboard } from "@/lib/dashboard-api";
 import { PRESCRIPTION_ANALYSIS_ENABLED } from "@/lib/feature-flags";
+import {
+  buildInvoiceCollectionPath,
+  canAccessInvoiceCollection,
+} from "@/lib/invoice-payment-access";
 import {
   canPayPharmacySubscription,
   isKnownInactiveSubscription,
@@ -68,6 +73,7 @@ const defaultDiscount: DiscountForm = {
 };
 
 export default function CreateSalePage({ params }: CreateSalePageProps) {
+  const router = useRouter();
   const [pharmacyId, setPharmacyId] = useState("");
   const [pharmacyName, setPharmacyName] = useState("");
   const [currency, setCurrency] = useState("");
@@ -87,6 +93,7 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
   const [aiCreditsRemaining, setAiCreditsRemaining] = useState<number | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [aiUnavailableDialogOpen, setAiUnavailableDialogOpen] = useState(false);
+  const [createdInvoiceReference, setCreatedInvoiceReference] = useState("");
   const aiUserReferenceRef = useRef("");
 
   useEffect(() => {
@@ -381,6 +388,20 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
     setFeedback({ tone: "info", message: "Brouillon vidé." });
   }
 
+  function openCreatedInvoiceCollection(invoiceReference: string) {
+    if (!canAccessInvoiceCollection(permissions)) {
+      setCreatedInvoiceReference("");
+      setFeedback({
+        tone: "error",
+        message: "Vous n'avez plus la permission d'encaisser les factures de cette pharmacie.",
+      });
+      return;
+    }
+
+    setCreatedInvoiceReference("");
+    router.push(buildInvoiceCollectionPath(pharmacyId, invoiceReference));
+  }
+
   async function submitSale() {
     if (!items.length) {
       setFeedback({ tone: "error", message: "Ajoutez au moins un produit à la vente." });
@@ -407,12 +428,17 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
     };
 
     try {
-      await createSale(payload);
+      const createdSale = await createSale(payload);
       setItems([]);
       setCustomer(defaultCustomer);
       setDiscount(defaultDiscount);
       clearSaleDraft(pharmacyId);
-      setFeedback({ tone: "success", message: "Facture créée avec succès. Le paiement sera enregistré par le caissier." });
+      if (canAccessInvoiceCollection(permissions) && createdSale.reference) {
+        setFeedback(null);
+        setCreatedInvoiceReference(createdSale.reference);
+      } else {
+        setFeedback({ tone: "success", message: "Facture créée avec succès. Le paiement sera enregistré par le caissier." });
+      }
     } catch (error) {
       if (isSubscriptionInactiveError(error, null)) {
         setPageState("subscription-inactive");
@@ -590,6 +616,12 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
       <AiUnavailableDialog
         open={aiUnavailableDialogOpen}
         onClose={() => setAiUnavailableDialogOpen(false)}
+      />
+
+      <InvoicePaymentSuggestionDialog
+        invoiceReference={createdInvoiceReference}
+        onClose={() => setCreatedInvoiceReference("")}
+        onCollect={openCreatedInvoiceCollection}
       />
 
       <ConfirmDialog
@@ -1942,6 +1974,93 @@ function AiUnavailableDialog({ open, onClose }: { open: boolean; onClose: () => 
           Compris
         </button>
       </div>
+    </div>
+  );
+}
+
+function InvoicePaymentSuggestionDialog({
+  invoiceReference,
+  onClose,
+  onCollect,
+}: {
+  invoiceReference: string;
+  onClose: () => void;
+  onCollect: (invoiceReference: string) => void;
+}) {
+  const [secondsRemaining, setSecondsRemaining] = useState(10);
+  const [openingCollection, setOpeningCollection] = useState(false);
+  const navigationStartedRef = useRef(false);
+
+  useEffect(() => {
+    if (!invoiceReference) {
+      return;
+    }
+
+    navigationStartedRef.current = false;
+    setOpeningCollection(false);
+    setSecondsRemaining(10);
+    const countdown = window.setInterval(() => {
+      setSecondsRemaining((seconds) => Math.max(seconds - 1, 0));
+    }, 1000);
+    const closeTimer = window.setTimeout(onClose, 10000);
+
+    return () => {
+      window.clearInterval(countdown);
+      window.clearTimeout(closeTimer);
+    };
+  }, [invoiceReference, onClose]);
+
+  if (!invoiceReference) {
+    return null;
+  }
+
+  function collectNow() {
+    if (navigationStartedRef.current) {
+      return;
+    }
+
+    navigationStartedRef.current = true;
+    setOpeningCollection(true);
+    onCollect(invoiceReference);
+  }
+
+  return (
+    <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" aria-hidden="true" />
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="invoice-payment-suggestion-title"
+        className="relative w-full max-w-md rounded-xl border border-app-border bg-app-card p-4 shadow-soft sm:p-5"
+      >
+        <h2 id="invoice-payment-suggestion-title" className="text-lg font-bold text-app-text">
+          Facture créée avec succès
+        </h2>
+        <p className="mt-2 text-sm leading-6 text-app-muted">
+          La facture a été créée. Voulez-vous procéder maintenant à son encaissement ?
+        </p>
+        <p className="mt-3 text-xs font-semibold text-app-muted">
+          Cette proposition se ferme dans {secondsRemaining}s.
+        </p>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={openingCollection}
+            className="inline-flex min-h-11 w-full items-center justify-center rounded-md border border-app-border bg-app-surface px-4 py-2 text-sm font-semibold text-app-text transition hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Plus tard
+          </button>
+          <button
+            type="button"
+            onClick={collectNow}
+            disabled={openingCollection}
+            className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-success-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-success-700"
+          >
+            {openingCollection ? "Ouverture..." : "Encaisser maintenant"}
+          </button>
+        </div>
+      </section>
     </div>
   );
 }
