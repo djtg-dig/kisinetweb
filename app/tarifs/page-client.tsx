@@ -76,11 +76,11 @@ export default function TarifsPageClient({
               )}
 
               {state === "ready" && (
-                <div className="grid items-stretch gap-6 md:grid-cols-3">
+                <div className="grid items-stretch gap-6 md:grid-cols-2 lg:grid-cols-3">
                   {plans.map((plan) => (
                     <article
                       key={plan.id || plan.name}
-                      className={`relative flex flex-col rounded-2xl border p-5 transition duration-200 hover:-translate-y-1 hover:shadow-soft sm:p-6 lg:p-7 ${
+                      className={`relative flex min-w-0 flex-col rounded-2xl border p-5 transition duration-200 hover:-translate-y-1 hover:shadow-soft sm:p-6 lg:p-7 ${
                         (plan.code === "STANDARD" || plan.highlighted)
                           ? "border-primary-600 bg-app-card shadow-soft ring-1 ring-primary-200"
                           : "border-app-border bg-app-card shadow-sm"
@@ -92,7 +92,7 @@ export default function TarifsPageClient({
                         </span>
                       )}
 
-                      <div className="flex items-center gap-3">
+                      <div className="flex min-w-0 items-center gap-3">
                         <span
                           className={`flex h-11 w-11 items-center justify-center rounded-xl text-lg font-bold ${
                             plan.highlighted
@@ -102,7 +102,7 @@ export default function TarifsPageClient({
                         >
                           {plan.name.charAt(0).toUpperCase()}
                         </span>
-                        <div>
+                        <div className="min-w-0">
                           <h2 className="text-xl font-bold text-app-text">{plan.name}</h2>
                           <p className="flex flex-wrap items-center gap-2 text-xs font-medium uppercase tracking-wide text-app-muted">
                             <span>{plan.code}</span>

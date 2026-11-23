@@ -140,15 +140,21 @@ export function SubscriptionConfirmation({
                 {planElements.map((element) => (
                   <li
                     key={element.label}
-                    className="flex items-start justify-between gap-3"
+                    className="flex min-w-0 items-start justify-between gap-3"
                   >
-                    <span className="flex items-start gap-2 text-app-muted">
+                    <span className="flex min-w-0 flex-1 items-start gap-2 text-app-muted">
                       <span aria-hidden="true" className="text-success-600">
                         ✓
                       </span>
-                      {element.label}
+                      <span className="min-w-0 break-words">{element.label}</span>
                     </span>
-                    <span className="max-w-[50%] text-right font-semibold text-app-text">
+                    <span
+                      className={
+                        element.kind === "users"
+                          ? "min-w-0 flex-1 break-words text-right font-semibold text-app-text"
+                          : "shrink-0 whitespace-nowrap text-right font-semibold text-app-text"
+                      }
+                    >
                       {element.value}
                     </span>
                   </li>
