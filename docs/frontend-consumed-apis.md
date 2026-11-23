@@ -975,9 +975,13 @@ Content-Type: application/json
   automatiquement dans `localStorage`, avec une clé par pharmacie. Le brouillon est
   restauré après actualisation de la page et supprimé lorsqu'il ne contient plus de
   produit ou lorsque l'utilisateur confirme l'action `Annuler`.
-- **Scanner IA** : analyse réelle d'une ordonnance via la caméra ou un fichier
-  importé depuis le stockage local. Le flux est géré par le composant
-  `AiScannerModal` (ouvert depuis la carte « Scanner avec l'IA ») :
+- **Scanner IA temporairement désactivé** : la carte « Scanner avec l'IA » reste
+  visible, mais son bouton affiche le message « Analyse IA indisponible ». Tant que
+  `PRESCRIPTION_ANALYSIS_ENABLED` vaut `false`, le frontend ne monte pas
+  `AiScannerModal` et n'ouvre ni caméra ni sélecteur de fichiers ; il n'appelle ni
+  `POST /api/sales/vision/`, ni `POST /api/sales/prescription-captures/`, ni
+  l'endpoint de crédits IA. L'intégration existante est conservée pour une
+  réactivation ultérieure :
   1. ouverture de la caméra (`getUserMedia`) avec un bouton en bas à gauche pour
      importer une image depuis le stockage local ;
   2. capture ou import de la photo, affichée avec le rappel
@@ -992,16 +996,14 @@ Content-Type: application/json
   4. pour chaque médicament détecté (`medications[].raw_name`), le frontend recherche
      le produit correspondant via `searchSaleProducts` et l'ajoute au brouillon
      (`addProduct`). Les médicaments sans correspondance dans le stock sont signalés.
-- **Crédits IA** : la carte « Scanner avec l'IA » appelle
-   `GET /api/paiements/pharmacies/{pharmacy_id}/users/{user_reference}/ai-credits/`
-   (voir section « Crédits IA ») pour afficher `(X crédits IA restants)`. La même
-   requête est consommée par la page `settings/me` (« Mon espace dans cette pharmacie »)
-   pour afficher le compteur personnel de crédits IA restants, la période en cours et
-   le taux d'utilisation. Après une analyse réussie, le scanner diffuse l'événement
-   global `kisinet:ai-credits-updated` (via `notifyAiCreditsUpdated`) ; la page
-   `settings/me` l'écoute et recharge automatiquement le compteur de crédits IA
-   (rafraîchissement inter-pages, utile si les deux pages sont ouvertes dans des
-   onglets distincts).
+- **Crédits IA** : pendant cette désactivation, la page de vente n'affiche pas de
+  compteur et n'appelle pas
+  `GET /api/paiements/pharmacies/{pharmacy_id}/users/{user_reference}/ai-credits/`.
+  La page `settings/me` (« Mon espace dans cette pharmacie ») continue d'utiliser
+  cette requête pour afficher le compteur personnel de crédits IA restants, la période
+  en cours et le taux d'utilisation. À la réactivation du scanner, il diffusera à
+  nouveau l'événement global `kisinet:ai-credits-updated` (via
+  `notifyAiCreditsUpdated`) après une analyse réussie.
 - **Données temporaires** : aucune donnée produit temporaire n'est utilisée pour la
   recherche manuelle ; les produits viennent de l'API existante. Le champ affiché
   `dosage` est alimenté par `strength`. Les champs non exposés par l'API actuelle
@@ -1525,8 +1527,10 @@ pas appelés et aucun parcours fictif n'est affiché.
 ## Crédits IA (scan d'ordonnance)
 
 - **Pages frontend** :
-  - `/app/pharmacies/[pharmacyId]/sales/create` (solde utilisateur)
   - `/app/pharmacies/[pharmacyId]/settings/ai` (solde pharmacie)
+  - `/app/pharmacies/[pharmacyId]/settings/me` (solde utilisateur)
+  - `/app/pharmacies/[pharmacyId]/sales/create` : analyse et compteur
+    temporairement désactivés.
 - **Service frontend** : `lib/api/billing.ts` (fonctions `getUserAiCredits` et `getPharmacyAiCredits`)
 - **Authentification** : requise avec `Authorization: Bearer <access_token>`.
 - **Règle importante** : les soldes sont fournis par le backend (`PharmacyUserAnalysisCreditPeriod`
@@ -1537,7 +1541,7 @@ Endpoints consommés:
 
 | Usage frontend | Méthode et URL |
 | --- | --- |
-| Crédits IA restants d'un utilisateur | `GET /api/paiements/pharmacies/{pharmacy_id}/users/{user_reference}/ai-credits/` (page vente « Scanner avec l'IA » et page `settings/me` « Mon espace ») |
+| Crédits IA restants d'un utilisateur | `GET /api/paiements/pharmacies/{pharmacy_id}/users/{user_reference}/ai-credits/` (page `settings/me` « Mon espace » ; pas appelé par la page de vente tant que l'analyse IA est désactivée) |
 | Crédits IA restants d'une pharmacie | `GET /api/paiements/pharmacies/{pharmacy_id}/ai-credits/` |
 
 Paramètres de chemin:
@@ -1571,9 +1575,11 @@ Le frontend de la page `settings/ai` utilise `credits.included`, `credits.used`,
 et `credits.usage_percent`, ainsi que `plan.name`, `period.start/end` et `billing.billable_users`.
 En cas d'erreur (401/403/404), la page affiche un message d'erreur sans blocage.
 
-Le frontend de la page de vente utilise uniquement `credits.remaining` pour afficher
-`(X crédits IA restants)`. En cas d'erreur (401/403/404), l'appel est ignoré
-`.catch(() => null)` et le solde n'est pas affiché, sans bloquer la page de vente.
+Tant que `PRESCRIPTION_ANALYSIS_ENABLED` vaut `false`, la page de vente ne consomme
+pas cet endpoint et affiche une indisponibilité temporaire à la place du compteur.
+Lors de la réactivation, elle utilisera uniquement `credits.remaining` pour afficher
+`(X crédits IA restants)` ; en cas d'erreur (401/403/404), l'appel sera ignoré
+`.catch(() => null)` sans bloquer la page de vente.
 
 ## Parrainage
 

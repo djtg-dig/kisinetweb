@@ -31,6 +31,7 @@ import {
 import { getUserAiCredits } from "@/lib/api/billing";
 import { notifyAiCreditsUpdated } from "@/lib/ai-credits-events";
 import { getPharmacyDashboard } from "@/lib/dashboard-api";
+import { PRESCRIPTION_ANALYSIS_ENABLED } from "@/lib/feature-flags";
 import {
   canPayPharmacySubscription,
   isKnownInactiveSubscription,
@@ -85,6 +86,7 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [aiCreditsRemaining, setAiCreditsRemaining] = useState<number | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [aiUnavailableDialogOpen, setAiUnavailableDialogOpen] = useState(false);
   const aiUserReferenceRef = useRef("");
 
   useEffect(() => {
@@ -145,7 +147,7 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
         const [dashboard, cashier, aiCredits] = await Promise.all([
           getPharmacyDashboard(pharmacyId),
           getCurrentCashierName(),
-          userReference
+          PRESCRIPTION_ANALYSIS_ENABLED && userReference
             ? getUserAiCredits(pharmacyId, userReference).catch(() => null)
             : Promise.resolve(null),
         ]);
@@ -498,7 +500,7 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
   }
 
   return (
-    <main className="mx-auto min-h-[calc(100vh-4rem)] max-w-7xl px-4 py-8 text-app-text sm:px-6 lg:min-h-[calc(100vh-4.5rem)] lg:px-8">
+    <main className="mx-auto min-h-[calc(100vh-4rem)] w-full max-w-7xl px-4 py-5 text-app-text sm:px-6 sm:py-8 lg:min-h-[calc(100vh-4.5rem)] lg:px-8">
       <PageHeader
         pharmacyId={pharmacyId}
         pharmacyName={pharmacyName}
@@ -512,35 +514,49 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
         </ToastMessage>
       )}
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_360px] xl:items-start">
-        <div className="grid gap-6">
-          <section className="grid gap-4 md:grid-cols-2">
+      <div className="mt-6 grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
+        <div className="grid min-w-0 gap-6">
+          <section className="grid min-w-0 gap-4 md:grid-cols-2">
             <ProductSearch pharmacyId={pharmacyId} onAdd={addProduct} currency={activeCurrency} />
             <ModeCard
               active={scannerOpen}
               title="Scanner avec l'IA"
-              description="Importez ou prenez une photo d'une ordonnance pour détecter les produits."
+              description="L'analyse des ordonnances est temporairement indisponible."
               buttonLabel="Scanner maintenant"
-              onClick={() => setScannerOpen(true)}
+              onClick={() => {
+                if (!PRESCRIPTION_ANALYSIS_ENABLED) {
+                  setAiUnavailableDialogOpen(true);
+                  return;
+                }
+                setScannerOpen(true);
+              }}
             >
-              {aiCreditsRemaining !== null && (
+              {PRESCRIPTION_ANALYSIS_ENABLED && aiCreditsRemaining !== null ? (
                 <p className="mt-3 text-xs font-semibold text-primary-700">
                   ({aiCreditsRemaining.toLocaleString("fr-FR")} crédits IA restants)
                 </p>
+              ) : (
+                <p className="mt-3 rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-700">
+                  Fonctionnalité temporairement indisponible.
+                </p>
               )}
-              <p className="mt-3 rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-700">
-                Les résultats proposés par l'IA doivent être vérifiés avant validation.
-              </p>
+              {PRESCRIPTION_ANALYSIS_ENABLED && (
+                <p className="mt-3 rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-700">
+                  Les résultats proposés par l'IA doivent être vérifiés avant validation.
+                </p>
+              )}
             </ModeCard>
           </section>
-          <AiScannerModal
-            open={scannerOpen}
-            pharmacyId={pharmacyId}
-            userReferenceRef={aiUserReferenceRef}
-            onCreditsUpdated={(remaining) => setAiCreditsRemaining(remaining)}
-            onClose={() => setScannerOpen(false)}
-            onComplete={handleScanComplete}
-          />
+          {PRESCRIPTION_ANALYSIS_ENABLED && (
+            <AiScannerModal
+              open={scannerOpen}
+              pharmacyId={pharmacyId}
+              userReferenceRef={aiUserReferenceRef}
+              onCreditsUpdated={(remaining) => setAiCreditsRemaining(remaining)}
+              onClose={() => setScannerOpen(false)}
+              onComplete={handleScanComplete}
+            />
+          )}
           <SaleDraft
             items={items}
             currency={activeCurrency}
@@ -571,6 +587,11 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
         />
       </div>
 
+      <AiUnavailableDialog
+        open={aiUnavailableDialogOpen}
+        onClose={() => setAiUnavailableDialogOpen(false)}
+      />
+
       <ConfirmDialog
         open={cancelDialogOpen}
         title="Vider le brouillon"
@@ -595,21 +616,21 @@ function PageHeader({
   salesHref: string;
 }) {
   return (
-    <header className="grid gap-5 border-b border-app-border pb-6 lg:grid-cols-[1fr_auto] lg:items-end">
-      <div>
+    <header className="grid min-w-0 gap-5 border-b border-app-border pb-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+      <div className="min-w-0">
         <p className="text-sm font-semibold text-primary-700">
           {pharmacyName || "Pharmacie active"}
         </p>
         <h1 className="mt-2 text-3xl font-bold text-app-text">Nouvelle vente</h1>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-app-muted">
+        <p className="mt-3 max-w-3xl break-words text-sm leading-6 text-app-muted">
           Ajoutez les produits, vérifiez le stock et créez la facture. Le paiement sera enregistré séparément par le caissier.
         </p>
       </div>
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <LinkButton href={dashboardHref} variant="secondary">
+      <div className="flex min-w-0 flex-col gap-3 sm:flex-row">
+        <LinkButton href={dashboardHref} variant="secondary" className="w-full sm:w-auto">
           Retour au dashboard
         </LinkButton>
-        <LinkButton href={salesHref} variant="secondary">
+        <LinkButton href={salesHref} variant="secondary" className="w-full sm:w-auto">
           Historique des ventes
         </LinkButton>
       </div>
@@ -634,17 +655,17 @@ function ModeCard({
 }) {
   return (
     <article
-      className={`rounded-lg border bg-app-card p-5 shadow-sm ${
+      className={`min-w-0 rounded-lg border bg-app-card p-4 shadow-sm sm:p-5 ${
         active ? "border-primary-200 ring-2 ring-primary-100" : "border-app-border"
       }`}
     >
-      <h2 className="text-lg font-bold text-app-text">{title}</h2>
+      <h2 className="break-words text-lg font-bold text-app-text">{title}</h2>
       <p className="mt-2 text-sm leading-6 text-app-muted">{description}</p>
       {children}
       <button
         type="button"
         onClick={onClick}
-        className="mt-5 inline-flex min-h-11 items-center justify-center rounded-md bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-700 focus:outline-none focus:ring-4 focus:ring-primary-200"
+        className="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-md bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-700 focus:outline-none focus:ring-4 focus:ring-primary-200 sm:w-auto"
       >
         {buttonLabel}
       </button>
@@ -711,7 +732,7 @@ function ProductSearch({
   }, [pharmacyId, query]);
 
   return (
-    <section className="rounded-lg border border-app-border bg-app-card p-5 shadow-sm">
+    <section className="min-w-0 rounded-lg border border-app-border bg-app-card p-4 shadow-sm sm:p-5">
       <div className="mb-4">
         <h2 className="text-lg font-bold text-app-text">Entrée manuelle</h2>
         <p className="mt-1 text-sm leading-6 text-app-muted">
@@ -726,7 +747,7 @@ function ProductSearch({
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Nom, référence ou code-barres saisi"
-              className="min-h-11 w-full rounded-md border border-app-border bg-white px-3 pr-12 text-sm text-app-text outline-none transition focus:border-primary-300 focus:ring-4 focus:ring-primary-100"
+              className="min-h-11 w-full min-w-0 rounded-md border border-app-border bg-white px-3 pr-12 text-sm text-app-text outline-none transition focus:border-primary-300 focus:ring-4 focus:ring-primary-100"
             />
             {state === "loading" && (
               <span
@@ -780,10 +801,10 @@ function ProductResultCard({
   const stockIsLow = product.availableStock <= 0;
 
   return (
-    <article className="grid gap-4 rounded-lg border border-app-border bg-app-surface p-4 md:grid-cols-[1fr_auto] md:items-center">
-      <div>
+    <article className="grid min-w-0 gap-4 rounded-lg border border-app-border bg-app-surface p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+      <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <h3 className="font-bold text-app-text">{product.name}</h3>
+          <h3 className="min-w-0 break-words font-bold text-app-text">{product.name}</h3>
           {product.isExpired && <Badge tone="error">Expiré</Badge>}
           {product.isExpiringSoon && <Badge tone="warning">Expire bientôt</Badge>}
         </div>
@@ -1444,14 +1465,27 @@ function SaleDraft({
   onRemove: (reference: string) => void;
 }) {
   return (
-    <section className="rounded-lg border border-app-border bg-app-card p-5 shadow-sm">
+    <section className="min-w-0 rounded-lg border border-app-border bg-app-card p-4 shadow-sm sm:p-5">
       <h2 className="text-lg font-bold text-app-text">Brouillon de vente</h2>
       {!items.length ? (
         <p className="mt-4 rounded-md border border-app-border bg-app-surface p-4 text-sm text-app-muted">
           Le brouillon est vide. Ajoutez un produit pour commencer la vente.
         </p>
       ) : (
-        <div className="mt-4 overflow-x-auto">
+        <div className="mt-4 grid gap-3 lg:hidden">
+          {items.map((item) => (
+            <SaleDraftItemCard
+              key={item.product.reference}
+              item={item}
+              currency={currency}
+              onQuantityChange={onQuantityChange}
+              onRemove={onRemove}
+            />
+          ))}
+        </div>
+      )}
+      {items.length > 0 && (
+        <div className="mt-4 hidden overflow-x-auto lg:block">
           <table className="w-full min-w-[760px] border-collapse text-left text-sm">
             <thead>
               <tr className="border-b border-app-border text-xs font-semibold text-app-muted">
@@ -1478,7 +1512,8 @@ function SaleDraft({
                       <button
                         type="button"
                         onClick={() => onQuantityChange(item.product.reference, item.quantity - 1)}
-                        className="h-10 w-10 text-lg font-bold text-app-muted hover:text-primary-700"
+                        aria-label={`Réduire la quantité de ${item.product.name}`}
+                        className="h-11 w-11 text-lg font-bold text-app-muted hover:text-primary-700"
                       >
                         -
                       </button>
@@ -1487,13 +1522,15 @@ function SaleDraft({
                         onChange={(event) =>
                           onQuantityChange(item.product.reference, Number(event.target.value))
                         }
-                        className="h-10 w-16 border-x border-app-border bg-transparent text-center text-sm font-semibold text-app-text outline-none"
+                        aria-label={`Quantité de ${item.product.name}`}
+                        className="h-11 w-16 border-x border-app-border bg-transparent text-center text-sm font-semibold text-app-text outline-none"
                         inputMode="numeric"
                       />
                       <button
                         type="button"
                         onClick={() => onQuantityChange(item.product.reference, item.quantity + 1)}
-                        className="h-10 w-10 text-lg font-bold text-app-muted hover:text-primary-700"
+                        aria-label={`Augmenter la quantité de ${item.product.name}`}
+                        className="h-11 w-11 text-lg font-bold text-app-muted hover:text-primary-700"
                       >
                         +
                       </button>
@@ -1519,6 +1556,87 @@ function SaleDraft({
         </div>
       )}
     </section>
+  );
+}
+
+function SaleDraftItemCard({
+  item,
+  currency,
+  onQuantityChange,
+  onRemove,
+}: {
+  item: SaleDraftItem;
+  currency: string;
+  onQuantityChange: (reference: string, quantity: number) => void;
+  onRemove: (reference: string) => void;
+}) {
+  return (
+    <article className="min-w-0 rounded-lg border border-app-border bg-app-surface p-4">
+      <div className="min-w-0">
+        <h3 className="break-words font-bold text-app-text">{item.product.name}</h3>
+        <p className="mt-1 break-all text-xs text-app-muted">{item.product.reference}</p>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+        <Info label="Prix unitaire" value={formatCurrency(item.product.salePrice, currency)} />
+        <Info label="Stock" value={String(item.product.availableStock)} />
+        <Info label="Sous-total" value={formatCurrency(item.product.salePrice * item.quantity, currency)} />
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+        <div className="grid gap-2">
+          <span className="text-sm font-semibold text-app-text">Quantité</span>
+          <QuantityControl
+            productName={item.product.name}
+            quantity={item.quantity}
+            onChange={(quantity) => onQuantityChange(item.product.reference, quantity)}
+          />
+        </div>
+        <button
+          type="button"
+          onClick={() => onRemove(item.product.reference)}
+          className="inline-flex min-h-11 w-full items-center justify-center rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 sm:w-auto"
+        >
+          Supprimer
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function QuantityControl({
+  productName,
+  quantity,
+  onChange,
+}: {
+  productName: string;
+  quantity: number;
+  onChange: (quantity: number) => void;
+}) {
+  return (
+    <div className="flex w-fit items-center rounded-md border border-app-border bg-app-card">
+      <button
+        type="button"
+        onClick={() => onChange(quantity - 1)}
+        aria-label={`Réduire la quantité de ${productName}`}
+        className="h-11 w-11 text-lg font-bold text-app-muted hover:text-primary-700"
+      >
+        -
+      </button>
+      <input
+        value={String(quantity)}
+        onChange={(event) => onChange(Number(event.target.value))}
+        aria-label={`Quantité de ${productName}`}
+        className="h-11 w-16 border-x border-app-border bg-transparent text-center text-sm font-semibold text-app-text outline-none"
+        inputMode="numeric"
+      />
+      <button
+        type="button"
+        onClick={() => onChange(quantity + 1)}
+        aria-label={`Augmenter la quantité de ${productName}`}
+        className="h-11 w-11 text-lg font-bold text-app-muted hover:text-primary-700"
+      >
+        +
+      </button>
+    </div>
   );
 }
 
@@ -1609,7 +1727,7 @@ function SaleSummary({
   onSubmit: () => void;
 }) {
   return (
-    <aside className="sticky top-24 rounded-lg border border-app-border bg-app-card p-5 shadow-sm">
+    <aside className="rounded-lg border border-app-border bg-app-card p-4 shadow-sm sm:p-5 xl:sticky xl:top-24">
       <h2 className="text-lg font-bold text-app-text">Résumé de la vente</h2>
       <div className="mt-4 grid gap-3 text-sm">
         <SummaryRow label="Produits différents" value={String(itemCount)} />
@@ -1654,7 +1772,7 @@ function FormSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-lg border border-app-border bg-app-card p-5 shadow-sm">
+    <section className="min-w-0 rounded-lg border border-app-border bg-app-card p-4 shadow-sm sm:p-5">
       <h2 className="text-lg font-bold text-app-text">{title}</h2>
       <p className="mt-1 text-sm text-app-muted">{description}</p>
       <div className="mt-4">{children}</div>
@@ -1676,7 +1794,7 @@ function TextInput({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="grid gap-2">
+    <label className="grid min-w-0 gap-2">
       <span className="text-sm font-semibold text-app-text">{label}</span>
       <input
         type={type}
@@ -1684,7 +1802,7 @@ function TextInput({
         disabled={disabled}
         min={type === "number" ? "0" : undefined}
         onChange={(event) => onChange(event.target.value)}
-        className="min-h-11 rounded-md border border-app-border bg-white px-3 text-sm text-app-text outline-none transition focus:border-primary-300 focus:ring-4 focus:ring-primary-100 disabled:cursor-not-allowed disabled:bg-app-surface disabled:text-app-muted"
+        className="min-h-11 w-full min-w-0 rounded-md border border-app-border bg-white px-3 text-sm text-app-text outline-none transition focus:border-primary-300 focus:ring-4 focus:ring-primary-100 disabled:cursor-not-allowed disabled:bg-app-surface disabled:text-app-muted"
       />
     </label>
   );
@@ -1702,12 +1820,12 @@ function SelectInput({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="grid gap-2">
+    <label className="grid min-w-0 gap-2">
       <span className="text-sm font-semibold text-app-text">{label}</span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="min-h-11 rounded-md border border-app-border bg-white px-3 text-sm text-app-text outline-none transition focus:border-primary-300 focus:ring-4 focus:ring-primary-100"
+        className="min-h-11 w-full min-w-0 rounded-md border border-app-border bg-white px-3 text-sm text-app-text outline-none transition focus:border-primary-300 focus:ring-4 focus:ring-primary-100"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
@@ -1729,9 +1847,9 @@ function SummaryRow({
   strong?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4">
+    <div className="flex flex-col items-start gap-1 text-left sm:flex-row sm:items-center sm:justify-between sm:gap-4">
       <span className={strong ? "font-bold text-app-text" : "text-app-muted"}>{label}</span>
-      <span className={strong ? "text-lg font-bold text-app-text" : "font-semibold text-app-text"}>
+      <span className={strong ? "break-words text-xl font-bold text-app-text" : "break-words font-semibold text-app-text"}>
         {value}
       </span>
     </div>
@@ -1792,6 +1910,38 @@ function ToastMessage({
       <button type="button" onClick={onClose} className="text-sm font-bold">
         Fermer
       </button>
+    </div>
+  );
+}
+
+function AiUnavailableDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  if (!open) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" aria-hidden="true" />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ai-unavailable-dialog-title"
+        className="relative w-full max-w-md rounded-xl border border-app-border bg-app-card p-5 shadow-soft sm:p-6"
+      >
+        <h2 id="ai-unavailable-dialog-title" className="text-lg font-bold text-app-text">
+          Analyse IA indisponible
+        </h2>
+        <p className="mt-3 text-sm leading-6 text-app-muted">
+          L'analyse des ordonnances par intelligence artificielle est temporairement indisponible. Cette fonctionnalité sera réactivée prochainement. Merci de votre compréhension.
+        </p>
+        <button
+          type="button"
+          onClick={onClose}
+          className="mt-6 inline-flex min-h-11 w-full items-center justify-center rounded-md bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-700 focus:outline-none focus:ring-4 focus:ring-primary-200"
+        >
+          Compris
+        </button>
+      </div>
     </div>
   );
 }
