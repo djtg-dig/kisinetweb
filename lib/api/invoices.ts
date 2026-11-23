@@ -45,6 +45,8 @@ export type Invoice = {
   reference: string;
   customerName: string;
   customerPhone: string;
+  customerNameRaw: string;
+  customerPhoneRaw: string;
   subtotalAmount: number;
   discountAmount: number;
   totalAmount: number;
@@ -368,6 +370,8 @@ function normalizeInvoicePage(data: unknown): PaginatedInvoices {
 function normalizeInvoice(item: InvoiceApiItem): Invoice {
   const totalAmount = toNumber(item.total_amount ?? item.amount);
   const paidAmount = toNumber(item.paid_amount);
+  const customerNameRaw = (item.customer_name || item.customer || "").trim();
+  const customerPhoneRaw = (item.customer_phone || "").trim();
   const remainingAmount =
     item.remaining_amount === undefined ? Math.max(totalAmount - paidAmount, 0) : toNumber(item.remaining_amount);
   const paymentStatus = normalizePaymentStatus(item.payment_status || item.status, remainingAmount, paidAmount);
@@ -376,8 +380,10 @@ function normalizeInvoice(item: InvoiceApiItem): Invoice {
   return {
     id: String(item.id || item.reference || ""),
     reference: item.reference || "Facture sans référence",
-    customerName: item.customer_name || item.customer || "Client non renseigné",
-    customerPhone: item.customer_phone || "Non renseigné",
+    customerName: customerNameRaw || "Client non renseigné",
+    customerPhone: customerPhoneRaw || "Non renseigné",
+    customerNameRaw,
+    customerPhoneRaw,
     subtotalAmount: toNumber(item.subtotal_amount),
     discountAmount: toNumber(item.discount_amount),
     totalAmount,

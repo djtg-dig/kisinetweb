@@ -3,12 +3,15 @@
 import { useEffect, useRef, type CSSProperties } from "react";
 import JsBarcode from "jsbarcode";
 import { getInvoicePaymentStatusLabel } from "@/lib/api/invoices";
+import { getReceiptCustomerInfo } from "@/lib/invoice-receipt-customer";
 
 type PrintReceiptData = {
   invoice: {
     reference: string;
     customerName: string;
     customerPhone: string;
+    customerNameRaw: string;
+    customerPhoneRaw: string;
     subtotalAmount: number;
     discountAmount: number;
     totalAmount: number;
@@ -108,6 +111,10 @@ export function InvoiceReceiptTicket({ data }: { data: PrintReceiptData }) {
   const currencyCode = data.currency || "USD";
   // Le reste a payer vient de la facture metier rechargee apres succes backend.
   const remainingAmount = Math.max(data.invoice.remainingAmount, 0);
+  const customer = getReceiptCustomerInfo(
+    data.invoice.customerNameRaw,
+    data.invoice.customerPhoneRaw,
+  );
 
   const paperClass = is58mm ? "ticket-58mm" : "ticket-80mm";
 
@@ -156,6 +163,20 @@ export function InvoiceReceiptTicket({ data }: { data: PrintReceiptData }) {
     flex: "1",
     wordBreak: "break-word",
     minWidth: 0,
+  };
+
+  const customerRowStyle: CSSProperties = {
+    display: "grid",
+    gridTemplateColumns: "max-content minmax(0, 1fr)",
+    columnGap: "2mm",
+    alignItems: "start",
+    marginBottom: is58mm ? "1.5mm" : "2mm",
+  };
+
+  const customerValueStyle: CSSProperties = {
+    minWidth: 0,
+    overflowWrap: "anywhere",
+    textAlign: "right",
   };
 
   const productQtyStyle: CSSProperties = {
@@ -231,6 +252,20 @@ export function InvoiceReceiptTicket({ data }: { data: PrintReceiptData }) {
             <span>Paiement :</span>
             <span>{PAYMENT_METHOD_LABELS[data.paymentInfo.paymentMethod] || data.paymentInfo.paymentMethod}</span>
           </div>
+        )}
+        {customer && (
+          <>
+            <div style={customerRowStyle}>
+              <span>Client :</span>
+              <span style={customerValueStyle}>{customer.name}</span>
+            </div>
+            {customer.phone && (
+              <div style={customerRowStyle}>
+                <span>Téléphone :</span>
+                <span style={customerValueStyle}>{customer.phone}</span>
+              </div>
+            )}
+          </>
         )}
       </div>
 
