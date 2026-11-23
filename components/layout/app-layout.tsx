@@ -56,7 +56,7 @@ export function AppLayout({ children, pharmacyId, permissions: initialPermission
   const [isMounted, setIsMounted] = useState(false);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const router = useRouter();
-  const { authenticated, loading: sessionLoading } = useSession();
+  const { authenticated, error: sessionError, loading: sessionLoading } = useSession();
 
   useEffect(() => {
     setIsMounted(true);
@@ -69,10 +69,10 @@ export function AppLayout({ children, pharmacyId, permissions: initialPermission
       }
     }
 
-    if (!sessionLoading) {
+    if (!sessionLoading && !sessionError) {
       redirectIfSessionClosed();
     }
-  }, [authenticated, sessionLoading, router]);
+  }, [authenticated, sessionError, sessionLoading, router]);
 
   useEffect(() => {
     if (!pharmacyId) return;

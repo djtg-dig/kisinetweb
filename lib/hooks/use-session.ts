@@ -73,12 +73,29 @@ export function useSession(): SessionState {
       setState({ authenticated: sessionData.authenticated, user: sessionData.user, loading: false, error: false });
     } catch {
       // Une indisponibilité réseau ou serveur ne signifie pas une déconnexion.
-      setState({ authenticated: false, user: null, loading: false, error: true });
+      setState((previousState) => ({
+        ...previousState,
+        loading: false,
+        error: true,
+      }));
     }
   }, []);
 
   useEffect(() => {
     loadSession();
+  }, [loadSession]);
+
+  useEffect(() => {
+    function refreshSessionWhenAppReturns() {
+      if (document.visibilityState === "visible") {
+        void loadSession();
+      }
+    }
+
+    document.addEventListener("visibilitychange", refreshSessionWhenAppReturns);
+    return () => {
+      document.removeEventListener("visibilitychange", refreshSessionWhenAppReturns);
+    };
   }, [loadSession]);
 
   return {

@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { filterResponseHeaders, signedBackendFetch } from "@/lib/server/backend-fetch";
 import { ACCESS_COOKIE_NAME, REFRESH_COOKIE_NAME } from "@/lib/server/cookies";
 import { ADMIN_ACCESS_COOKIE_NAME, ADMIN_REFRESH_COOKIE_NAME } from "@/lib/server/admin-cookies";
+import { refreshTokens } from "@/lib/server/token-refresh";
 import {
   CSRF_HEADER_NAME,
   createCsrfErrorResponse,
@@ -67,30 +68,19 @@ async function proxyBackendRequest(request: NextRequest, context: RouteContext):
     });
 
     if (response.status === 401 && refreshToken && accessToken) {
-      const refreshed = await tryRefreshTokens(refreshToken, accessToken, isAdminSession);
-      if (refreshed) {
+      const refreshed = await refreshTokens({
+        scope: isAdminSession ? "admin" : "account",
+        refreshToken,
+        accessToken,
+      });
+      if (refreshed.kind === "refreshed") {
         const retryResponse = await signedBackendFetch({
           path: backendPath,
           method,
           headers: request.headers,
           body,
-          accessToken: refreshed.newAccessToken,
+          accessToken: refreshed.accessToken,
         });
-
-        if (retryResponse.ok) {
-          const bodyBytes = await retryResponse.arrayBuffer();
-          const nextResponse = new NextResponse(bodyBytes, {
-            status: retryResponse.status,
-            statusText: retryResponse.statusText,
-            headers: filterResponseHeaders(retryResponse.headers),
-          });
-          if (isAdminSession) {
-            setAdminAuthCookies(nextResponse, refreshed.newAccessToken, refreshed.newRefreshToken || refreshToken);
-          } else {
-            setAuthCookies(nextResponse, refreshed.newAccessToken, refreshed.newRefreshToken || refreshToken);
-          }
-          return nextResponse;
-        }
 
         if (retryResponse.status === 401) {
           const errorResponse = NextResponse.json({ detail: "Session expirée." }, { status: 401 });
@@ -101,6 +91,26 @@ async function proxyBackendRequest(request: NextRequest, context: RouteContext):
           }
           return errorResponse;
         }
+
+        const bodyBytes = method === "HEAD" ? null : await retryResponse.arrayBuffer();
+        const nextResponse = new NextResponse(bodyBytes, {
+          status: retryResponse.status,
+          statusText: retryResponse.statusText,
+          headers: filterResponseHeaders(retryResponse.headers),
+        });
+        if (isAdminSession) {
+          setAdminAuthCookies(nextResponse, refreshed.accessToken, refreshed.refreshToken);
+        } else {
+          setAuthCookies(nextResponse, refreshed.accessToken, refreshed.refreshToken);
+        }
+        return nextResponse;
+      }
+
+      if (refreshed.kind === "unavailable") {
+        return NextResponse.json(
+          { detail: "Session temporairement indisponible. Veuillez réessayer." },
+          { status: 503 },
+        );
       }
 
       const errorResponse = NextResponse.json({ detail: "Session expirée." }, { status: 401 });
@@ -135,37 +145,6 @@ async function proxyBackendRequest(request: NextRequest, context: RouteContext):
     });
   } catch {
     return NextResponse.json({ detail: "Requete invalide ou Serveur indisponible." }, { status: 502 });
-  }
-}
-
-type RefreshResult = {
-  newAccessToken: string;
-  newRefreshToken: string;
-} | null;
-
-async function tryRefreshTokens(refreshToken: string, currentAccessToken: string, isAdmin: boolean): Promise<RefreshResult> {
-  const refreshPath = isAdmin ? "/api/admin/auth/refresh/" : "/api/accounts/token/refresh/";
-  try {
-    const response = await signedBackendFetch({
-      path: refreshPath,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refresh: refreshToken }),
-      accessToken: currentAccessToken,
-      cache: "no-store",
-    });
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const data = await response.json();
-    return {
-      newAccessToken: data.access,
-      newRefreshToken: data.refresh || refreshToken,
-    };
-  } catch {
-    return null;
   }
 }
 

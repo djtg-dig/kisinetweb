@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { ACCESS_COOKIE_NAME, REFRESH_COOKIE_NAME } from "@/lib/server/cookies";
 import { signedBackendFetch } from "@/lib/server/backend-fetch";
+import { refreshTokens } from "@/lib/server/token-refresh";
 
 export async function GET(request: NextRequest) {
   const accessToken = request.cookies.get(ACCESS_COOKIE_NAME)?.value;
@@ -31,19 +32,22 @@ export async function GET(request: NextRequest) {
         return logoutResponse;
       }
 
-      const refreshed = await tryRefreshTokens(refreshToken);
+      const refreshed = await refreshTokens({
+        scope: "account",
+        refreshToken,
+      });
       if (refreshed.kind === "refreshed") {
         const retryResponse = await signedBackendFetch({
           path: "/api/accounts/session/",
           method: "GET",
-          accessToken: refreshed.newAccessToken,
+          accessToken: refreshed.accessToken,
           cache: "no-store",
         });
 
         if (retryResponse.ok) {
           const data = await retryResponse.json();
           const response = NextResponse.json({ authenticated: true, user: data.user });
-          setAuthCookies(response, refreshed.newAccessToken, refreshed.newRefreshToken);
+          setAuthCookies(response, refreshed.accessToken, refreshed.refreshToken);
           return response;
         }
 
@@ -53,7 +57,9 @@ export async function GET(request: NextRequest) {
           return logoutResponse;
         }
 
-        return sessionUnavailableResponse();
+        const unavailableResponse = sessionUnavailableResponse();
+        setAuthCookies(unavailableResponse, refreshed.accessToken, refreshed.refreshToken);
+        return unavailableResponse;
       }
 
       if (refreshed.kind === "invalid") {
@@ -68,35 +74,6 @@ export async function GET(request: NextRequest) {
     return sessionUnavailableResponse();
   } catch {
     return sessionUnavailableResponse();
-  }
-}
-
-type RefreshResult =
-  | { kind: "refreshed"; newAccessToken: string; newRefreshToken: string }
-  | { kind: "invalid" }
-  | { kind: "unavailable" };
-
-async function tryRefreshTokens(refreshToken: string): Promise<RefreshResult> {
-  try {
-    const response = await signedBackendFetch({
-      path: "/api/accounts/token/refresh/",
-      method: "POST",
-      body: JSON.stringify({ refresh: refreshToken }),
-      cache: "no-store",
-    });
-
-    if (!response.ok) {
-      return response.status >= 500 ? { kind: "unavailable" } : { kind: "invalid" };
-    }
-
-    const data = await response.json();
-    return {
-      kind: "refreshed",
-      newAccessToken: data.access,
-      newRefreshToken: data.refresh || refreshToken,
-    };
-  } catch {
-    return { kind: "unavailable" };
   }
 }
 

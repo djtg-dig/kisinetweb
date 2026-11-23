@@ -307,6 +307,88 @@ describe("BFF /api/backend route handler", () => {
     assert.equal(call.headers.get("X-Kisinet-Content-SHA256"), computeBodySha256(multipart));
   });
 
+  test("partage un unique renouvellement JWT entre deux requêtes parallèles", async () => {
+    const route = await loadRoute();
+    let protectedRequestCount = 0;
+    let refreshRequestCount = 0;
+    let releaseRefresh: (() => void) | undefined;
+    const refreshStarted = new Promise<void>((resolve) => {
+      releaseRefresh = resolve;
+    });
+    let signalRefreshStart: (() => void) | undefined;
+    const waitForRefresh = new Promise<void>((resolve) => {
+      signalRefreshStart = resolve;
+    });
+
+    mockBackend((url) => {
+      if (url.endsWith("/api/accounts/token/refresh/")) {
+        refreshRequestCount += 1;
+        signalRefreshStart?.();
+        return refreshStarted.then(() => Response.json({ access: "renewed-access", refresh: "renewed-refresh" }));
+      }
+
+      protectedRequestCount += 1;
+      return protectedRequestCount <= 2
+        ? Response.json({ detail: "Token expired" }, { status: 401 })
+        : Response.json({ ok: true });
+    });
+
+    const first = route.GET(
+      makeRequest("GET", "http://next.test/api/backend/api/pharmacies/", new Uint8Array(), VALID_COOKIES) as never,
+      routeContext(["api", "pharmacies"]) as never,
+    );
+    await waitForRefresh;
+    const second = route.GET(
+      makeRequest("GET", "http://next.test/api/backend/api/pharmacies/", new Uint8Array(), VALID_COOKIES) as never,
+      routeContext(["api", "pharmacies"]) as never,
+    );
+    await Promise.resolve();
+    releaseRefresh?.();
+
+    const [firstResponse, secondResponse] = await Promise.all([first, second]);
+
+    assert.equal(refreshRequestCount, 1);
+    assert.equal(firstResponse.status, 200);
+    assert.equal(secondResponse.status, 200);
+  });
+
+  test("conserve les cookies quand le service de renouvellement est temporairement indisponible", async () => {
+    const route = await loadRoute();
+    const calls = mockBackend((url) => {
+      if (url.endsWith("/api/accounts/token/refresh/")) {
+        return Response.json({ detail: "Service indisponible" }, { status: 503 });
+      }
+      return Response.json({ detail: "Token expired" }, { status: 401 });
+    });
+
+    const response = await route.GET(
+      makeRequest("GET", "http://next.test/api/backend/api/pharmacies/", new Uint8Array(), VALID_COOKIES) as never,
+      routeContext(["api", "pharmacies"]) as never,
+    );
+
+    assert.equal(calls.length, 2);
+    assert.equal(response.status, 503);
+    assert.equal(response.headers.get("set-cookie"), null);
+  });
+
+  test("supprime les cookies lorsqu'un renouvellement est réellement refusé", async () => {
+    const route = await loadRoute();
+    mockBackend((url) => {
+      if (url.endsWith("/api/accounts/token/refresh/")) {
+        return Response.json({ detail: "Refresh token invalid" }, { status: 401 });
+      }
+      return Response.json({ detail: "Token expired" }, { status: 401 });
+    });
+
+    const response = await route.GET(
+      makeRequest("GET", "http://next.test/api/backend/api/pharmacies/", new Uint8Array(), VALID_COOKIES) as never,
+      routeContext(["api", "pharmacies"]) as never,
+    );
+
+    assert.equal(response.status, 401);
+    assert.match(response.headers.get("set-cookie") || "", /Max-Age=0/);
+  });
+
   test("deux passages BFF successifs génèrent un nouveau nonce et une nouvelle signature", async () => {
     const route = await loadRoute();
     const calls = mockBackend(() => Response.json({ ok: true }));
