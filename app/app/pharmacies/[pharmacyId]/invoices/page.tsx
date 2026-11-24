@@ -943,6 +943,12 @@ function InvoiceDetailDialog({
     encodeURIComponent(invoice.reference) +
     "/products";
   const canCollectPayment = canCollectInvoicePayment(invoice, canOpenCashRegister);
+  // L'API ne fournit pas encore un champ de taxe séparé. Lorsqu'un écart est
+  // déjà inclus dans le total, on l'affiche sans modifier aucun calcul métier.
+  const taxAmount = Math.max(
+    invoice.totalAmount - invoice.subtotalAmount + invoice.discountAmount,
+    0,
+  );
 
   useEffect(() => {
     let isCurrent = true;
@@ -969,44 +975,61 @@ function InvoiceDetailDialog({
     };
   }, [invoice.reference, pharmacyId]);
 
+  useEffect(() => {
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 z-[1100] flex items-start justify-center overflow-y-auto p-3 sm:items-center sm:p-4">
+    <div className="fixed inset-0 z-[1100] flex items-start justify-center overflow-y-auto p-2.5 sm:items-center sm:p-4">
       <button
         type="button"
         className="absolute inset-0 bg-black/40"
         aria-label="Fermer le détail"
         onClick={onClose}
       />
-      <section className="relative my-auto flex max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-app-border bg-app-card shadow-soft sm:max-h-[calc(100dvh-2rem)]">
-        <header className="flex shrink-0 items-start justify-between gap-3 border-b border-app-border px-4 py-3 sm:px-5">
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="invoice-detail-dialog-title"
+        className="relative my-auto flex max-h-[calc(100dvh-1.25rem)] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-app-border bg-app-card shadow-soft sm:max-h-[calc(100dvh-2rem)]"
+      >
+        <header className="flex shrink-0 items-start justify-between gap-3 border-b border-app-border px-3 py-2.5 sm:px-5 sm:py-3">
           <div className="min-w-0">
             <p className="text-sm font-semibold text-primary-700">{invoice.reference}</p>
-            <h2 className="mt-1 text-lg font-bold text-app-text sm:text-xl">Détail de la facture</h2>
+            <h2 id="invoice-detail-dialog-title" className="mt-1 text-lg font-bold text-app-text sm:text-xl">Détail de la facture</h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-md border border-app-border bg-app-surface px-3 py-1.5 text-sm font-semibold text-app-text hover:bg-primary-50"
+            className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-md border border-app-border bg-app-surface px-3 py-1.5 text-sm font-semibold text-app-text hover:bg-primary-50"
           >
             Fermer
           </button>
         </header>
 
-        <div className="min-h-0 overflow-y-auto px-4 py-3 sm:px-5">
-          <div className="grid gap-2 sm:grid-cols-2">
+        <div className="min-h-0 overflow-y-auto px-3 py-2.5 sm:px-5 sm:py-3">
+          <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
             <Detail label="Client" value={invoice.customerName} />
             <Detail label="Téléphone" value={invoice.customerPhone} />
             <Detail label="Date" value={formatDateTime(invoice.createdAt)} />
             <Detail label="Créée par" value={invoice.createdBy} />
             <Detail label="Sous-total" value={formatCurrency(invoice.subtotalAmount, currency)} />
             <Detail label="Réduction" value={formatCurrency(invoice.discountAmount, currency)} />
+            {taxAmount > 0 && <Detail label="Taxes" value={formatCurrency(taxAmount, currency)} />}
             <Detail label="Total" value={formatCurrency(invoice.totalAmount, currency)} />
             <Detail label="Payé" value={formatCurrency(invoice.paidAmount, currency)} />
             <Detail label="Reste" value={formatCurrency(invoice.remainingAmount, currency)} />
             <Detail label="Statut" value={getInvoicePaymentStatusLabel(invoice.paymentStatus)} />
           </div>
 
-          <section className="mt-4 border-t border-app-border pt-3">
+          <section className="mt-3 border-t border-app-border pt-2.5 sm:mt-4 sm:pt-3">
             <h3 className="text-sm font-bold text-app-text">Produits facturés</h3>
             {items === null && !itemsError && (
               <p className="mt-2 text-sm text-app-muted">Chargement des produits…</p>
@@ -1031,7 +1054,7 @@ function InvoiceDetailDialog({
           </section>
         </div>
 
-        <footer className="grid shrink-0 gap-2 border-t border-app-border px-4 py-3 sm:flex sm:flex-row sm:justify-end sm:px-5">
+        <footer className="grid shrink-0 gap-2 border-t border-app-border px-3 py-2.5 sm:flex sm:flex-row sm:justify-end sm:px-5 sm:py-3">
           <LinkButton href={invoiceProductsPath} onClick={onClose} className="w-full sm:w-auto">
             Voir les produits
           </LinkButton>
@@ -1461,9 +1484,9 @@ function Info({
 
 function Detail({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-md border border-app-border bg-app-surface p-3">
+    <div className="min-w-0 rounded-md border border-app-border bg-app-surface p-2 sm:p-3">
       <p className="text-xs font-semibold text-app-muted">{label}</p>
-      <p className="mt-1 break-words font-semibold text-app-text">{value}</p>
+      <p className="mt-0.5 break-words text-sm font-semibold leading-5 text-app-text sm:mt-1 sm:text-base">{value}</p>
     </div>
   );
 }

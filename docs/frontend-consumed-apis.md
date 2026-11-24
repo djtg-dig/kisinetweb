@@ -971,8 +971,9 @@ Content-Type: application/json
   la référence de facture retournée. Si l'utilisateur possède simultanément
   `sale_view` et `sale_payment_create`, une proposition d'encaissement est affichée
   pendant 10 secondes. Le choix « Encaisser maintenant » ouvre la page Factures avec
-  cette référence ; aucun paiement n'est envoyé sans validation du formulaire
-  d'encaissement.
+  cette référence ; les deux permissions sont rechargées et vérifiées à nouveau
+  juste avant cette navigation. Aucun paiement n'est envoyé sans validation du
+  formulaire d'encaissement.
 - **Brouillon temporaire** : dès qu'au moins un produit est présent dans le
   brouillon, les produits, les informations client et la réduction sont sauvegardés
   automatiquement dans `localStorage`, avec une clé par pharmacie. Le brouillon est
@@ -1280,6 +1281,7 @@ Content-Type: application/json
 - **Pages frontend** : `/app/pharmacies/[pharmacyId]/dashboard`,
   `/app/pharmacies/[pharmacyId]/products`,
   `/app/pharmacies/[pharmacyId]/products/create`,
+  `/app/pharmacies/[pharmacyId]/sales/create`,
   `/app/pharmacies/[pharmacyId]/invoices`,
   `/app/pharmacies/[pharmacyId]/reports`,
   `/app/pharmacies/[pharmacyId]/settings`,
@@ -1300,6 +1302,11 @@ Content-Type: application/json
 - **Comportement frontend factures** : la page `Factures` utilise `sale_view` pour
   l'accès, `sale_create` pour le bouton `Nouvelle vente`, `sale_payment_create`
   pour l'action liée à la caisse, et `sale_cancel` pour l'action d'annulation.
+- **Comportement frontend création de vente** : après une création réussie, la
+  proposition d'encaissement exige simultanément `sale_view` et
+  `sale_payment_create`. Au clic sur « Encaisser maintenant », le frontend relit
+  ces permissions avant de naviguer ; un refus ou la fermeture/expiration de la
+  proposition n'envoie aucun paiement.
 - **Comportement frontend navbar pharmacie** : les onglets contrôlés par permissions
   restent visibles dans la navigation de la pharmacie, mais ils sont désactivés si
   la permission correspondante n'est pas accordée. `Produits` dépend de

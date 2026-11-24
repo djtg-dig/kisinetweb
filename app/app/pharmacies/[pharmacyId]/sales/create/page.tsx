@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { LinkButton } from "@/components/ui/link-button";
@@ -95,6 +95,8 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
   const [aiUnavailableDialogOpen, setAiUnavailableDialogOpen] = useState(false);
   const [createdInvoiceReference, setCreatedInvoiceReference] = useState("");
   const aiUserReferenceRef = useRef("");
+  const createdInvoiceReferenceRef = useRef("");
+  const collectionNavigationStartedRef = useRef(false);
 
   useEffect(() => {
     let isCurrent = true;
@@ -388,19 +390,60 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
     setFeedback({ tone: "info", message: "Brouillon vidé." });
   }
 
-  function openCreatedInvoiceCollection(invoiceReference: string) {
-    if (!canAccessInvoiceCollection(permissions)) {
-      setCreatedInvoiceReference("");
-      setFeedback({
-        tone: "error",
-        message: "Vous n'avez plus la permission d'encaisser les factures de cette pharmacie.",
-      });
-      return;
+  const closeInvoicePaymentSuggestion = useCallback(() => {
+    createdInvoiceReferenceRef.current = "";
+    setCreatedInvoiceReference("");
+  }, []);
+
+  const openCreatedInvoiceCollection = useCallback(async (invoiceReference: string): Promise<boolean> => {
+    if (
+      !invoiceReference ||
+      createdInvoiceReferenceRef.current !== invoiceReference ||
+      collectionNavigationStartedRef.current
+    ) {
+      return false;
     }
 
-    setCreatedInvoiceReference("");
-    router.push(buildInvoiceCollectionPath(pharmacyId, invoiceReference));
-  }
+    collectionNavigationStartedRef.current = true;
+    let navigationStarted = false;
+
+    try {
+      // Les droits peuvent avoir changé pendant la saisie de la vente : on les
+      // recharge avant de proposer l'encaissement, sans contourner le backend.
+      const currentPermissions = await getPharmacyPermissions(pharmacyId);
+      if (createdInvoiceReferenceRef.current !== invoiceReference) {
+        return false;
+      }
+
+      setPermissions(currentPermissions);
+      if (!canAccessInvoiceCollection(currentPermissions)) {
+        closeInvoicePaymentSuggestion();
+        setFeedback({
+          tone: "error",
+          message: "Vous n'avez plus la permission d'encaisser les factures de cette pharmacie.",
+        });
+        return false;
+      }
+
+      closeInvoicePaymentSuggestion();
+      navigationStarted = true;
+      router.push(buildInvoiceCollectionPath(pharmacyId, invoiceReference));
+      return true;
+    } catch {
+      if (createdInvoiceReferenceRef.current === invoiceReference) {
+        closeInvoicePaymentSuggestion();
+        setFeedback({
+          tone: "error",
+          message: "Impossible de vérifier vos permissions pour ouvrir l'encaissement.",
+        });
+      }
+      return false;
+    } finally {
+      if (!navigationStarted) {
+        collectionNavigationStartedRef.current = false;
+      }
+    }
+  }, [closeInvoicePaymentSuggestion, pharmacyId, router]);
 
   async function submitSale() {
     if (!items.length) {
@@ -433,8 +476,16 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
       setCustomer(defaultCustomer);
       setDiscount(defaultDiscount);
       clearSaleDraft(pharmacyId);
-      if (canAccessInvoiceCollection(permissions) && createdSale.reference) {
+      // La vente vient d'être créée : le contrôle d'affichage s'appuie sur les
+      // droits actuels, pas seulement sur ceux chargés à l'ouverture de la page.
+      const currentPermissions = await getPharmacyPermissions(pharmacyId).catch(() => null);
+      if (currentPermissions) {
+        setPermissions(currentPermissions);
+      }
+
+      if (currentPermissions && canAccessInvoiceCollection(currentPermissions) && createdSale.reference) {
         setFeedback(null);
+        createdInvoiceReferenceRef.current = createdSale.reference;
         setCreatedInvoiceReference(createdSale.reference);
       } else {
         setFeedback({ tone: "success", message: "Facture créée avec succès. Le paiement sera enregistré par le caissier." });
@@ -620,7 +671,7 @@ export default function CreateSalePage({ params }: CreateSalePageProps) {
 
       <InvoicePaymentSuggestionDialog
         invoiceReference={createdInvoiceReference}
-        onClose={() => setCreatedInvoiceReference("")}
+        onClose={closeInvoicePaymentSuggestion}
         onCollect={openCreatedInvoiceCollection}
       />
 
@@ -1985,57 +2036,109 @@ function InvoicePaymentSuggestionDialog({
 }: {
   invoiceReference: string;
   onClose: () => void;
-  onCollect: (invoiceReference: string) => void;
+  onCollect: (invoiceReference: string) => Promise<boolean>;
 }) {
   const [secondsRemaining, setSecondsRemaining] = useState(10);
   const [openingCollection, setOpeningCollection] = useState(false);
   const navigationStartedRef = useRef(false);
+  const isSuggestionActiveRef = useRef(false);
 
   useEffect(() => {
     if (!invoiceReference) {
       return;
     }
 
+    isSuggestionActiveRef.current = true;
     navigationStartedRef.current = false;
     setOpeningCollection(false);
     setSecondsRemaining(10);
     const countdown = window.setInterval(() => {
       setSecondsRemaining((seconds) => Math.max(seconds - 1, 0));
     }, 1000);
-    const closeTimer = window.setTimeout(onClose, 10000);
+    const closeTimer = window.setTimeout(() => {
+      isSuggestionActiveRef.current = false;
+      onClose();
+    }, 10000);
 
     return () => {
+      isSuggestionActiveRef.current = false;
       window.clearInterval(countdown);
       window.clearTimeout(closeTimer);
     };
   }, [invoiceReference, onClose]);
 
+  useEffect(() => {
+    if (!invoiceReference) {
+      return;
+    }
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape" && !openingCollection) {
+        isSuggestionActiveRef.current = false;
+        onClose();
+      }
+    }
+
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [invoiceReference, onClose, openingCollection]);
+
   if (!invoiceReference) {
     return null;
   }
 
-  function collectNow() {
-    if (navigationStartedRef.current) {
+  function closeSuggestion() {
+    if (openingCollection) {
+      return;
+    }
+
+    isSuggestionActiveRef.current = false;
+    onClose();
+  }
+
+  async function collectNow() {
+    if (navigationStartedRef.current || !isSuggestionActiveRef.current) {
       return;
     }
 
     navigationStartedRef.current = true;
     setOpeningCollection(true);
-    onCollect(invoiceReference);
+    const navigationStarted = await onCollect(invoiceReference);
+    if (!navigationStarted && isSuggestionActiveRef.current) {
+      navigationStartedRef.current = false;
+      setOpeningCollection(false);
+    }
   }
 
   return (
-    <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40" aria-hidden="true" />
+    <div className="fixed inset-0 z-[1100] flex items-center justify-center p-3 sm:p-4">
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/40"
+        aria-label="Fermer la proposition d'encaissement"
+        disabled={openingCollection}
+        onClick={closeSuggestion}
+      />
       <section
         role="dialog"
         aria-modal="true"
         aria-labelledby="invoice-payment-suggestion-title"
-        className="relative w-full max-w-md rounded-xl border border-app-border bg-app-card p-4 shadow-soft sm:p-5"
+        className="relative flex max-h-[calc(100dvh-1.5rem)] w-full max-w-md flex-col overflow-y-auto rounded-xl border border-app-border bg-app-card p-4 shadow-soft sm:max-h-[calc(100dvh-2rem)] sm:p-5"
       >
-        <h2 id="invoice-payment-suggestion-title" className="text-lg font-bold text-app-text">
-          Facture créée avec succès
-        </h2>
+        <div className="flex items-start justify-between gap-3">
+          <h2 id="invoice-payment-suggestion-title" className="text-lg font-bold text-app-text">
+            Facture créée avec succès
+          </h2>
+          <button
+            type="button"
+            onClick={closeSuggestion}
+            disabled={openingCollection}
+            aria-label="Fermer"
+            className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-md border border-app-border bg-app-surface px-3 py-1.5 text-sm font-semibold text-app-text transition hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Fermer
+          </button>
+        </div>
         <p className="mt-2 text-sm leading-6 text-app-muted">
           La facture a été créée. Voulez-vous procéder maintenant à son encaissement ?
         </p>
@@ -2045,7 +2148,7 @@ function InvoicePaymentSuggestionDialog({
         <div className="mt-4 grid gap-2 sm:grid-cols-2">
           <button
             type="button"
-            onClick={onClose}
+            onClick={closeSuggestion}
             disabled={openingCollection}
             className="inline-flex min-h-11 w-full items-center justify-center rounded-md border border-app-border bg-app-surface px-4 py-2 text-sm font-semibold text-app-text transition hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
