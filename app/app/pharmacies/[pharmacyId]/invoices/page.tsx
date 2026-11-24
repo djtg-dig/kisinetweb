@@ -30,6 +30,10 @@ import {
   canAccessInvoiceCollection,
   INVOICE_COLLECTION_QUERY_PARAM,
 } from "@/lib/invoice-payment-access";
+import {
+  createInvoicePrintLifecycle,
+  type InvoicePrintLifecycle,
+} from "@/lib/invoice-print-lifecycle";
 import { InvoiceReceiptTicket, type PrintReceiptData } from "@/components/invoices/PrintableInvoiceReceipt";
 import { SubscriptionInactiveState } from "@/components/subscriptions/subscription-inactive-state";
 import {
@@ -500,28 +504,49 @@ function InvoicePrintPreview({
   data: PrintReceiptData;
   onClose: () => void;
 }) {
+  const [isPrinting, setIsPrinting] = useState(false);
+  const [printError, setPrintError] = useState("");
+  const printLifecycleRef = useRef<InvoicePrintLifecycle | null>(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   useEffect(() => {
     document.body.classList.add("invoice-print-preview-open");
 
     function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        onClose();
-      }
+      if (event.key === "Escape") onCloseRef.current();
     }
+
+    const lifecycle = createInvoicePrintLifecycle(window, {
+      onPrintRequested: () => {
+        setIsPrinting(true);
+        setPrintError("");
+      },
+      onPrintCompleted: () => {
+        setIsPrinting(false);
+        onCloseRef.current();
+      },
+      onPrintError: () => {
+        setIsPrinting(false);
+        setPrintError("Impossible de lancer l'impression. Veuillez réessayer.");
+      },
+    });
+    printLifecycleRef.current = lifecycle;
 
     document.addEventListener("keydown", closeOnEscape);
     return () => {
+      lifecycle.dispose();
+      printLifecycleRef.current = null;
       document.body.classList.remove("invoice-print-preview-open");
       document.removeEventListener("keydown", closeOnEscape);
     };
-  }, [onClose]);
+  }, []);
 
   function handlePrint() {
-    // Deux frames garantissent que le ticket et son code-barres sont peints avant
-    // l'ouverture du dialogue natif, notamment sur les navigateurs Android.
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => window.print());
-    });
+    printLifecycleRef.current?.start();
   }
 
   return createPortal(
@@ -557,7 +582,12 @@ function InvoicePrintPreview({
         </div>
 
         <footer className="invoice-preview-controls flex justify-end border-t border-slate-200 p-4">
-          <Button type="button" onClick={handlePrint}>Imprimer ce ticket</Button>
+          <div className="flex flex-col items-end gap-2">
+            {printError && <p className="text-sm font-semibold text-red-700">{printError}</p>}
+            <Button type="button" onClick={handlePrint} disabled={isPrinting}>
+              {isPrinting ? "Impression en cours..." : "Imprimer ce ticket"}
+            </Button>
+          </div>
         </footer>
       </section>
     </div>,
