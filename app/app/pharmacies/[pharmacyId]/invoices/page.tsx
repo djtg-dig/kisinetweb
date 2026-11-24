@@ -500,17 +500,11 @@ function InvoicePrintPreview({
   data: PrintReceiptData;
   onClose: () => void;
 }) {
-  const [isPrinting, setIsPrinting] = useState(false);
-  const [printError, setPrintError] = useState("");
-  const printInProgressRef = useRef(false);
-  const animationFrameIdsRef = useRef<number[]>([]);
-  const cleanupPrintListenersRef = useRef<() => void>(() => undefined);
-
   useEffect(() => {
     document.body.classList.add("invoice-print-preview-open");
 
     function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape" && !printInProgressRef.current) {
+      if (event.key === "Escape") {
         onClose();
       }
     }
@@ -519,87 +513,15 @@ function InvoicePrintPreview({
     return () => {
       document.body.classList.remove("invoice-print-preview-open");
       document.removeEventListener("keydown", closeOnEscape);
-      animationFrameIdsRef.current.forEach((frameId) => window.cancelAnimationFrame(frameId));
-      cleanupPrintListenersRef.current();
     };
   }, [onClose]);
 
-  function clearPrintListeners() {
-    cleanupPrintListenersRef.current();
-    cleanupPrintListenersRef.current = () => undefined;
-  }
-
-  function closeAfterPrint() {
-    if (!printInProgressRef.current) {
-      return;
-    }
-
-    printInProgressRef.current = false;
-    clearPrintListeners();
-    onClose();
-  }
-
-  function handlePrintError() {
-    printInProgressRef.current = false;
-    clearPrintListeners();
-    setIsPrinting(false);
-    setPrintError("Impossible de lancer l'impression. Veuillez réessayer.");
-  }
-
   function handlePrint() {
-    if (printInProgressRef.current) {
-      return;
-    }
-
-    printInProgressRef.current = true;
-    setIsPrinting(true);
-    setPrintError("");
-
-    const afterPrint = () => closeAfterPrint();
-    const printMediaQuery = window.matchMedia?.("print");
-    let printMediaWasActive = false;
-    const handlePrintMediaChange = (event: MediaQueryListEvent) => {
-      if (event.matches) {
-        printMediaWasActive = true;
-      } else if (printMediaWasActive) {
-        closeAfterPrint();
-      }
-    };
-
-    window.addEventListener("afterprint", afterPrint);
-    if (printMediaQuery) {
-      if (typeof printMediaQuery.addEventListener === "function") {
-        printMediaQuery.addEventListener("change", handlePrintMediaChange);
-      } else {
-        printMediaQuery.addListener(handlePrintMediaChange);
-      }
-    }
-
-    cleanupPrintListenersRef.current = () => {
-      window.removeEventListener("afterprint", afterPrint);
-      if (!printMediaQuery) {
-        return;
-      }
-      if (typeof printMediaQuery.removeEventListener === "function") {
-        printMediaQuery.removeEventListener("change", handlePrintMediaChange);
-      } else {
-        printMediaQuery.removeListener(handlePrintMediaChange);
-      }
-    };
-
     // Deux frames garantissent que le ticket et son code-barres sont peints avant
     // l'ouverture du dialogue natif, notamment sur les navigateurs Android.
-    const firstFrame = window.requestAnimationFrame(() => {
-      const secondFrame = window.requestAnimationFrame(() => {
-        try {
-          window.print();
-        } catch {
-          handlePrintError();
-        }
-      });
-      animationFrameIdsRef.current = [secondFrame];
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => window.print());
     });
-    animationFrameIdsRef.current = [firstFrame];
   }
 
   return createPortal(
@@ -608,8 +530,7 @@ function InvoicePrintPreview({
         type="button"
         className="invoice-preview-backdrop absolute inset-0 bg-black/50"
         aria-label="Fermer l'aperçu d'impression"
-        disabled={isPrinting}
-        onClick={() => !isPrinting && onClose()}
+        onClick={onClose}
       />
       <section
         className="invoice-preview-panel relative flex max-h-[calc(100vh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl sm:max-h-[calc(100vh-3rem)]"
@@ -624,8 +545,7 @@ function InvoicePrintPreview({
           </div>
           <button
             type="button"
-            onClick={() => !isPrinting && onClose()}
-            disabled={isPrinting}
+            onClick={onClose}
             className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
           >
             Fermer
@@ -637,12 +557,7 @@ function InvoicePrintPreview({
         </div>
 
         <footer className="invoice-preview-controls flex justify-end border-t border-slate-200 p-4">
-          <div className="flex flex-col items-end gap-2">
-            {printError && <p className="text-sm font-semibold text-red-700">{printError}</p>}
-            <Button type="button" onClick={handlePrint} disabled={isPrinting}>
-              {isPrinting ? "Impression en cours..." : "Imprimer ce ticket"}
-            </Button>
-          </div>
+          <Button type="button" onClick={handlePrint}>Imprimer ce ticket</Button>
         </footer>
       </section>
     </div>,
