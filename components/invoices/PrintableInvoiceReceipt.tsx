@@ -77,7 +77,7 @@ function BarcodeForPrint({ value }: { value: string }) {
       JsBarcode(svgRef.current, value, {
         format: "CODE128",
         width: 1.5,
-        height: 40,
+        height: 36,
         displayValue: false,
         margin: 0,
         marginTop: 0,
@@ -121,20 +121,20 @@ export function InvoiceReceiptTicket({ data }: { data: PrintReceiptData }) {
   const ticketStyle: CSSProperties = is58mm
     ? {
         width: "54mm",
-        padding: "2mm 1mm",
+        padding: "0.75mm",
         fontFamily: "Arial, Helvetica, sans-serif",
         fontSize: "8.5px",
-        lineHeight: "1.18",
+        lineHeight: "1.15",
         background: "#fff",
         color: "#000",
         boxSizing: "border-box",
       }
     : {
         width: "76mm",
-        padding: "3mm 2mm",
+        padding: "1mm 1.5mm",
         fontFamily: "Arial, Helvetica, sans-serif",
         fontSize: "9.5px",
-        lineHeight: "1.25",
+        lineHeight: "1.2",
         background: "#fff",
         color: "#000",
         boxSizing: "border-box",
@@ -142,21 +142,21 @@ export function InvoiceReceiptTicket({ data }: { data: PrintReceiptData }) {
 
   const dividerStyle: CSSProperties = {
     borderTop: "1px dashed #000",
-    margin: is58mm ? "1.5mm 0" : "2mm 0",
+    margin: is58mm ? "0.5mm 0" : "0.75mm 0",
   };
 
   const labelStyle: CSSProperties = {
     fontSize: is58mm ? "7.5px" : "8.5px",
     color: "#555",
-    marginBottom: is58mm ? "1mm" : "1.5mm",
+    marginBottom: is58mm ? "0.5mm" : "0.75mm",
   };
 
   const rowStyle: CSSProperties = {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: is58mm ? "1.5mm" : "2mm",
-    gap: "2mm",
+    marginBottom: is58mm ? "0.45mm" : "0.6mm",
+    gap: is58mm ? "1.5mm" : "2mm",
   };
 
   const productNameStyle: CSSProperties = {
@@ -168,9 +168,9 @@ export function InvoiceReceiptTicket({ data }: { data: PrintReceiptData }) {
   const customerRowStyle: CSSProperties = {
     display: "grid",
     gridTemplateColumns: "max-content minmax(0, 1fr)",
-    columnGap: "2mm",
+    columnGap: is58mm ? "1.5mm" : "2mm",
     alignItems: "start",
-    marginBottom: is58mm ? "1.5mm" : "2mm",
+    marginBottom: is58mm ? "0.45mm" : "0.6mm",
   };
 
   const customerValueStyle: CSSProperties = {
@@ -194,15 +194,28 @@ export function InvoiceReceiptTicket({ data }: { data: PrintReceiptData }) {
   const totalRowStyle: CSSProperties = {
     display: "grid",
     gridTemplateColumns: "minmax(0, 1fr) max-content",
-    columnGap: "3mm",
+    columnGap: is58mm ? "1.5mm" : "2mm",
     alignItems: "baseline",
-    marginBottom: is58mm ? "1mm" : "1.5mm",
+    marginBottom: is58mm ? "0.4mm" : "0.6mm",
+  };
+
+  const lastTotalRowStyle: CSSProperties = {
+    ...totalRowStyle,
+    marginBottom: 0,
+  };
+
+  const productCalculationStyle: CSSProperties = {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) max-content",
+    columnGap: is58mm ? "1.5mm" : "2mm",
+    alignItems: "baseline",
+    marginTop: 0,
   };
 
   const grandTotalStyle: CSSProperties = {
     display: "grid",
     gridTemplateColumns: "minmax(0, 1fr) max-content",
-    columnGap: "3mm",
+    columnGap: is58mm ? "1.5mm" : "2mm",
     alignItems: "baseline",
     fontWeight: "bold",
     fontSize: is58mm ? "11px" : "12px",
@@ -212,7 +225,7 @@ export function InvoiceReceiptTicket({ data }: { data: PrintReceiptData }) {
 
   return (
     <div className={`invoice-receipt ${paperClass}`} style={ticketStyle}>
-      <div style={{ textAlign: "center", marginBottom: is58mm ? "2mm" : "3mm" }}>
+      <div style={{ textAlign: "center", marginBottom: is58mm ? "0.75mm" : "1mm" }}>
         {pharmacyHeader.showLabel && (
           <div style={{ fontSize: is58mm ? "8px" : "9px", fontWeight: "bold", letterSpacing: "0.2mm" }}>
             PHARMACIE
@@ -221,14 +234,14 @@ export function InvoiceReceiptTicket({ data }: { data: PrintReceiptData }) {
         <div style={{ fontWeight: "bold", fontSize: is58mm ? "11px" : "13px", marginTop: pharmacyHeader.showLabel ? "0.5mm" : 0 }}>
           {pharmacyHeader.name}
         </div>
-        <div style={{ fontWeight: "bold", marginTop: is58mm ? "1.5mm" : "2mm", fontSize: is58mm ? "9px" : "11px" }}>
+        <div style={{ fontWeight: "bold", marginTop: is58mm ? "0.5mm" : "0.75mm", fontSize: is58mm ? "9px" : "11px" }}>
           FACTURE
         </div>
       </div>
 
       <div style={dividerStyle} />
 
-      <div style={{ marginBottom: is58mm ? "2mm" : "2.5mm" }}>
+      <div style={{ marginBottom: is58mm ? "0.5mm" : "0.75mm" }}>
         <div style={rowStyle}>
           <span>Réf :</span>
           <span style={{ fontWeight: "bold", textAlign: "right" }}>{data.invoice.reference}</span>
@@ -275,9 +288,19 @@ export function InvoiceReceiptTicket({ data }: { data: PrintReceiptData }) {
 
       <div>
         {data.invoice.items.map((item, index) => (
-          <div key={index} style={{ marginBottom: is58mm ? "2mm" : "2.5mm" }}>
+          <div
+            key={index}
+            style={{
+              marginBottom:
+                index === data.invoice.items.length - 1
+                  ? 0
+                  : is58mm
+                    ? "0.7mm"
+                    : "1mm",
+            }}
+          >
             <div style={productNameStyle}>{item.productName}</div>
-            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) max-content", columnGap: "3mm", alignItems: "baseline", marginTop: "0.5mm" }}>
+            <div style={productCalculationStyle}>
               <span style={productQtyStyle}>
                 {item.quantity} x {formatMoney(item.unitPrice, currencyCode)}
               </span>
@@ -308,12 +331,12 @@ export function InvoiceReceiptTicket({ data }: { data: PrintReceiptData }) {
           <span>Payé</span>
           <span>{formatMoney(data.invoice.paidAmount, currencyCode)}</span>
         </div>
-        <div style={totalRowStyle}>
+        <div style={data.invoice.changeAmount > 0 ? totalRowStyle : lastTotalRowStyle}>
           <span>Reste à payer</span>
           <span>{formatMoney(remainingAmount, currencyCode)}</span>
         </div>
         {data.invoice.changeAmount > 0 && (
-          <div style={totalRowStyle}>
+          <div style={lastTotalRowStyle}>
             <span>Monnaie</span>
             <span>{formatMoney(data.invoice.changeAmount, currencyCode)}</span>
           </div>
@@ -322,13 +345,13 @@ export function InvoiceReceiptTicket({ data }: { data: PrintReceiptData }) {
 
       <div style={dividerStyle} />
 
-      <div style={{ textAlign: "center", marginBottom: is58mm ? "2mm" : "2.5mm" }}>
+      <div style={{ textAlign: "center", marginBottom: is58mm ? "0.75mm" : "1mm" }}>
         <BarcodeForPrint value={data.invoice.reference} />
         <div style={{
           fontSize: is58mm ? "8px" : "9px",
           fontFamily: "monospace",
-          marginTop: "1mm",
-          letterSpacing: "0.3mm",
+          marginTop: "0.4mm",
+          letterSpacing: "0.2mm",
         }}>
           {data.invoice.reference}
         </div>
